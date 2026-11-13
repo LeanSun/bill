@@ -1867,6 +1867,7 @@
     if (main) main.classList.toggle('is-calendar', view === 'calendar');
     if ($('pageTitle')) $('pageTitle').textContent = VIEW_META[view][0];
     if ($('pageSub')) $('pageSub').textContent = VIEW_META[view][1];
+    writeRoute(view, false);
     if (view === 'calendar') renderBoard();
     requestAnimationFrame(function () {
       /* 日历在 rAF 里再排一次：此时视图已可见，格子高度才是真值，
@@ -1876,6 +1877,39 @@
       renderCharts(view);
     });
   }
+  /* ---------------- 路由 ----------------
+     GitHub Pages 是纯静态托管，没有服务端重写，所以走 hash 路由：
+     #/home  #/calendar  #/analysis 都能直接分享、刷新、前进后退。 */
+  var ROUTE_ALIAS = {
+    home: 'overview', overview: 'overview', index: 'overview',
+    calendar: 'calendar', week: 'calendar', month: 'calendar', year: 'calendar',
+    analysis: 'analysis', stats: 'analysis', trend: 'analysis'
+  };
+  var ROUTE_CANON = { overview: 'home', calendar: 'calendar', analysis: 'analysis' };
+
+  function parseRoute() {
+    var h = String(location.hash || '').replace(/^#\/?/, '');
+    h = h.split('?')[0].split('/')[0].toLowerCase();
+    return ROUTE_ALIAS[h] || '';
+  }
+  function writeRoute(view, replace) {
+    var target = '#/' + (ROUTE_CANON[view] || view);
+    if (location.hash === target) return;
+    if (!location.hash) replace = true;
+    try {
+      if (replace) history.replaceState(null, '', target);
+      else history.pushState(null, '', target);
+    } catch (e) { location.hash = target; }
+  }
+  function bindRoute() {
+    function sync() {
+      var v = parseRoute();
+      if (v && v !== state.view) setView(v);
+    }
+    window.addEventListener('hashchange', sync);
+    window.addEventListener('popstate', sync);
+  }
+
   function bindSeg(el, attr, handler) {
     if (!el) return;
     var btns = Array.prototype.slice.call(el.querySelectorAll('button[' + attr + ']'));
@@ -2631,6 +2665,12 @@
     bindDatePicker();
     setSegActive($('scaleSeg'), 'data-scale', state.scale);
     renderAll();
+
+    /* 深链优先：地址栏带 #/calendar 就直接开到日历，否则补上 #/home */
+    var initialRoute = parseRoute();
+    bindRoute();
+    if (initialRoute && initialRoute !== state.view) setView(initialRoute);
+    else writeRoute(state.view, true);
 
     if (!hasEcharts) toast('ECharts 未加载，图表不可用', 'warn');
     requestAnimationFrame(function () {
