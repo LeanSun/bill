@@ -152,6 +152,8 @@
   };
 
   var charts = {};
+  /* 状态每次落盘后的回调，云同步层（assets/sync.js）靠它知道"本地改了" */
+  var STORE_HOOKS = [];
   var lastFocused = null;
   var lastTrendRows = [], lastBalanceRows = [], lastStackRows = [], lastTopRows = [], lastSideTrendRows = [];
   var VIEW_META = {
@@ -304,6 +306,9 @@
   }
   function saveStore() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state.store)); } catch (e) { /* 隐私模式下静默 */ }
+    for (var i = 0; i < STORE_HOOKS.length; i++) {
+      try { STORE_HOOKS[i](); } catch (e) { /* 通知失败不能拖垮记账 */ }
+    }
   }
   function canonNote(n) {
     var s = String(n || '').trim();
@@ -2680,6 +2685,35 @@
       }, 420);
     });
   }
+
+  /* ---------------- 对外挂钩（assets/sync.js 用） ----------------
+     同步层不碰内部结构，只通过这几个方法读一份快照、灌一份快照。 */
+  window.QZ = {
+    getStore: function () {
+      return {
+        added: state.store.added,
+        edited: state.store.edited,
+        deleted: state.store.deleted,
+        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+      };
+    },
+    setStore: function (s) {
+      s = s || {};
+      state.store = {
+        added: Array.isArray(s.added) ? s.added : [],
+        edited: (s.edited && typeof s.edited === 'object' && !Array.isArray(s.edited)) ? s.edited : {},
+        deleted: Array.isArray(s.deleted) ? s.deleted : []
+      };
+      saveStore();
+      renderAll();
+    },
+    theme: function () {
+      return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    },
+    setTheme: function (t) { if (t === 'dark' || t === 'light') setTheme(t); },
+    onStoreChange: function (fn) { if (typeof fn === 'function') STORE_HOOKS.push(fn); },
+    toast: toast
+  };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

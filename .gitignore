@@ -3,3 +3,7 @@ Thumbs.db
 desktop.ini
 *.log
 
+# 后端运行时数据：口令、密钥、状态、备份，一律不进仓库
+server/data/
+.env
+node_modules/

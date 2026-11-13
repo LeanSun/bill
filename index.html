@@ -67,6 +67,7 @@
 
     <div class="side-foot">
       <p>数据源 · 2024后账单.xlsx<br>2025账单.xlsx · 2026账单.xlsx</p>
+      <button type="button" class="link-btn" id="syncBtn">云同步</button>
       <button type="button" class="link-btn" id="resetBtn">恢复初始数据</button>
     </div>
   </aside>
@@ -459,10 +460,66 @@
   </div>
 </div>
 
+<!-- ============ 云同步 ============ -->
+<div class="sync-mask" id="syncMask" hidden>
+  <div class="sync-card" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
+    <header class="sync-head">
+      <div>
+        <h3 id="syncTitle">云同步</h3>
+        <p>多设备共用一份账。数据存在你自己的服务器上。</p>
+      </div>
+      <button type="button" class="icon-btn" id="syncClose" aria-label="关闭云同步设置">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+
+    <div class="sync-body">
+      <label class="sync-field">
+        <span>服务器地址</span>
+        <input type="url" id="syncUrl" placeholder="https://ledger.example.com" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="sync-field">
+        <span>访问口令</span>
+        <input type="password" id="syncPw" placeholder="服务器首次启动时生成的那串口令" autocomplete="current-password">
+      </label>
+
+      <div class="sync-actions">
+        <button type="button" class="btn btn-primary" id="syncConnect">连接并同步</button>
+        <button type="button" class="btn btn-ghost" id="syncNow" disabled>立即同步</button>
+        <button type="button" class="btn btn-ghost" id="syncDisconnect" disabled>断开</button>
+      </div>
+
+      <div class="sync-line">
+        <span class="sync-dot" id="syncDot"></span>
+        <b class="sync-status" id="syncStatus">未连接</b>
+      </div>
+      <p class="sync-meta" id="syncMeta">—</p>
+
+      <div class="sync-conflict" id="syncConflict" hidden>
+        <p><b>两边都改过了。</b>选一份保留，另一份会被覆盖。</p>
+        <div class="sync-actions">
+          <button type="button" class="btn btn-ghost" id="syncKeepServer">用服务器版本</button>
+          <button type="button" class="btn btn-danger" id="syncKeepLocal">用本地版本</button>
+        </div>
+      </div>
+
+      <div class="sync-backup">
+        <h4>备份</h4>
+        <p>导出的是服务器上的完整数据。导入会整份替换服务器内容，替换前旧版自动留在 <code>server/data/backups</code>。</p>
+        <div class="sync-actions">
+          <button type="button" class="btn btn-ghost" id="syncExport">导出备份</button>
+          <label class="btn btn-ghost sync-file">导入备份<input type="file" id="syncImport" accept="application/json,.json" hidden></label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
 <script src="assets/echarts.min.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/sync.js"></script>
 </body>
 </html>
