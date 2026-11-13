@@ -237,6 +237,15 @@ html[data-theme="dark"] .topbar { background: #0d121c; }
 .icon-btn:hover { transform: translateY(-2px); color: var(--primary); border-color: var(--primary); }
 .icon-btn svg { width: 17px; height: 17px; }
 .ico-moon { display: none; }
+/* 云同步的窄屏入口：桌面走侧栏脚部，≤940px 侧栏脚部隐藏，改由顶栏图标顶上 */
+.sync-mobile-btn { display: none; }
+/* 已连接时给个绿点常驻提醒 */
+.sync-mobile-btn.is-on { color: var(--primary); border-color: var(--primary); }
+.sync-mobile-btn.is-on::after {
+  content: ""; position: absolute; top: 6px; right: 6px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--income); box-shadow: 0 0 0 2px var(--surface);
+}
 html[data-theme="dark"] .ico-sun { display: none; }
 html[data-theme="dark"] .ico-moon { display: block; }
 
@@ -1005,6 +1014,7 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .nav-item { width: auto; padding: 8px 12px; }
   .nav-ind { display: none; }
   .side-block, .side-foot { display: none; }
+  .sync-mobile-btn { display: grid; }
   .main { padding: 0 18px 48px; }
   .chart-grid { grid-template-columns: 1fr; }
   .chart-card.span-2 { grid-column: span 1; }

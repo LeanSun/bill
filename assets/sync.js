@@ -367,6 +367,9 @@
     el.className = 'sync-status' + (kind ? ' is-' + kind : '');
     var dot = $('syncDot');
     if (dot) dot.className = 'sync-dot' + (kind === 'warn' ? ' is-warn' : (connected() ? ' is-on' : ''));
+    /* 窄屏顶栏图标同步状态：连接后挂绿点 */
+    var mb = $('syncBtnM');
+    if (mb) mb.classList.toggle('is-on', connected());
   }
 
   function refreshMeta() {
@@ -669,8 +672,9 @@
     var q = api();
     if (q && typeof q.onStoreChange === 'function') q.onStoreChange(onLocalChange);
 
-    var openBtn = $('syncBtn');
-    if (openBtn) openBtn.addEventListener('click', open);
+    /* 两个入口：侧栏「云同步」+ 窄屏顶栏图标（手机侧栏脚部被隐藏） */
+    var openBtns = document.querySelectorAll('#syncBtn, #syncBtnM');
+    for (var bi = 0; bi < openBtns.length; bi++) openBtns[bi].addEventListener('click', open);
     var closeBtn = $('syncClose');
     if (closeBtn) closeBtn.addEventListener('click', close);
     var mask = $('syncMask');
