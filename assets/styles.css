@@ -1150,3 +1150,34 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 @media (max-width: 620px) {
   .sync-card { width: calc(100vw - 18px); max-height: 88vh; }
 }
+
+/* ---------------- 云同步 · 两种后端 ---------------- */
+.sync-seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+  padding: 3px; border-radius: 11px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.sync-seg-btn {
+  appearance: none; border: 0; cursor: pointer;
+  padding: 7px 9px; border-radius: 8px;
+  font-family: var(--font); font-size: 12px; font-weight: 600;
+  color: var(--muted); background: transparent;
+  transition: background-color .18s var(--ease), color .18s var(--ease), box-shadow .18s var(--ease);
+}
+.sync-seg-btn:hover { color: var(--text-2); }
+.sync-seg-btn.is-on {
+  color: var(--text); background: var(--surface);
+  box-shadow: 0 1px 2px rgba(9, 14, 24, .1), 0 0 0 1px var(--border);
+}
+.sync-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.sync-hint {
+  margin: -2px 0 0; font-size: 11px; line-height: 1.65; color: var(--muted);
+}
+.sync-hint code {
+  font-size: 10.5px; padding: 1px 4px; border-radius: 4px; background: var(--surface-3);
+}
+.sync-card[data-sync-mode="github"] .sync-only-http { display: none; }
+.sync-card[data-sync-mode="http"] .sync-only-github { display: none; }
+@media (max-width: 420px) {
+  .sync-row { grid-template-columns: 1fr; }
+}

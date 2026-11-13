@@ -462,11 +462,11 @@
 
 <!-- ============ 云同步 ============ -->
 <div class="sync-mask" id="syncMask" hidden>
-  <div class="sync-card" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
+  <div class="sync-card" id="syncCard" data-sync-mode="github" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
     <header class="sync-head">
       <div>
         <h3 id="syncTitle">云同步</h3>
-        <p>多设备共用一份账。数据存在你自己的服务器上。</p>
+        <p>多设备共用一份账。数据只存在你自己的私有仓库 / 服务器里。</p>
       </div>
       <button type="button" class="icon-btn" id="syncClose" aria-label="关闭云同步设置">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -474,14 +474,41 @@
     </header>
 
     <div class="sync-body">
-      <label class="sync-field">
+      <div class="sync-seg" role="tablist" aria-label="存储方式">
+        <button type="button" class="sync-seg-btn is-on" data-mode="github" role="tab" aria-selected="true">GitHub 私有仓库</button>
+        <button type="button" class="sync-seg-btn" data-mode="http" role="tab" aria-selected="false">自建服务器</button>
+      </div>
+
+      <label class="sync-field sync-only-github">
+        <span>私有仓库</span>
+        <input type="text" id="syncRepo" placeholder="LeanSun/bill-data" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="sync-row sync-only-github">
+        <label class="sync-field">
+          <span>分支</span>
+          <input type="text" id="syncBranch" value="main" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="sync-field">
+          <span>文件</span>
+          <input type="text" id="syncPath" value="state.json" autocomplete="off" spellcheck="false">
+        </label>
+      </div>
+
+      <label class="sync-field sync-only-http">
         <span>服务器地址</span>
         <input type="url" id="syncUrl" placeholder="https://ledger.example.com" autocomplete="off" spellcheck="false">
       </label>
+
       <label class="sync-field">
-        <span>访问口令</span>
-        <input type="password" id="syncPw" placeholder="服务器首次启动时生成的那串口令" autocomplete="current-password">
+        <span id="syncPwLabel">访问令牌</span>
+        <input type="password" id="syncPw" placeholder="github_pat_… （只给这一个仓库的 Contents 读写）" autocomplete="current-password">
       </label>
+
+      <p class="sync-hint sync-only-github">
+        令牌在 GitHub → Settings → Developer settings → Fine-grained tokens 建，
+        <b>只选这一个仓库</b>，权限只给 <code>Contents: Read and write</code>。
+        令牌存在本机浏览器里，不上传任何地方。
+      </p>
 
       <div class="sync-actions">
         <button type="button" class="btn btn-primary" id="syncConnect">连接并同步</button>
@@ -498,14 +525,15 @@
       <div class="sync-conflict" id="syncConflict" hidden>
         <p><b>两边都改过了。</b>选一份保留，另一份会被覆盖。</p>
         <div class="sync-actions">
-          <button type="button" class="btn btn-ghost" id="syncKeepServer">用服务器版本</button>
+          <button type="button" class="btn btn-ghost" id="syncKeepServer">用云端版本</button>
           <button type="button" class="btn btn-danger" id="syncKeepLocal">用本地版本</button>
         </div>
       </div>
 
       <div class="sync-backup">
         <h4>备份</h4>
-        <p>导出的是服务器上的完整数据。导入会整份替换服务器内容，替换前旧版自动留在 <code>server/data/backups</code>。</p>
+        <p class="sync-only-github">导出的是云端 <code>state.json</code> 的当前内容。导入会整份替换，旧版仍留在 git 历史里，随时能翻回来。</p>
+        <p class="sync-only-http">导出的是服务器上的完整数据。导入会整份替换服务器内容，替换前旧版自动留在 <code>server/data/backups</code>。</p>
         <div class="sync-actions">
           <button type="button" class="btn btn-ghost" id="syncExport">导出备份</button>
           <label class="btn btn-ghost sync-file">导入备份<input type="file" id="syncImport" accept="application/json,.json" hidden></label>
