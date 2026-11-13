@@ -235,6 +235,11 @@ function corsHeaders(req) {
     h['Access-Control-Allow-Headers'] = 'authorization,content-type';
     h['Access-Control-Allow-Methods'] = 'GET,PUT,POST,OPTIONS';
     h['Access-Control-Max-Age'] = '600';
+    /* 公网 https 页面（GitHub Pages）回连本机 127.0.0.1 时，Chrome 的
+       Private Network Access 会带这个预检头，不回它请求会被拦下。 */
+    if (req.headers['access-control-request-private-network'] === 'true') {
+      h['Access-Control-Allow-Private-Network'] = 'true';
+    }
   }
   return h;
 }
@@ -479,6 +484,15 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log('[ledger] 已启动 http://' + (HOST === '0.0.0.0' ? '127.0.0.1' : HOST) + ':' + PORT);
+  /* 手机 / 平板同一个 Wi-Fi 下的入口：把本机内网地址都列出来 */
+  if (HOST === '0.0.0.0') {
+    const ifs = require('node:os').networkInterfaces();
+    for (const name of Object.keys(ifs)) {
+      for (const a of ifs[name] || []) {
+        if (a.family === 'IPv4' && !a.internal) console.log('[ledger] 局域网 http://' + a.address + ':' + PORT);
+      }
+    }
+  }
   console.log('[ledger] 数据目录 ' + DATA_DIR + ' · 当前 rev ' + STATE.rev);
   console.log('[ledger] 允许来源 ' + (ORIGINS.join(', ') || '(无)'));
 });
