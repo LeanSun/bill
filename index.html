@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="轻账 — 个人收支看板，基于 2024 — 2026 账单明细，含统计图表与记账管理。">
+<meta name="theme-color" content="#f5f7fa">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%234a6cf7'/%3E%3Crect x='8' y='21' width='6' height='12' rx='2.5' fill='white' opacity='.55'/%3E%3Crect x='17' y='13' width='6' height='20' rx='2.5' fill='white' opacity='.8'/%3E%3Crect x='26' y='7' width='6' height='26' rx='2.5' fill='white'/%3E%3C/svg%3E">
+<title>轻账 · 收支看板</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="boot-veil" id="bootVeil" aria-hidden="true">
+  <div class="boot-inner">
+    <div class="boot-mark">
+      <svg viewBox="0 0 40 40" fill="none"><rect x="7" y="20" width="6" height="13" rx="2.5" fill="currentColor" opacity=".55"/><rect x="17" y="12" width="6" height="21" rx="2.5" fill="currentColor" opacity=".8"/><rect x="27" y="6" width="6" height="27" rx="2.5" fill="currentColor"/></svg>
+    </div>
+    <div class="boot-name">轻账</div>
+    <div class="boot-bar"><i></i></div>
+  </div>
+</div>
+
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" fill="none"><rect x="7" y="20" width="6" height="13" rx="2.5" fill="currentColor" opacity=".55"/><rect x="17" y="12" width="6" height="21" rx="2.5" fill="currentColor" opacity=".8"/><rect x="27" y="6" width="6" height="27" rx="2.5" fill="currentColor"/></svg>
+      </div>
+      <div class="brand-text"><strong>轻账</strong><span>LEDGER · 收支看板</span></div>
+    </div>
+
+    <nav class="nav" aria-label="主导航">
+      <button type="button" class="nav-item is-active" data-view="overview">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span>总览</span><i class="nav-ind"></i>
+      </button>
+      <button type="button" class="nav-item" data-view="calendar">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8.5" cy="14.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="17.5" r="1.3" fill="currentColor"/></svg>
+        <span>日历</span><i class="nav-ind"></i>
+      </button>
+      <button type="button" class="nav-item" data-view="analysis">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>分析</span><i class="nav-ind"></i>
+      </button>
+    </nav>
+
+    <div class="side-block">
+      <div class="side-label">统计年度</div>
+      <div class="seg" id="yearSwitch" style="--seg-n:4" role="group" aria-label="统计年度">
+        <span class="seg-ind" aria-hidden="true"></span>
+        <button type="button" data-year="2024">2024</button>
+        <button type="button" data-year="2025">2025</button>
+        <button type="button" data-year="2026">2026</button>
+        <button type="button" data-year="all" class="is-active">全部</button>
+      </div>
+    </div>
+
+    <div class="side-block side-stats">
+      <div class="side-label">数据概览</div>
+      <div class="side-stat"><span>账单笔数</span><b id="sideCount">—</b></div>
+      <div class="side-stat"><span>覆盖区间</span><b id="sideRange">—</b></div>
+      <div class="side-stat"><span>分类维度</span><b id="sideDims">5 类 · 35 子类</b></div>
+      <div class="side-stat"><span>本地修改</span><b id="sideLocal">0 笔</b></div>
+    </div>
+
+    <div class="side-foot">
+      <p>数据源 · 2024后账单.xlsx<br>2025账单.xlsx · 2026账单.xlsx</p>
+      <button type="button" class="link-btn" id="resetBtn">恢复初始数据</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="pageTitle">总览</h1>
+        <p id="pageSub">把每一笔收支，摊开来看。</p>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-chip" id="periodChip">—</span>
+        <button type="button" class="icon-btn" id="themeBtn" aria-label="切换深浅色主题" title="切换主题">
+          <svg class="ico-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <svg class="ico-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5 8.6 8.6 0 1 0 20.5 14.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="btn btn-primary" id="addBtn">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          记一笔
+        </button>
+      </div>
+    </header>
+
+    <div class="views">
+
+      <!-- ============ 总览 ============ -->
+      <section class="view is-active" id="view-overview" aria-label="总览">
+        <div class="card stat-strip" style="--i:0" role="group" aria-label="收支总览">
+          <button type="button" class="stat-cell" data-jump="income" style="--accent:var(--income)" aria-label="查看全部收入记录">
+            <span class="sc-top">
+              <span class="sc-label">总收入</span>
+              <b class="sc-delta" id="deltaIncome">—</b>
+            </span>
+            <span class="sc-value pos" id="kpiIncome" data-value="0">¥0</span>
+            <span class="sc-chart"><svg class="sc-spark" id="sparkIncome" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"></svg></span>
+            <span class="sc-foot">
+              <i class="sc-note" id="kpiIncomeSub">月均 ¥0</i>
+              <i class="sc-note" id="kpiIncomeSub2">0 笔</i>
+            </span>
+          </button>
+          <button type="button" class="stat-cell" data-jump="expense" style="--accent:var(--expense)" aria-label="查看全部支出记录">
+            <span class="sc-top">
+              <span class="sc-label">总支出</span>
+              <b class="sc-delta" id="deltaExpense">—</b>
+            </span>
+            <span class="sc-value neg" id="kpiExpense" data-value="0">¥0</span>
+            <span class="sc-chart"><svg class="sc-spark" id="sparkExpense" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"></svg></span>
+            <span class="sc-foot">
+              <i class="sc-note" id="kpiExpenseSub">日均 ¥0</i>
+              <i class="sc-note" id="kpiExpenseSub2">0 笔</i>
+            </span>
+          </button>
+          <button type="button" class="stat-cell" data-jump="balance" style="--accent:var(--primary)" aria-label="查看全部记录">
+            <span class="sc-top">
+              <span class="sc-label">净结余</span>
+              <b class="sc-delta" id="deltaBalance">—</b>
+            </span>
+            <span class="sc-value" id="kpiBalance" data-value="0">¥0</span>
+            <span class="sc-chart"><svg class="sc-spark" id="sparkBalance" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"></svg></span>
+            <span class="sc-foot">
+              <i class="sc-note" id="kpiBalanceSub">月均 ¥0</i>
+              <i class="sc-note" id="kpiBalanceSub2">占收入 0%</i>
+            </span>
+          </button>
+          <button type="button" class="stat-cell" data-jump="rate" style="--accent:var(--amber)" aria-label="查看年度分析">
+            <span class="sc-top">
+              <span class="sc-label">储蓄率</span>
+              <b class="sc-delta" id="deltaRate">—</b>
+            </span>
+            <span class="sc-value" id="kpiRate" data-value="0">0%</span>
+            <span class="sc-chart">
+              <span class="sc-bar"><i id="rateFill"></i></span>
+              <span class="sc-scale"><i>0</i><i>50%</i><i>100%</i></span>
+            </span>
+            <span class="sc-foot">
+              <i class="sc-note" id="kpiRateSub">结余 / 总收入</i>
+              <i class="sc-note" id="kpiRateSub2">—</i>
+            </span>
+          </button>
+        </div>
+
+        <div class="card stat-mini" style="--i:1" role="group" aria-label="本月速览">
+          <div class="sm-cell">
+            <span class="sm-label" id="mmL1">本月支出</span>
+            <b class="sm-value" id="mmExp">¥0</b>
+            <i class="sm-note" id="mmExpD">较上月 —</i>
+          </div>
+          <div class="sm-cell">
+            <span class="sm-label" id="mmL2">本月结余</span>
+            <b class="sm-value" id="mmBal">¥0</b>
+            <i class="sm-note" id="mmBalD">储蓄率 0%</i>
+          </div>
+          <div class="sm-cell">
+            <span class="sm-label" id="mmL3">日均支出</span>
+            <b class="sm-value" id="mmDaily">¥0</b>
+            <i class="sm-note" id="mmDailyD">本月 · 0 天有账</i>
+          </div>
+          <div class="sm-cell">
+            <span class="sm-label" id="mmL4">单笔均值</span>
+            <b class="sm-value" id="mmAvg">¥0</b>
+            <i class="sm-note" id="mmAvgD">最大 ¥0</i>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <article class="card chart-card span-2" style="--i:4">
+            <div class="card-head">
+              <div><h3>月度收支趋势</h3><p id="trendSub">按自然月汇总</p></div>
+              <div class="seg seg-sm" id="trendScope" role="group" aria-label="趋势范围">
+                <span class="seg-ind" aria-hidden="true"></span>
+                <button type="button" data-scope="both" class="is-active">全部</button>
+                <button type="button" data-scope="expense">支出</button>
+                <button type="button" data-scope="income">收入</button>
+              </div>
+            </div>
+            <div class="chart chart-lg" id="chartTrend"></div>
+          </article>
+
+          <article class="card chart-card" style="--i:5">
+            <div class="card-head"><div><h3>支出构成</h3><p>点击分类跳到日历查看</p></div></div>
+            <div class="chart chart-donut" id="chartDonut"></div>
+          </article>
+
+          <article class="card chart-card" style="--i:6">
+            <div class="card-head"><div><h3>结余变化</h3><p>月度净额与累计结余对照</p></div></div>
+            <div class="chart chart-md" id="chartBalance"></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ 日历 ============ -->
+      <section class="view" id="view-calendar" aria-label="日历">
+        <div class="card cal-toolbar">
+          <div class="ct-nav">
+            <button type="button" class="ct-nav-btn" id="calPrev" aria-label="上一段">
+              <svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="ct-title-wrap">
+              <button type="button" class="ct-title" id="calTitle" aria-haspopup="dialog" aria-expanded="false">
+                <h2 id="calTitleText">2026年 11月</h2>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div class="cal-month-pop" id="calMonthPop" role="dialog" aria-label="选择月份" hidden>
+                <div class="dp-head">
+                  <button type="button" class="dp-nav" id="cmpPrev" aria-label="上一年"><svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <button type="button" class="dp-title" id="cmpTitle">2026年</button>
+                  <button type="button" class="dp-nav" id="cmpNext" aria-label="下一年"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+                <div class="dp-months" id="cmpMonths"></div>
+              </div>
+            </div>
+            <button type="button" class="ct-nav-btn" id="calNext" aria-label="下一段">
+              <svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+
+          <span class="ct-count" id="calSub">0 笔</span>
+
+          <span class="ct-vr" aria-hidden="true"></span>
+
+          <div class="seg seg-sm seg-4" id="scaleSeg" role="group" aria-label="日历粒度">
+            <span class="seg-ind" aria-hidden="true"></span>
+            <button type="button" data-scale="year">年</button>
+            <button type="button" data-scale="month" class="is-active">月</button>
+            <button type="button" data-scale="week">周</button>
+            <button type="button" data-scale="day">天</button>
+          </div>
+
+          <span class="ct-vr" aria-hidden="true"></span>
+
+          <div class="ct-chips">
+            <span class="ct-group" id="catRow" role="group" aria-label="分类筛选"></span>
+            <span class="ct-group" id="subRow" role="group" aria-label="子类筛选"></span>
+            <button type="button" class="chip chip-clear" id="weekdayChip" hidden></button>
+            <button type="button" class="chip chip-clear" id="subChip" hidden></button>
+          </div>
+
+          <div class="ct-right">
+            <div class="search-field">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <input type="search" id="searchInput" placeholder="搜索" autocomplete="off" aria-label="搜索账单">
+            </div>
+            <div class="seg seg-sm" id="typeSeg" role="group" aria-label="收支类型">
+              <span class="seg-ind" aria-hidden="true"></span>
+              <button type="button" data-type="all" class="is-active">全部</button>
+              <button type="button" data-type="expense">支</button>
+              <button type="button" data-type="income">收</button>
+            </div>
+            <button type="button" class="ct-ico" id="resetFilters" aria-label="重置筛选" title="重置筛选">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5v5h5M20 19v-5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 9A7.5 7.5 0 0 0 6.1 6.1L4 10m16 4-2.1 3.9A7.5 7.5 0 0 1 4.8 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="ct-ico" id="exportBtn" aria-label="导出本月" title="导出本月 CSV">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="ct-ico" id="calToday" aria-label="回到今天" title="回到今天">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="card cal-board">
+          <div class="cal-weekhead" id="calWeekHead"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
+          <div class="board-empty" id="boardEmpty" hidden>
+            <strong>这段时间没有匹配的记录</strong><span>换个筛选条件，或点击日历空白格新增一笔。</span>
+            <button type="button" class="btn btn-ghost" id="boardReset">重置筛选</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="cal-week" id="calWeekGrid" hidden></div>
+          <div class="cal-day" id="calDayBoard" hidden></div>
+          <div class="cal-year" id="calYearBoard" hidden></div>
+        </div>
+      </section>
+
+      <!-- ============ 分析 ============ -->
+      <section class="view" id="view-analysis" aria-label="分析">
+        <article class="card annual-card" style="--i:0">
+          <div class="card-head">
+            <div><h3>年度分析</h3><p id="annualSub">2024 — 2026 全年收支总览</p></div>
+            <div class="seg seg-sm" id="annualScope" style="--seg-n:4" role="group" aria-label="分析年度">
+              <span class="seg-ind" aria-hidden="true"></span>
+              <button type="button" data-ay="2024">2024</button>
+              <button type="button" data-ay="2025">2025</button>
+              <button type="button" data-ay="2026" class="is-active">2026</button>
+              <button type="button" data-ay="both" >对比</button>
+            </div>
+          </div>
+          <div class="annual-grid" id="annualGrid"></div>
+        </article>
+
+        <div class="chart-grid">
+          <article class="card chart-card span-2" style="--i:1">
+            <div class="card-head">
+              <div><h3>年度对比</h3><p id="compareSub">2025 与 2026 逐月对照</p></div>
+              <div class="seg seg-sm" id="compareMetric" role="group" aria-label="对比指标">
+                <span class="seg-ind" aria-hidden="true"></span>
+                <button type="button" data-metric="expense" class="is-active">支出</button>
+                <button type="button" data-metric="income">收入</button>
+                <button type="button" data-metric="balance">结余</button>
+              </div>
+            </div>
+            <div class="chart chart-lg" id="chartCompare"></div>
+          </article>
+
+          <article class="card chart-card" style="--i:2">
+            <div class="card-head"><div><h3>分类排行</h3><p>累计支出金额</p></div></div>
+            <div class="chart chart-md" id="chartRank"></div>
+          </article>
+
+          <article class="card chart-card" style="--i:3">
+            <div class="card-head"><div><h3>星期分布</h3><p>按星期汇总的支出</p></div></div>
+            <div class="chart chart-md" id="chartWeekday"></div>
+          </article>
+
+          <article class="card chart-card span-2" style="--i:4">
+            <div class="card-head">
+              <div><h3>消费日历</h3><p id="calendarSub">颜色越深，当日支出越高</p></div>
+              <div class="seg seg-sm" id="calendarYear" role="group" aria-label="日历年份">
+                <span class="seg-ind" aria-hidden="true"></span>
+                <button type="button" data-cy="2024">2024</button>
+                <button type="button" data-cy="2025">2025</button>
+                <button type="button" data-cy="2026" class="is-active">2026</button>
+              </div>
+            </div>
+            <div class="chart chart-calendar" id="chartCalendar"></div>
+          </article>
+
+          <article class="card chart-card span-2" style="--i:5">
+            <div class="card-head"><div><h3>分类走势</h3><p>各类支出的月度堆叠</p></div></div>
+            <div class="chart chart-lg" id="chartStack"></div>
+          </article>
+
+          <article class="card chart-card span-2" style="--i:6">
+            <div class="card-head"><div><h3>高频项目 TOP 10</h3><p>累计金额最高的消费名目</p></div></div>
+            <div class="chart chart-lg" id="chartTop"></div>
+          </article>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ============ 记账弹窗 ============ -->
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <div><h2 id="modalTitle">记一笔</h2><p id="modalDesc">记录一条新的收支流水</p></div>
+      <button type="button" class="icon-btn" id="modalClose" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <form id="entryForm" novalidate>
+      <div class="type-toggle" id="typeToggle" role="group" aria-label="收支类型">
+        <button type="button" data-type="expense" class="is-active">− 支出</button>
+        <button type="button" data-type="income">＋ 收入</button>
+      </div>
+      <label class="field">
+        <span>金额 <em>*</em></span>
+        <div class="amount-input"><i>¥</i><input type="number" id="fAmount" step="0.01" min="0.01" placeholder="0.00" required autocomplete="off"></div>
+      </label>
+      <div class="field-row">
+        <div class="field date-wrap" id="dateWrap">
+          <span>日期 <em>*</em></span>
+          <input type="hidden" id="fDate" value="">
+          <button type="button" class="date-field" id="dateField" aria-haspopup="dialog" aria-expanded="false" aria-label="选择日期">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            <span id="dateDisplay">选择日期</span>
+            <svg class="date-chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="date-pop" id="datePop" role="dialog" aria-label="选择日期" hidden>
+            <div class="dp-head">
+              <button type="button" class="dp-nav" id="dpPrev" aria-label="上一页">
+                <svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <button type="button" class="dp-title" id="dpTitle" aria-label="切换月份选择">2026年 11月</button>
+              <button type="button" class="dp-nav" id="dpNext" aria-label="下一页">
+                <svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+
+            <div class="dp-view" id="dpDays">
+              <div class="dp-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+              <div class="dp-grid" id="dpGrid"></div>
+            </div>
+
+            <div class="dp-view dp-months" id="dpMonths" hidden></div>
+
+            <div class="dp-foot">
+              <button type="button" class="link-btn" id="dpToday">回到今天</button>
+              <button type="button" class="dp-close" id="dpClose">完成</button>
+            </div>
+          </div>
+        </div>
+        <label class="field"><span>分类 <em>*</em></span><select id="fCategory"></select></label>
+      </div>
+      <div class="field-row">
+        <label class="field"><span>子类</span><select id="fSub"></select><i class="field-note" id="fSubNote">留空自动识别</i></label>
+        <label class="field"><span>项目 / 备注</span><input type="text" id="fNote" maxlength="40" placeholder="例如：午餐、房租、工资" autocomplete="off"></label>
+      </div>
+      <p class="form-error" id="formError" hidden></p>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-danger" id="modalDelete" hidden>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          删除
+        </button>
+        <div class="mf-right">
+          <button type="button" class="btn btn-ghost" id="modalCancel">取消</button>
+          <button type="submit" class="btn btn-primary" id="modalSave">保存记录</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ 删除确认 ============ -->
+<div class="modal-backdrop" id="confirmBackdrop" hidden>
+  <div class="modal modal-sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-icon">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h2 id="confirmTitle">删除这条记录？</h2>
+    <p id="confirmDesc">删除后可以从「恢复初始数据」找回。</p>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="confirmCancel">再想想</button>
+      <button type="button" class="btn btn-danger" id="confirmOk">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 当日明细浮层 ============ -->
+<div class="day-mask" id="dayMask" hidden></div>
+<div class="day-pop" id="dayPop" role="dialog" aria-modal="true" aria-labelledby="dayPopTitle" hidden>
+  <div class="day-pop-head">
+    <div class="dph-left">
+      <h3 id="dayPopTitle">—</h3>
+      <p id="dayPopSub">—</p>
+    </div>
+    <button type="button" class="icon-btn" id="dayPopClose" aria-label="关闭当日明细">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="day-pop-totals">
+    <span class="dpt-item"><i>−</i><b id="dayPopExp">¥0</b></span>
+    <span class="dpt-item"><i>＋</i><b id="dayPopInc">¥0</b></span>
+    <span class="dpt-item dpt-net"><i>＝</i><b id="dayPopNet">¥0</b></span>
+  </div>
+  <div class="day-pop-list" id="dayPopList"></div>
+  <div class="day-pop-foot">
+    <button type="button" class="btn btn-primary" id="dayPopAdd">＋ 在这一天记一笔</button>
+  </div>
+</div>
+
+<div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+<script src="assets/echarts.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
