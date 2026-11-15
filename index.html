@@ -32,17 +32,13 @@
     </div>
 
     <nav class="nav" aria-label="主导航">
-      <button type="button" class="nav-item is-active" data-view="overview">
+      <button type="button" class="nav-item" data-view="overview">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7"/></svg>
         <span>总览</span><i class="nav-ind"></i>
       </button>
-      <button type="button" class="nav-item" data-view="calendar">
+      <button type="button" class="nav-item is-active" data-view="calendar">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8.5" cy="14.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="17.5" r="1.3" fill="currentColor"/></svg>
         <span>日历</span><i class="nav-ind"></i>
-      </button>
-      <button type="button" class="nav-item" data-view="analysis">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-        <span>分析</span><i class="nav-ind"></i>
       </button>
     </nav>
 
@@ -74,7 +70,7 @@
     <div class="views">
 
       <!-- ============ 总览 ============ -->
-      <section class="view is-active" id="view-overview" aria-label="总览">
+      <section class="view" id="view-overview" aria-label="总览 · 分析">
         <div class="card stat-strip" style="--i:0" role="group" aria-label="收支总览">
           <button type="button" class="stat-cell" data-jump="income" style="--accent:var(--income)" aria-label="查看全部收入记录">
             <span class="sc-top">
@@ -176,94 +172,8 @@
             <div class="chart chart-md" id="chartBalance"></div>
           </article>
         </div>
-      </section>
+      <div class="merged-head"><h2>年度分析与对比</h2><span>逐月、逐年、分类与高频项目</span></div>
 
-      <!-- ============ 日历 ============ -->
-      <section class="view" id="view-calendar" aria-label="日历">
-        <div class="card cal-toolbar">
-          <div class="ct-nav">
-            <button type="button" class="ct-nav-btn" id="calPrev" aria-label="上一段">
-              <svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <div class="ct-title-wrap">
-              <button type="button" class="ct-title" id="calTitle" aria-haspopup="dialog" aria-expanded="false">
-                <h2 id="calTitleText">2026年 11月</h2>
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </button>
-              <div class="cal-month-pop" id="calMonthPop" role="dialog" aria-label="选择月份" hidden>
-                <div class="dp-head">
-                  <button type="button" class="dp-nav" id="cmpPrev" aria-label="上一年"><svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                  <button type="button" class="dp-title" id="cmpTitle">2026年</button>
-                  <button type="button" class="dp-nav" id="cmpNext" aria-label="下一年"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                </div>
-                <div class="dp-months" id="cmpMonths"></div>
-              </div>
-            </div>
-            <button type="button" class="ct-nav-btn" id="calNext" aria-label="下一段">
-              <svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
-
-          <span class="ct-count" id="calSub">0 笔</span>
-
-          <span class="ct-vr" aria-hidden="true"></span>
-
-          <div class="seg seg-sm seg-4" id="scaleSeg" role="group" aria-label="日历粒度">
-            <span class="seg-ind" aria-hidden="true"></span>
-            <button type="button" data-scale="year">年</button>
-            <button type="button" data-scale="month" class="is-active">月</button>
-            <button type="button" data-scale="week">周</button>
-            <button type="button" data-scale="day">天</button>
-          </div>
-
-          <span class="ct-vr" aria-hidden="true"></span>
-
-          <div class="ct-chips">
-            <span class="ct-ind" aria-hidden="true"></span>
-            <span class="ct-group" id="catRow" role="group" aria-label="分类筛选"></span>
-            <span class="ct-group" id="subRow" role="group" aria-label="子类筛选"></span>
-            <button type="button" class="chip chip-clear" id="weekdayChip" hidden></button>
-            <button type="button" class="chip chip-clear" id="subChip" hidden></button>
-          </div>
-
-          <div class="ct-right">
-            <div class="search-field">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-              <input type="search" id="searchInput" placeholder="搜索" autocomplete="off" aria-label="搜索账单">
-            </div>
-            <div class="seg seg-sm" id="typeSeg" role="group" aria-label="收支类型">
-              <span class="seg-ind" aria-hidden="true"></span>
-              <button type="button" data-type="all" class="is-active">全部</button>
-              <button type="button" data-type="expense">支</button>
-              <button type="button" data-type="income">收</button>
-            </div>
-            <button type="button" class="ct-ico" id="resetFilters" aria-label="重置筛选" title="重置筛选">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5v5h5M20 19v-5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 9A7.5 7.5 0 0 0 6.1 6.1L4 10m16 4-2.1 3.9A7.5 7.5 0 0 1 4.8 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" class="ct-ico" id="exportBtn" aria-label="导出本月" title="导出本月 CSV">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" class="ct-ico" id="calToday" aria-label="回到今天" title="回到今天">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <div class="card cal-board">
-          <div class="cal-weekhead" id="calWeekHead"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
-          <div class="board-empty" id="boardEmpty" hidden>
-            <strong>这段时间没有匹配的记录</strong><span>换个筛选条件，或点击日历空白格新增一笔。</span>
-            <button type="button" class="btn btn-ghost" id="boardReset">重置筛选</button>
-          </div>
-          <div class="cal-grid" id="calGrid"></div>
-          <div class="cal-week" id="calWeekGrid" hidden></div>
-          <div class="cal-day" id="calDayBoard" hidden></div>
-          <div class="cal-year" id="calYearBoard" hidden></div>
-        </div>
-      </section>
-
-      <!-- ============ 分析 ============ -->
-      <section class="view" id="view-analysis" aria-label="分析">
         <article class="card annual-card" style="--i:0">
           <div class="card-head">
             <div><h3>年度分析</h3><p id="annualSub">2024 — 2026 全年收支总览</p></div>
@@ -326,6 +236,91 @@
           </article>
         </div>
       </section>
+
+      <!-- ============ 日历 ============ -->
+      <section class="view is-active" id="view-calendar" aria-label="日历">
+        <div class="card cal-toolbar">
+          <div class="ct-nav">
+            <button type="button" class="ct-nav-btn" id="calPrev" aria-label="上一段">
+              <svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="ct-title-wrap">
+              <button type="button" class="ct-title" id="calTitle" aria-haspopup="dialog" aria-expanded="false">
+                <h2 id="calTitleText">2026年 11月</h2>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div class="cal-month-pop" id="calMonthPop" role="dialog" aria-label="选择月份" hidden>
+                <div class="dp-head">
+                  <button type="button" class="dp-nav" id="cmpPrev" aria-label="上一年"><svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <button type="button" class="dp-title" id="cmpTitle">2026年</button>
+                  <button type="button" class="dp-nav" id="cmpNext" aria-label="下一年"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+                <div class="dp-months" id="cmpMonths"></div>
+              </div>
+            </div>
+            <button type="button" class="ct-nav-btn" id="calNext" aria-label="下一段">
+              <svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+
+          <span class="ct-count" id="calSub">0 笔</span>
+
+          <span class="ct-vr" aria-hidden="true"></span>
+
+          <div class="seg seg-sm seg-4" id="scaleSeg" role="group" aria-label="日历粒度">
+            <span class="seg-ind" aria-hidden="true"></span>
+            <button type="button" data-scale="year">年</button>
+            <button type="button" data-scale="month" class="is-active">月</button>
+            <button type="button" data-scale="week">周</button>
+            <button type="button" data-scale="day">天</button>
+          </div>
+
+          <span class="ct-vr" aria-hidden="true"></span>
+
+          <div class="ct-right">
+            <button type="button" class="chip chip-clear" id="weekdayChip" hidden></button>
+            <button type="button" class="chip chip-clear" id="subChip" hidden></button>
+            <div class="search-field">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <input type="search" id="searchInput" placeholder="搜索" autocomplete="off" aria-label="搜索账单">
+            </div>
+            <div class="seg seg-sm" id="typeSeg" role="group" aria-label="收支类型">
+              <span class="seg-ind" aria-hidden="true"></span>
+              <button type="button" data-type="all" class="is-active">全部</button>
+              <button type="button" data-type="expense">支</button>
+              <button type="button" data-type="income">收</button>
+            </div>
+            <button type="button" class="ct-ico" id="resetFilters" aria-label="重置筛选" title="重置筛选">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5v5h5M20 19v-5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 9A7.5 7.5 0 0 0 6.1 6.1L4 10m16 4-2.1 3.9A7.5 7.5 0 0 1 4.8 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="ct-ico" id="exportBtn" aria-label="导出本月" title="导出本月 CSV">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="ct-ico" id="calToday" aria-label="回到今天" title="回到今天">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+
+          <div class="ct-filters" id="ctFilters">
+            <div class="seg cat-seg" id="catRow" role="group" aria-label="分类筛选"><span class="seg-ind" aria-hidden="true"></span></div>
+            <div class="seg sub-seg" id="subRow" role="group" aria-label="子类筛选" hidden><span class="seg-ind" aria-hidden="true"></span></div>
+          </div>
+        </div>
+
+        <div class="card cal-board">
+          <div class="cal-weekhead" id="calWeekHead"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
+          <div class="board-empty" id="boardEmpty" hidden>
+            <strong>这段时间没有匹配的记录</strong><span>换个筛选条件，或点击日历空白格新增一笔。</span>
+            <button type="button" class="btn btn-ghost" id="boardReset">重置筛选</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="cal-week" id="calWeekGrid" hidden></div>
+          <div class="cal-day" id="calDayBoard" hidden></div>
+          <div class="cal-year" id="calYearBoard" hidden></div>
+        </div>
+      </section>
+
+
 
     </div>
   </main>
@@ -503,6 +498,7 @@
 
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
+<div class="hover-tip" id="hoverTip" hidden></div>
 <script src="assets/echarts.min.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>

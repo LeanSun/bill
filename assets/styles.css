@@ -197,7 +197,7 @@ svg { display: block; }
   padding: 4px; border-radius: 11px; background: var(--surface-3);
   border: 1px solid var(--border);
 }
-.seg button { position: relative; z-index: 1; padding: 8px 2px; font-size: 12.5px; font-weight: 600; color: var(--muted); border-radius: 8px; transition: color .3s var(--ease-soft); }
+.seg button { position: relative; z-index: 1; padding: 9px 2px; font-size: 13.5px; font-weight: 600; color: var(--muted); border-radius: 8px; transition: color .3s var(--ease-soft); }
 .seg button.is-active { color: var(--text); }
 .seg-ind { position: absolute; z-index: 0; top: 4px; left: 4px; width: calc((100% - 8px) / var(--seg-n)); height: calc(100% - 8px); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-sm), 0 2px 6px rgba(24, 39, 75, .07); transform: translateX(calc(var(--seg-i, 0) * 100%)); transition: transform .42s var(--ease); }
 
@@ -379,8 +379,8 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 6px; }
 .card-head h3 { margin: 0; font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; }
 .card-head p { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); }
-.seg-sm { min-width: 180px; padding: 3px; }
-.seg-sm button { padding: 6px 2px; font-size: 12.5px; }
+.seg-sm { min-width: 210px; padding: 3px; }
+.seg-sm button { padding: 8px 2px; font-size: 13.5px; }
 .seg-sm .seg-ind { top: 3px; left: 3px; width: calc((100% - 6px) / var(--seg-n)); height: calc(100% - 6px); }
 /* 四段：日历粒度 年 / 月 / 周 / 天 */
 .seg-4 { --seg-n: 4; min-width: 136px; }
@@ -461,16 +461,16 @@ html[data-theme="dark"] .ico-moon { display: block; }
    原来三行（月份条 / 分类条 / 筛选条）加起来 190px 高，
    把所有控件压进一行：导航 · 粒度 · 分类&子类（横向滚动）· 收支合计 · 搜索 · 类型 · 动作
    关键：导航块和笔数块都给定宽，粒度控件的横坐标就与当前日期文本长度彻底解耦。 */
-.cal-toolbar { display: flex; align-items: center; gap: 8px; padding: 9px 11px; min-height: 56px; margin-bottom: 8px; }
+.cal-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 12px; margin-bottom: 8px; }
 
 /* 日期前进/后退整块做成有边框的范围框，两颗箭头各自带实底方格 */
 .ct-nav {
-  display: flex; align-items: center; gap: 1px; flex: 0 0 212px; width: 212px;
+  display: flex; align-items: center; gap: 1px; flex: 0 0 240px; width: 240px;
   padding: 3px; border: 1px solid var(--border); border-radius: 12px;
   background: var(--surface-3);
 }
 .ct-nav-btn {
-  position: relative; width: 36px; height: 36px; flex: 0 0 36px;
+  position: relative; width: 40px; height: 40px; flex: 0 0 40px;
   display: grid; place-items: center; border-radius: 9px; color: var(--text-2);
   background: var(--surface); border: 1px solid var(--border);
   transition: color .2s, background-color .2s, border-color .2s, transform .18s var(--ease);
@@ -478,87 +478,58 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .ct-nav-btn::before { content: ""; position: absolute; inset: -4px; border-radius: 13px; }
 .ct-nav-btn:hover { color: var(--primary); background: var(--primary-soft); border-color: var(--primary); }
 .ct-nav-btn:active { transform: scale(.93); }
-.ct-nav-btn svg { width: 17px; height: 17px; }
+.ct-nav-btn svg { width: 19px; height: 19px; }
 .ct-title-wrap { position: relative; flex: 1 1 auto; min-width: 0; display: flex; }
 .ct-title { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; min-width: 0; padding: 5px 8px; border-radius: 8px; transition: background-color .2s; }
 .ct-title:hover { background: var(--primary-soft); }
-.ct-title h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.ct-title h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .ct-title svg { width: 12px; height: 12px; flex: 0 0 12px; color: var(--muted); transition: transform .3s var(--ease); }
 .ct-title.is-open svg { transform: rotate(180deg); }
-.ct-count { flex: 0 0 62px; width: 62px; text-align: center; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-.ct-vr { width: 1px; height: 24px; background: var(--border); flex: 0 0 1px; }
+.ct-count { flex: 0 0 70px; width: 70px; text-align: center; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.ct-vr { width: 1px; height: 28px; background: var(--border); flex: 0 0 1px; }
 
-/* 分类 / 子类：一行横向滚动，两端渐隐提示还有内容 */
-.ct-chips {
-  position: relative;
-  display: flex; align-items: center; gap: 5px;
-  flex: 1 1 240px; min-width: 150px; padding: 4px 5px;
-  background: var(--surface-3); border: 1px solid var(--border); border-radius: 12px;
-  overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: none; -ms-overflow-style: none;
+/* 分类 / 子类：筛选区独占第二行，两条等宽分段控件并排。
+   段数写进 --seg-n，滑块靠 --seg-i 平移，和「全部 / 支 / 收」完全同款；
+   子类出现时主类收到 58%，两条都不再有隐藏按钮。 */
+.ct-filters { display: flex; gap: 8px; flex: 1 1 100%; min-width: 0; }
+.cat-seg { flex: 1 1 100%; min-width: 0; }
+.ct-filters.has-sub .cat-seg { flex: 0 0 58%; }
+.sub-seg { flex: 1 1 auto; min-width: 0; }
+.cat-seg, .sub-seg { padding: 4px; border-radius: 12px; }
+.cat-seg button, .sub-seg button {
+  font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--ink, var(--text-2));
 }
-/* 分类筛选的滑块：位置/宽度/高度由 JS 按当前生效按钮量出来写进变量，
-   主类与子类共用这条轨道，横向滚动时随按钮一起走 */
-.ct-ind {
-  position: absolute; left: 0; top: 50%; z-index: 0;
-  width: var(--ind-w, 0px); height: var(--ind-h, 30px);
-  transform: translate(var(--ind-x, 0px), -50%);
-  border-radius: 20px; pointer-events: none; opacity: 0;
-  background: color-mix(in srgb, var(--ac, var(--primary)) 38%, var(--surface));
+.cat-seg button.is-active, .sub-seg button.is-active { color: var(--text); font-weight: 700; }
+.cat-seg .seg-ind, .sub-seg .seg-ind {
+  background: color-mix(in srgb, var(--ac, var(--primary)) 34%, var(--surface));
   border: 1px solid var(--ac, var(--primary));
   box-shadow: 0 1px 3px rgba(24, 39, 75, .1);
-  transition: transform .42s var(--ease), width .3s var(--ease), height .3s var(--ease),
-              background-color .3s, border-color .3s, opacity .2s;
+  transition: transform .42s var(--ease), background-color .3s, border-color .3s;
 }
-.ct-ind.is-ready { opacity: 1; }
-/* 渐隐只在真溢出时出现（JS 打 is-scrollable）；
-   不溢出还留着遮罩，会把最后一颗"收入"的右边缘也淡掉 */
-.ct-chips.is-scrollable {
-  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), transparent 100%);
-          mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), transparent 100%);
+.cat-seg .ct-sub b, .sub-seg .ct-sub b {
+  font-weight: 700; font-size: 10.5px; padding: 0 4px; margin-left: 4px;
+  border-radius: 5px; background: var(--surface-3); color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
-.ct-chips::-webkit-scrollbar { display: none; }
-/* 分类与子类两组按钮流进同一条滚动行，中间的竖线由 .ct-div 承担 */
-.ct-group { display: contents; }
-/* 每颗胶囊按自己的分类色铺一层淡底：--c 由 renderCatBar 写入，
-   --ink 是同色相压暗后的文字色，浅底上仍然读得清。 */
-.ct-chips button {
-  position: relative; z-index: 1;
-  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
-  padding: 5px 11px; border-radius: 20px;
-  font-size: 12.5px; font-weight: 600; color: var(--ink, var(--text-2));
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--c, var(--primary)) 34%, transparent);
-  transition: color .2s, border-color .2s;
-}
-.ct-chips button:hover { border-color: var(--c, var(--border-strong)); color: var(--ink, var(--text)); }
-.ct-chips button.is-active { color: var(--ink, var(--text)); border-color: transparent; font-weight: 700; }
-/* 分类色点让位给文字：一行要塞下七个分类，图省 80px 比留个 6px 点划算；
-   颜色归属交给选中态底色和格子里的条目本身 */
-.ct-chips i { display: none; }
-
-.ct-chips .ct-sub { font-size: 11.5px; padding: 4px 9px; }
-.ct-chips .ct-sub b { font-weight: 700; font-size: 10px; padding: 0 3px; border-radius: 4px; background: var(--surface-3); color: var(--muted); font-variant-numeric: tabular-nums; }
-.ct-chips .ct-sub.is-active b { background: color-mix(in srgb, var(--c) 45%, var(--surface)); color: var(--ink, var(--text)); }
-.ct-chips .is-empty { opacity: .48; }
-.ct-chips .ct-div { position: relative; z-index: 1; width: 1px; height: 20px; background: var(--border); flex: 0 0 1px; margin: 0 2px; }
+.sub-seg .is-empty { opacity: .5; }
 .ct-hint { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 
-/* 右侧固定宽度、不参与收缩：收缩权全交给 .ct-chips。
-   原来 flex: 0 1 auto 允许整块被压到比内容还窄，孩子只能往外溢。 */
-.ct-right { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-.ct-ico { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border-radius: 8px; color: var(--text-2); border: 1px solid var(--border); background: var(--surface-2); transition: color .2s, background-color .2s, border-color .2s; }
+
+/* 右侧控件不参与收缩；筛选区独占第二行 */
+.ct-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
+.ct-ico { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 8px; color: var(--text-2); border: 1px solid var(--border); background: var(--surface-2); transition: color .2s, background-color .2s, border-color .2s; }
 .ct-ico:hover { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); background: var(--primary-soft); }
-.ct-ico svg { width: 17px; height: 17px; }
+.ct-ico svg { width: 19px; height: 19px; }
 .ct-add { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 11px; border-radius: 8px; font-size: 11.5px; font-weight: 600; color: #fff; background: var(--primary); box-shadow: 0 6px 14px -8px var(--primary); transition: transform .2s var(--ease), box-shadow .25s; }
 .ct-add:hover { transform: translateY(-1px); box-shadow: 0 10px 20px -10px var(--primary); }
 .ct-add svg { width: 13px; height: 13px; }
 
-.ct-right .search-field { width: 124px; flex: 0 0 124px; }
+.ct-right .search-field { width: 150px; flex: 0 0 150px; }
 .ct-right .search-field svg { left: 9px; width: 14px; height: 14px; }
-.ct-right .search-field input { height: 32px; padding: 0 10px 0 28px; border-radius: 8px; font-size: 12.5px; }
-.ct-right .seg-sm { min-width: 124px; padding: 2px; flex: 0 0 auto; }
-.ct-right .seg-sm button { padding: 5px 2px; font-size: 12px; }
+.ct-right .search-field input { height: 36px; padding: 0 10px 0 28px; border-radius: 9px; font-size: 13.5px; }
+.ct-right .seg-sm { min-width: 150px; padding: 2px; flex: 0 0 auto; }
+.ct-right .seg-sm button { padding: 6px 2px; font-size: 13.5px; }
 .ct-right .seg-sm .seg-ind { top: 2px; left: 2px; width: calc((100% - 4px) / var(--seg-n)); height: calc(100% - 4px); }
 
 /* 全部 / 支 / 收：和 年/月/周/天 同一套滑块，.seg-ind 靠 --seg-i 平移。
@@ -813,8 +784,17 @@ html[data-theme="dark"] .cal-item:hover {
 .ds-quick h4 { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; font-weight: 700; }
 .ds-quick h4 span { font-size: 10.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dq-types { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 9px; background: var(--surface-3); }
-.dq-types button { padding: 6px 4px; border-radius: 7px; font-size: 11.5px; font-weight: 600; color: var(--muted); background: transparent; transition: background-color .18s, color .18s; }
-.dq-types button.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.dq-types button { padding: 7px 4px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--muted); background: transparent; transition: background-color .2s, color .2s, box-shadow .2s; }
+.dq-types button[data-qtype="expense"] { color: color-mix(in srgb, var(--expense) 62%, var(--muted)); }
+.dq-types button[data-qtype="income"] { color: color-mix(in srgb, var(--income) 62%, var(--muted)); }
+.dq-types button[data-qtype="expense"].is-active {
+  background: color-mix(in srgb, var(--expense) 22%, var(--surface)); color: var(--expense);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--expense) 48%, transparent);
+}
+.dq-types button[data-qtype="income"].is-active {
+  background: color-mix(in srgb, var(--income) 22%, var(--surface)); color: var(--income);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--income) 48%, transparent);
+}
 .dq-amount { position: relative; }
 .dq-amount i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 14px; font-weight: 700; color: var(--muted); }
 .dq-amount input {
@@ -834,7 +814,7 @@ html[data-theme="dark"] .cal-item:hover {
 .dq-error { margin: 0; font-size: 11px; color: var(--danger); }
 .ds-quick .btn { width: 100%; height: 36px; justify-content: center; }
 
-.day-list { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; overflow: auto; min-height: 0; }
+.day-list { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; overflow: auto; min-height: 0; }
 .day-list-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex: 0 0 auto; padding-bottom: 11px; border-bottom: 1px solid var(--border); }
 .day-list-head h3 { margin: 0 0 3px; font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; }
 .day-list-head > div > span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -853,40 +833,64 @@ html[data-theme="dark"] .cal-item:hover {
 .dlc-name b { font-size: 13.5px; font-weight: 700; }
 .dlc-name i { font-style: normal; font-size: 11px; color: var(--muted); }
 .dlc-recs { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.dlc-rec {
-  display: inline-flex; align-items: baseline; gap: 7px; padding: 5px 9px; border-radius: 8px;
-  font-size: 11.5px; color: var(--text-2);
-  background: color-mix(in srgb, var(--c) 12%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--c) 26%, transparent);
-  transition: background-color .18s, border-color .18s;
-}
-.dlc-rec:hover { background: color-mix(in srgb, var(--c) 24%, var(--surface)); border-color: var(--c); }
-.dlc-rec b { font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* 和月/周格子里的条目同款两块式，只是放大到能一眼读清 */
+.dlc-recs .cal-item { flex: 0 1 auto; min-width: 132px; min-height: 46px; padding: 5px 9px; }
+.dlc-recs .cal-item .ci-name { font-size: 12.5px; }
+.dlc-recs .cal-item b { font-size: 12.5px; }
 .dlc-total { font-style: normal; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .day-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 48px 18px; text-align: center; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 12px; }
 .day-empty strong { font-size: 15px; }
 .day-empty span { font-size: 12.5px; color: var(--muted); }
 
 /* 关于这一天：三张图 */
-.ins-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border); flex: 0 0 auto; }
+.ins-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); flex: 0 0 auto; }
 .ins-title h3 { margin: 0; font-size: 15px; font-weight: 700; }
 .ins-title span { font-size: 11.5px; color: var(--muted); }
-.day-insights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; flex: 0 0 auto; }
-.ins-card { padding: 12px 13px 13px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); min-width: 0; }
-.ins-card h4 { margin: 0 0 9px; font-size: 12px; font-weight: 700; color: var(--text-2); }
-.ins-spark { display: block; width: 100%; height: 62px; }
-.ins-foot { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 7px; font-size: 10.5px; color: var(--muted); }
+.day-insights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 0 0 auto; align-items: stretch; }
+.ins-card {
+  padding: 10px 11px 10px; border-radius: 12px; background: var(--surface-2);
+  border: 1px solid var(--border); min-width: 0;
+  display: flex; flex-direction: column;
+  transition: transform .25s var(--ease), box-shadow .25s, border-color .25s, background-color .25s;
+  animation: insIn .5s var(--ease) backwards; animation-delay: calc(var(--i, 0) * 55ms);
+}
+.ins-card:hover { transform: translateY(-3px); background: var(--surface); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); box-shadow: var(--shadow-hover); }
+@keyframes insIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+[data-jump-day], [data-tip] { cursor: pointer; }
+.ins-card h4 { margin: 0 0 7px; font-size: 12px; font-weight: 700; color: var(--text-2); flex: 0 0 auto; }
+/* 卡内正文作为一整组贴底，六张卡的底边与文字基线对齐 */
+.ins-body { margin-top: auto; min-width: 0; }
+.ins-spark { display: block; width: 100%; height: 46px; flex: 0 0 auto; }
+.ins-foot { display: flex; flex-wrap: wrap; gap: 3px 8px; margin-top: 5px; font-size: 10px; color: var(--muted); flex: 0 0 auto; }
 .ins-foot b { color: var(--text); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.ins-badge { display: inline-block; margin-top: 8px; padding: 3px 9px; border-radius: 20px; font-size: 10.5px; font-weight: 700; color: var(--income); background: var(--income-soft); }
+.ins-badge { display: inline-block; margin-top: 6px; padding: 3px 9px; border-radius: 20px; font-size: 10.5px; font-weight: 700; color: var(--income); background: var(--income-soft); }
 .ins-badge.is-good { color: var(--expense); background: var(--expense-soft); }
-.ins-bars { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+.ins-bars { display: flex; align-items: flex-end; gap: 6px; height: 58px; }
 .ins-bar { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
-.ins-bar b { display: block; width: 100%; border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--primary) 34%, var(--surface)); }
+.ins-bar b { display: block; width: 100%; border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--primary) 34%, var(--surface)); transition: background-color .2s, transform .2s var(--ease); transform-origin: bottom; }
+.ins-bar:hover b { background: var(--primary); transform: scaleY(1.06); }
 .ins-bar.is-today b { background: var(--primary); }
 .ins-bar span { font-size: 10px; color: var(--muted); }
-.ins-ring-wrap { display: flex; align-items: center; gap: 11px; min-height: 80px; }
-.ins-ring { position: relative; width: 72px; height: 72px; flex: 0 0 72px; border-radius: 50%; background: conic-gradient(var(--rc, var(--primary)) 0 var(--pct, 0%), var(--surface-3) var(--pct, 0%) 100%); }
-.ins-ring i { position: absolute; inset: 11px; border-radius: 50%; background: var(--surface-2); }
+.ins-spark .ins-dot { cursor: pointer; transition: fill .18s, stroke .18s; }
+.ins-spark .ins-dot:hover { fill: color-mix(in srgb, var(--primary) 55%, transparent); stroke: var(--primary); stroke-width: 1.5; }
+.ins-heat { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; }
+.ins-heat i { display: block; height: 11px; border-radius: 3px; transition: transform .18s var(--ease), box-shadow .18s; }
+.ins-heat i:hover { position: relative; z-index: 1; transform: scale(1.4); box-shadow: 0 0 0 2px var(--primary); }
+.ins-wds { display: flex; align-items: flex-end; gap: 8px; height: 58px; }
+.ins-wd { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.ins-wd b { display: block; width: 100%; border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--primary) 30%, var(--surface)); transition: background-color .2s, transform .2s var(--ease); transform-origin: bottom; }
+.ins-wd:hover b { background: var(--primary); transform: scaleY(1.06); }
+.ins-wd.is-today b { background: var(--amber); }
+.ins-wd span { font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.ins-mtd { display: flex; flex-direction: column; gap: 2px; }
+.ins-mtd > b { font-size: 17px; font-weight: 700; letter-spacing: -.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+.ins-mtd span { font-size: 10.5px; color: var(--muted); }
+.ins-prog { height: 7px; margin-top: 6px; border-radius: 8px; background: var(--surface-3); overflow: hidden; }
+.ins-prog i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--primary-2), var(--primary)); transition: width .6s var(--ease); }
+.ins-ring-wrap { display: flex; align-items: center; gap: 10px; min-height: 62px; }
+.ins-ring { position: relative; width: 60px; height: 60px; flex: 0 0 60px; border-radius: 50%; background: conic-gradient(var(--rc, var(--primary)) 0 var(--pct, 0%), var(--surface-3) var(--pct, 0%) 100%); transition: transform .25s var(--ease), box-shadow .25s; }
+.ins-ring:hover { transform: scale(1.07); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rc, var(--primary)) 22%, transparent); }
+.ins-ring i { position: absolute; inset: 9px; border-radius: 50%; background: var(--surface-2); }
 .ins-ring-txt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .ins-ring-txt b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ins-ring-txt span { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
@@ -1033,12 +1037,10 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 /* 工具条是"挤着也要一行"，所以按优先级逐个退让：数字 → 导出 → 重置 → 搜索收窄 */
 @media (max-width: 1400px) { #exportBtn { display: none; } }
 @media (max-width: 1320px) {
-  /* 分类胶囊先收紧内边距再考虑滚动：八个分类优先保证一行看得见。
-     笔数退到 title 的 tooltip 里，把 62px 让给分类条。 */
-  .ct-chips button { padding: 4px 8px; }
+  /* 窄一点先收搜索与收支段，第二行筛选区始终完整 */
   .ct-count { display: none; }
-  .ct-right .search-field { width: 100px; flex: 0 0 100px; }
-  .ct-right .seg-sm { min-width: 116px; }
+  .ct-right .search-field { width: 116px; flex: 0 0 116px; }
+  .ct-right .seg-sm { min-width: 130px; }
 }
 @media (max-width: 1240px) { #resetFilters { display: none; } }
 @media (max-width: 1180px) {
@@ -1062,10 +1064,9 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .day-list-head { flex-wrap: wrap; gap: 8px; }
   .ct-right .search-field { width: 108px; flex: 0 0 108px; }
   .ct-right .search-field input { padding: 0 8px 0 26px; }
-  /* 1024 宽度下工具条只剩 725px：日期区收到 190、分类条压到 96，
-     "今天"退场（月导航里已经有箭头），保证整条不外溢 */
-  .ct-nav { flex: 0 0 190px; width: 190px; }
-  .ct-chips { min-width: 100px; }
+  /* 1024 宽度下第一行收紧，筛选区仍在第二行 */
+  .ct-nav { flex: 0 0 210px; width: 210px; }
+  .ct-right .search-field { width: 100px; flex: 0 0 100px; }
   #calToday { display: none; }
 }
 @media (max-width: 940px) {
@@ -1095,9 +1096,12 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .cal-year { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
-  .cal-toolbar { flex-wrap: wrap; gap: 7px; }
-  .ct-chips { order: 3; flex-basis: 100%; }
-  .ct-right { flex: 1 1 100%; justify-content: flex-end; }
+  .cal-toolbar { gap: 8px; }
+  /* 手机上两条分段控件上下排，主类仍是 7 等分 */
+  .ct-filters, .ct-filters.has-sub { flex-direction: column; }
+  .ct-filters.has-sub .cat-seg { flex: 1 1 auto; }
+  .cat-seg button, .sub-seg button { font-size: 11.5px; padding: 8px 2px; }
+  .ct-right { flex: 1 1 100%; justify-content: flex-end; margin-left: 0; }
   .ct-count { display: none; }
   .cal-grid { grid-template-rows: repeat(6, minmax(84px, 1fr)); }
   .cal-cell { padding: 4px 4px 6px; }
@@ -1126,7 +1130,7 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .sc-chart { height: 26px; }
   .stat-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sm-cell { padding: 8px 12px 9px; }
-  .cal-toolbar { padding: 7px 9px; }
+  .cal-toolbar { padding: 8px 9px; }
   .ct-nav { flex: 0 0 100%; width: 100%; }
   .chart-card { padding: 16px 14px 12px; }
   .card-head { flex-wrap: wrap; }
@@ -1258,3 +1262,19 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 @media (max-width: 420px) {
   .sync-row { grid-template-columns: 1fr; }
 }
+
+/* ---------------- 合并页 / 悬浮提示 ---------------- */
+.merged-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 26px 4px 12px; padding-top: 18px; border-top: 1px solid var(--border); }
+.merged-head h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.025em; }
+.merged-head span { font-size: 11.5px; color: var(--muted); }
+.hover-tip {
+  position: fixed; z-index: 9999; left: 0; top: 0;
+  max-width: 280px; padding: 7px 11px; border-radius: 9px;
+  background: rgba(18, 26, 40, .94); color: #fff;
+  font-size: 11.5px; line-height: 1.55; font-weight: 500;
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, .5);
+  pointer-events: none; white-space: pre-line;
+  transform: translate(-50%, -100%);
+  animation: tipIn .14s ease both;
+}
+@keyframes tipIn { from { opacity: 0; transform: translate(-50%, calc(-100% + 5px)); } to { opacity: 1; transform: translate(-50%, -100%); } }
