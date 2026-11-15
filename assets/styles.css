@@ -221,7 +221,7 @@ svg { display: block; }
 .side-tool-row { display: flex; align-items: center; gap: 8px; }
 .side-tool-btn {
   flex: 1 1 auto; min-width: 0;
-  display: flex; align-items: center; gap: 9px;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
   height: 36px; padding: 0 11px; border-radius: 10px;
   font-size: 12px; font-weight: 600; color: var(--text-2);
   background: var(--surface); border: 1px solid var(--border);
@@ -387,6 +387,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .seg-sm .seg-ind { top: 3px; left: 3px; width: calc((100% - 6px) / var(--seg-n)); height: calc(100% - 6px); }
 /* 四段：日历粒度 年 / 月 / 周 / 天 */
 .seg-4 { --seg-n: 4; min-width: 184px; }
+#scaleSeg { flex: 0 0 184px; width: 184px; }
 
 .chart { width: 100%; height: 270px; cursor: pointer; }
 .chart-lg { height: 300px; }
@@ -522,21 +523,9 @@ html[data-theme="dark"] .ico-moon { display: block; }
 }
 /* 图表按某个具体星期跳转时，三段控件没有对应项，滑块收起来 */
 .fx-seg.is-custom .seg-ind { opacity: 0; }
-.fx-quick {
-  flex: 1 1 auto; min-width: 0; height: 100%; box-sizing: border-box;
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 8px; border-radius: 12px;
-  background: var(--surface-3); border: 1px solid var(--border);
-}
-.fq-label { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
-.fx-quick button {
-  padding: 5px 10px; border-radius: 20px; white-space: nowrap;
-  font-size: 11.5px; font-weight: 600; color: var(--text-2);
-  background: var(--surface); border: 1px solid var(--border);
-  transition: color .2s, background-color .2s, border-color .2s;
-}
-.fx-quick button:hover { color: var(--primary); border-color: var(--primary); }
-.fx-quick button.is-active { color: #fff; background: var(--primary); border-color: var(--primary); }
+.quick-seg button { font-size: 11.5px; padding: 6px 2px; white-space: nowrap; }
+.quick-seg .seg-ind { background: color-mix(in srgb, var(--ac, var(--primary)) 30%, var(--surface)); border: 1px solid var(--ac, var(--primary)); }
+.quick-seg button.is-active { color: var(--text); font-weight: 700; }
 .cat-seg button, .sub-seg button {
   font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--ink, var(--text-2)); padding: 7px 2px;
@@ -596,7 +585,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 #typeSeg[data-active="1"] .seg-ind { background: color-mix(in srgb, var(--expense) 34%, var(--surface)); border-color: var(--expense); }
 #typeSeg[data-active="2"] .seg-ind { background: color-mix(in srgb, var(--income) 34%, var(--surface)); border-color: var(--income); }
 
-.cal-month-pop { position: absolute; top: calc(100% + 8px); left: 0; z-index: 45; width: 262px; padding: 13px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-pop); animation: dpIn .3s var(--ease) backwards; }
+.cal-month-pop { position: absolute; top: calc(100% + 8px); left: 0; z-index: 45; width: 294px; padding: 13px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-pop); animation: dpIn .3s var(--ease) backwards; }
 
 /* ---------------- 日历：已选筛选胶囊 ---------------- */
 .chip { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); transition: color .25s, background-color .25s, border-color .25s, box-shadow .25s; }
@@ -713,14 +702,23 @@ html[data-theme="dark"] .cal-item:hover {
 .ci-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-item b { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink, var(--c)); text-align: right; line-height: 1.2; letter-spacing: -.01em; }
 .cal-more {
-  justify-self: stretch; align-self: stretch;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 5px; text-align: center;
+  border-radius: 8px; text-align: center;
   font-size: 12px; font-weight: 700; color: var(--primary);
-  background: var(--primary-soft); transition: background-color .2s;
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  transition: background-color .2s;
 }
-.cal-more:hover { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+.cal-more:hover { background: color-mix(in srgb, var(--primary) 24%, var(--surface)); }
 .cal-more .cm-mini { display: none; }
+/* 月格：+N 笔 独占底部一行，铺满 + 左侧的整行宽度 */
+.cal-cell > .cal-more {
+  position: absolute; left: 5px; right: 36px; bottom: 4px; z-index: 2;
+  height: 28px; width: auto;
+}
+.cal-cell.has-more .cal-items { padding-bottom: 30px; box-sizing: border-box; }
+/* 周格沿用旧的一格预留 */
+.cal-items > .cal-more { justify-self: stretch; align-self: stretch; }
 
 /* 压缩档：单行"名称 …… 金额"。行高不够两块式时自动切换，
    名称会截断但金额永远完整，一列数字扫下去还是对齐的。 */
@@ -789,7 +787,7 @@ html[data-theme="dark"] .cal-item:hover {
 /* ---------------- 日历：天视图 ----------------
    左侧一张概览卡（含内嵌记账表单），右侧明细按「一个种类一行」分组，
    下方三张纯 SVG/CSS 图表回答"这一天有什么特别"。 */
-.cal-day { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
+.cal-day { display: grid; grid-template-columns: minmax(0, 290px) minmax(0, 0.85fr) minmax(0, 1.15fr); flex: 1 1 auto; min-height: 0; }
 .day-side {
   padding: 20px 20px 18px; border-right: 1px solid var(--border);
   background: var(--surface-2); overflow: auto; min-height: 0;
@@ -856,7 +854,16 @@ html[data-theme="dark"] .cal-item:hover {
 .dq-error { margin: 0; font-size: 11px; color: var(--danger); }
 .ds-quick .btn { width: 100%; height: 36px; justify-content: center; }
 
-.day-list { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; overflow: auto; min-height: 0; }
+.day-list { padding: 16px 16px; display: flex; flex-direction: column; gap: 10px; overflow: auto; min-height: 0; }
+.day-list-head { flex-wrap: wrap; }
+.day-ins-col {
+  padding: 16px 16px; border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 10px;
+  overflow: auto; min-height: 0;
+}
+.dl-cat { grid-template-columns: 4px 72px minmax(0, 1fr) auto; gap: 9px; padding: 10px 11px; }
+.dlc-recs { gap: 5px; }
+.dlc-recs .cal-item { min-width: 104px; }
 .day-list-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex: 0 0 auto; padding-bottom: 11px; border-bottom: 1px solid var(--border); }
 .day-list-head h3 { margin: 0 0 3px; font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; }
 .day-list-head > div > span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -885,10 +892,10 @@ html[data-theme="dark"] .cal-item:hover {
 .day-empty span { font-size: 12.5px; color: var(--muted); }
 
 /* 关于这一天：三张图 */
-.ins-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); flex: 0 0 auto; }
+.ins-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 0; padding-top: 0; border-top: 0; flex: 0 0 auto; }
 .ins-title h3 { margin: 0; font-size: 15px; font-weight: 700; }
 .ins-title span { font-size: 11.5px; color: var(--muted); }
-.day-insights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 0 0 auto; align-items: stretch; }
+.day-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; flex: 0 0 auto; align-items: stretch; }
 .ins-card {
   padding: 10px 11px 10px; border-radius: 12px; background: var(--surface-2);
   border: 1px solid var(--border); min-width: 0;
@@ -1110,8 +1117,9 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .cal-year { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); overflow: auto; }
   .ym { min-height: 150px; }
   .ym-day, .ym-blank { font-size: 11.5px; }
-  .cal-day { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .cal-day { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); }
   .day-side { border-right: 0; border-bottom: 1px solid var(--border); }
+  .day-ins-col { border-left: 0; border-top: 1px solid var(--border); }
   .ds-quick { margin-top: 16px; }
   .day-list { padding: 14px; }
   .day-list-head { flex-wrap: wrap; gap: 8px; }
@@ -1413,23 +1421,45 @@ body.is-ov-dragging { user-select: none; cursor: grabbing; }
 .ov-grid > .stat-strip > .stat-cell { justify-content: space-between; }
 @media (max-width: 940px) {
   .fx-seg button { font-size: 10.5px; padding: 7px 1px; }
-  .fx-quick { flex-wrap: wrap; }
+  .quick-seg button { font-size: 10.5px; padding: 6px 1px; }
 }
 
-/* ---------------- 已选筛选胶囊（第一行可伸缩，不新增行） ---------------- */
-.active-chips {
-  display: flex; align-items: center; gap: 4px;
-  flex: 1 1 0; min-width: 0; max-width: 320px;
-  overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: none; -ms-overflow-style: none;
+
+/* ---------------- 分类 / 子类下拉框 ---------------- */
+.ds-quick select, .field select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding-right: 30px;
+  background-color: var(--surface-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2378829b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center; background-size: 13px;
+  cursor: pointer;
+  transition: border-color .22s, box-shadow .22s, background-color .22s;
 }
-.active-chips::-webkit-scrollbar { display: none; }
-.active-chips .chip { flex: 0 0 auto; white-space: nowrap; padding: 3px 7px; font-size: 10.5px; }
-.active-chips .chip-clear-all { color: var(--text-2); background: var(--surface-2); border-color: var(--border); }
-.cal-toolbar.has-chips .ct-right .search-field { width: 96px; flex: 0 0 96px; }
-/* 有胶囊时笔数让位（笔数在未筛选时照常显示），胶囊条独占这段伸缩空间 */
-.cal-toolbar.has-chips .ct-count { display: none; }
-@media (max-width: 1320px) {
-  .cal-toolbar.has-chips .ct-right .search-field { width: 96px; flex: 0 0 96px; }
-  .active-chips { max-width: 220px; }
+.ds-quick select:hover, .field select:hover { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); }
+.ds-quick select:focus, .field select:focus {
+  background-color: var(--surface);
+  border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft);
 }
+.ds-quick select option, .field select option { background: var(--surface); color: var(--text); }
+html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9b4c9' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ---------------- 日期标题弹层：四种粒度 ---------------- */
+.cmp-body { min-height: 40px; }
+.dp-years { grid-template-columns: repeat(4, 1fr); }
+.dp-years .dp-month { padding: 9px 2px; font-size: 11.5px; }
+.dp-weeks { display: flex; flex-direction: column; gap: 5px; padding: 4px 0; }
+.dp-week-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 11px; border-radius: 9px; text-align: left;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-2); font-size: 11.5px;
+  transition: background-color .2s, border-color .2s, color .2s, transform .2s var(--ease);
+}
+.dp-week-btn b { font-size: 12px; font-weight: 700; color: var(--text); }
+.dp-week-btn span { font-variant-numeric: tabular-nums; color: var(--muted); }
+.dp-week-btn:hover { border-color: var(--primary); transform: translateX(2px); }
+.dp-week-btn.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.dp-week-btn.is-active b, .dp-week-btn.is-active span { color: #fff; }
+.dp-days .dp-week span { font-size: 10px; }

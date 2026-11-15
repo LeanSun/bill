@@ -274,7 +274,7 @@
                   <button type="button" class="dp-title" id="cmpTitle" data-page-node-id="h3hvtZCI9f1o8YL1qHoi2i">2026年</button>
                   <button type="button" class="dp-nav" id="cmpNext" aria-label="下一年" data-page-node-id="EhpMaRnu9KrXnbDx4etKEf"><svg viewBox="0 0 24 24" fill="none" data-page-node-id="IxAGeKcBrvn7EMR36LiWrb"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="w4bGsXsDIDDjAzIVK41N43"/></svg></button>
                 </div>
-                <div class="dp-months" id="cmpMonths" data-page-node-id="J88EMUnNpUNEmXyQTWkzGC"></div>
+                <div class="cmp-body" id="cmpMonths" data-page-node-id="J88EMUnNpUNEmXyQTWkzGC"></div>
               </div>
             </div>
             <button type="button" class="ct-nav-btn" id="calNext" aria-label="下一段" data-page-node-id="yAnIVco4RBuOnL1KKxHo64">
@@ -283,7 +283,6 @@
           </div>
 
           <span class="ct-count" id="calSub" data-page-node-id="dqqo7EMos8fIizf2Fy5bFc">0 笔</span>
-          <div class="active-chips" id="activeChips" hidden></div>
 
           <span class="ct-vr" aria-hidden="true" data-page-node-id="bOm4OYEdCiK86uXXv9TW1K"></span>
 
@@ -333,19 +332,19 @@
             </div>
             <div class="fx-cell fx-sub-slot" data-page-node-id="5OO2ujQ5yZ3QsvIHJKiXx1">
               <div class="seg sub-seg" id="subRow" role="group" aria-label="子类筛选" hidden data-page-node-id="HuS3BNPVzGP9rBV9x2Um8A"><span class="seg-ind" aria-hidden="true" data-page-node-id="3X0xGJZ0sDfiCI2KUHpcro"></span></div>
-              <div class="fx-quick" id="subQuick" role="group" aria-label="快捷筛选" data-page-node-id="0609piI5L7TxABfHTohcO2">
-                <span class="fq-label" data-page-node-id="TIKrxZZ4EMiBxTNlp7qqVF">子类 / 快捷</span>
-                <button type="button" data-quick="large" data-page-node-id="O4hZ2pPFwZcTuGjZPBrzts">大额支出</button>
-                <button type="button" data-quick="weekend" data-page-node-id="iCehcom8qeuzaSaFiCyNvb">周末消费</button>
-                <button type="button" data-quick="often" data-page-node-id="shQtcKclRvoNp8GYAGUe7k">高频消费</button>
-                <button type="button" data-quick="today" data-page-node-id="vxisc8pHwBCVD6b5eVxhAJ">只看今天</button>
+                            <div class="seg sub-seg quick-seg" id="subQuick" role="group" aria-label="快捷筛选"><span class="seg-ind" aria-hidden="true"></span>
+                <button type="button" data-quick="all" class="is-active">快捷</button>
+                <button type="button" data-quick="large">大额支出</button>
+                <button type="button" data-quick="weekend">周末消费</button>
+                <button type="button" data-quick="above">超均值</button>
+                <button type="button" data-quick="today">只看今天</button>
               </div>
             </div>
             <div class="fx-cell fx-extra" data-page-node-id="wy61E7Mndfbj1gi9qHrXML">
-                            <div class="seg fx-seg" id="freqSeg" role="group" aria-label="频次筛选"><span class="seg-ind" aria-hidden="true"></span>
-                <button type="button" data-freq="all" class="is-active">频次</button>
-                <button type="button" data-freq="often" title="同名备注在当前范围出现 3 次以上">高频</button>
-                <button type="button" data-freq="once" title="只出现过一次的备注">单次</button>
+                                          <div class="seg fx-seg" id="avgSeg" role="group" aria-label="均值筛选"><span class="seg-ind" aria-hidden="true"></span>
+                <button type="button" data-avg="all" class="is-active">均值</button>
+                <button type="button" data-avg="above" title="单笔金额高于当前范围的平均单笔">高于均</button>
+                <button type="button" data-avg="below" title="单笔金额不高于当前范围的平均单笔">低于均</button>
               </div>
               <div class="seg fx-seg" id="partSeg" role="group" aria-label="时段筛选" data-page-node-id="D0YPZie86RmPpF5Y89cuJw"><span class="seg-ind" aria-hidden="true" data-page-node-id="3HRqLAayDKgC0dBFbvrlAO"></span>
                 <button type="button" data-part="all" class="is-active" data-page-node-id="NfmXNXXg0GVDXdanO2duIN">时段</button>

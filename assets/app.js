@@ -143,7 +143,7 @@
     compareMetric: 'expense',
     calendarYear: Y_LAST,
     annualScope: 'both',
-    filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' },
+    filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', avg: 'all', part: 'all' },
     editingId: null,
     entryType: 'expense',
     pendingDeleteId: null,
@@ -527,19 +527,17 @@
     var y = state.calMonth.year, m = state.calMonth.month;
     return allRecords().filter(function (r) { return r.year === y && r.month === m; });
   }
-  var freqCache = { key: '', map: {} };
-  function noteFreqMap() {
+  var avgCache = { key: '', value: 0 };
+  /* 当前范围平均单笔金额：按范围 + 记录数缓存，切换筛选不重复算 */
+  function avgAmount() {
     var b = rangeBounds();
     var key = dateKey(b.from) + '|' + dateKey(b.to) + '|' + allRecords().length;
-    if (freqCache.key !== key) {
-      var map = {};
-      rangeRecords().forEach(function (r) {
-        var n = String(r.note || '').trim();
-        if (n) map[n] = (map[n] || 0) + 1;
-      });
-      freqCache = { key: key, map: map };
+    if (avgCache.key !== key) {
+      var rows = rangeRecords(), sum = 0;
+      rows.forEach(function (r) { sum += Math.abs(Number(r.amount) || 0); });
+      avgCache = { key: key, value: rows.length ? sum / rows.length : 0 };
     }
-    return freqCache.map;
+    return avgCache.value;
   }
   function matchFilters(r) {
     var f = state.filters;
@@ -563,11 +561,11 @@
       if (f.amount === 'mid' && (a <= 20 || a >= 100)) return false;
       if (f.amount === 'large' && a < 100) return false;
     }
-    /* 频次：同名备注在当前范围出现的次数 */
-    if (f.freq && f.freq !== 'all') {
-      var cnt = noteFreqMap()[String(r.note || '').trim()] || 0;
-      if (f.freq === 'often' && cnt < 3) return false;
-      if (f.freq === 'once' && cnt !== 1) return false;
+    /* 相对均值：单笔金额与当前范围平均单笔比较 */
+    if (f.avg && f.avg !== 'all') {
+      var am = Math.abs(Number(r.amount) || 0), mean = avgAmount();
+      if (f.avg === 'above' && am <= mean) return false;
+      if (f.avg === 'below' && am > mean) return false;
     }
     /* 时段：按每月的上 / 中 / 下旬切 */
     if (f.part && f.part !== 'all') {
@@ -586,7 +584,7 @@
     var f = state.filters;
     return f.category !== 'all' || f.sub !== 'all' || f.type !== 'all' ||
       (f.weekday !== 'all' && f.weekday !== '') || !!f.q.trim() ||
-      (f.amount && f.amount !== 'all') || (f.freq && f.freq !== 'all') || (f.part && f.part !== 'all');
+      (f.amount && f.amount !== 'all') || (f.avg && f.avg !== 'all') || (f.part && f.part !== 'all');
   }
   /* 当前筛选下命中最多（并列取最近）的年月，用于点击图表跳转后落在有数据的月份 */
   function bestMonthForFilters() {
@@ -713,60 +711,12 @@
     });
   }
 
-  /* ---------------- 已选筛选胶囊 ----------------
-     任何一项筛选生效都给一颗可点掉的胶囊，不再只有星期/子类两颗。
-     多项时末尾补一颗「全部清除」。容器本身参与第一行伸缩，不新增一行。 */
-  var CHIP_LABELS = {
-    type: { expense: '仅支出', income: '仅收入' },
-    amount: { small: '≤20', mid: '20~100', large: '≥100' },
-    weekday: { workday: '工作日', weekend: '周末' },
-    freq: { often: '高频', once: '单次' },
-    part: { early: '上旬', mid: '中旬', late: '下旬' }
-  };
-  function activeChipList() {
-    var f = state.filters, out = [];
-    if (f.q && f.q.trim()) out.push({ key: 'q', label: '搜索：' + f.q.trim() });
-    if (f.type && f.type !== 'all') out.push({ key: 'type', label: CHIP_LABELS.type[f.type] || f.type });
-    if (f.category && f.category !== 'all') out.push({ key: 'category', label: f.category });
-    if (f.sub && f.sub !== 'all') out.push({ key: 'sub', label: f.sub });
-    if (f.weekday && f.weekday !== 'all') {
-      var wd = String(f.weekday);
-      var l = CHIP_LABELS.weekday[wd] || (/^\d+$/.test(wd) ? WEEKDAYS[Number(wd)] : wd);
-      out.push({ key: 'weekday', label: l || wd });
-    }
-    ['amount', 'freq', 'part'].forEach(function (k) {
-      var v = f[k];
-      if (v && v !== 'all') out.push({ key: k, label: (CHIP_LABELS[k] && CHIP_LABELS[k][v]) || v });
-    });
-    return out;
-  }
-  function syncActiveChips() {
-    var box = $('activeChips');
-    if (!box) return;
-    var list = activeChipList();
-    var html = list.map(function (c) {
-      return '<button type="button" class="chip chip-clear" data-clear="' + esc(c.key) +
-        '" title="清除「' + esc(c.label) + '」">' + esc(c.label) + '<b>×</b></button>';
-    }).join('');
-    if (list.length > 1) html += '<button type="button" class="chip chip-clear chip-clear-all" data-clear="all" title="清除全部筛选">全部清除<b>×</b></button>';
-    box.innerHTML = html;
-    box.hidden = !list.length;
-    var tb = document.querySelector('.cal-toolbar');
-    if (tb) tb.classList.toggle('has-chips', list.length > 0);
-  }
-  function clearOneFilter(key) {
-    if (key === 'all') {
-      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' };
-    } else if (key === 'q') state.filters.q = '';
-    else state.filters[key] = 'all';
-    syncFilterUI(); renderBoard();
-  }
   function syncFilterUI() {
     var f = state.filters;
     if ($('searchInput')) $('searchInput').value = f.q;
     setSegActive($('typeSeg'), 'data-type', f.type);
     setSegActive($('amountSeg'), 'data-amount', f.amount || 'all');
-    setSegActive($('freqSeg'), 'data-freq', f.freq || 'all');
+    setSegActive($('avgSeg'), 'data-avg', f.avg || 'all');
     setSegActive($('partSeg'), 'data-part', f.part || 'all');
     var ws = $('weekdaySeg');
     if (ws) {
@@ -776,30 +726,36 @@
       if (numericWd) Array.prototype.forEach.call(ws.querySelectorAll('button'), function (b) { b.classList.remove('is-active'); });
     }
     syncChips();
-    syncActiveChips();
     syncCalLegend();
     syncQuickActive();
   }
-  /* 快捷项跟随当前生效的筛选高亮，再点一次即取消 */
+  /* 快捷分段：与其他子项同款滑块，算出唯一生效项，没有就落在「快捷」上 */
+  function activeQuickKey(f) {
+    if (f.avg === 'above') return 'above';
+    if (f.amount === 'large') return 'large';
+    if (f.weekday === 'weekend') return 'weekend';
+    if (f.q === todayStr()) return 'today';
+    return 'all';
+  }
   function syncQuickActive() {
     var box = $('subQuick');
     if (!box) return;
-    var f = state.filters;
-    Array.prototype.forEach.call(box.querySelectorAll('button[data-quick]'), function (b) {
-      var k = b.dataset.quick;
-      var on = (k === 'large' && f.amount === 'large') ||
-               (k === 'weekend' && f.weekday === 'weekend') ||
-               (k === 'often' && f.freq === 'often') ||
-               (k === 'today' && f.q === todayStr());
-      b.classList.toggle('is-active', !!on);
-    });
+    markActive(box, 'data-quick', activeQuickKey(state.filters));
+    syncFilterSeg(box);
   }
   function applyQuick(kind) {
     var f = state.filters;
-    if (kind === 'large') f.amount = f.amount === 'large' ? 'all' : 'large';
-    else if (kind === 'weekend') f.weekday = f.weekday === 'weekend' ? 'all' : 'weekend';
-    else if (kind === 'often') f.freq = f.freq === 'often' ? 'all' : 'often';
-    else if (kind === 'today') f.q = f.q === todayStr() ? '' : todayStr();
+    if (kind === 'all') {
+      f.amount = 'all'; f.weekday = 'all'; f.avg = 'all'; f.q = '';
+    } else if (kind === 'large') {
+      f.amount = f.amount === 'large' ? 'all' : 'large'; f.weekday = 'all'; f.avg = 'all'; f.q = '';
+    } else if (kind === 'weekend') {
+      f.weekday = f.weekday === 'weekend' ? 'all' : 'weekend'; f.amount = 'all'; f.avg = 'all'; f.q = '';
+    } else if (kind === 'above') {
+      f.avg = f.avg === 'above' ? 'all' : 'above'; f.amount = 'all'; f.weekday = 'all'; f.q = '';
+    } else if (kind === 'today') {
+      f.q = f.q === todayStr() ? '' : todayStr(); f.amount = 'all'; f.weekday = 'all'; f.avg = 'all';
+    }
     syncFilterUI(); renderBoard();
   }
   function setCalMonth(y, m) {
@@ -831,7 +787,7 @@
   }
   function jumpToDetail(opts) {
     opts = opts || {};
-    if (opts.reset) state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' };
+    if (opts.reset) state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', avg: 'all', part: 'all' };
     if (opts.category !== undefined) state.filters.category = opts.category;
     if (opts.sub !== undefined) state.filters.sub = opts.sub;
     if (opts.type !== undefined) state.filters.type = opts.type;
@@ -1537,14 +1493,14 @@
   }
 
   /* ---------------- 日历：分类 / 子类筛选（与工具条同一行） ---------------- */
-  var cmpYear = 2026, cmpOpen = false;
+  var cmpYear = 2026, cmpMonth = 11, cmpOpen = false;
   /* 分类 / 子类各是一条独立的等宽分段控件，和「全部 / 支 / 收」完全同款：
      段数写进 --seg-n，滑块靠 --seg-i 平移。
      关键：按钮与 .seg-ind 只在「集合真的变了」时重建；同一次筛选切换
      只改 is-active 与 --seg-i，滑块节点留在原地，transform 过渡才会跑。 */
   function syncFilterSeg(el) {
     if (!el) return;
-    var bs = el.querySelectorAll('button[data-cat], button[data-sub]');
+    var bs = el.querySelectorAll('button[data-cat], button[data-sub], button[data-quick]');
     var idx = 0, ac = '';
     for (var i = 0; i < bs.length; i++) {
       if (bs[i].classList.contains('is-active')) {
@@ -1624,19 +1580,86 @@
   }
   function syncCalLegend() { renderCatBar(palette()); }
 
+  /* 日期标题弹层：年→年历、月→月历、周→周历、天→日历。
+     四种粒度共用同一个浮层，内容按 state.scale 现场生成。 */
   function renderCmp() {
-    var box = $('cmpMonths');
+    var pop = $('calMonthPop'), box = $('cmpMonths'), title = $('cmpTitle');
     if (!box) return;
-    if ($('cmpTitle')) $('cmpTitle').textContent = cmpYear + '年';
-    box.innerHTML = MONTH_CN.map(function (n, i) {
-      var active = cmpYear === state.calMonth.year && (i + 1) === state.calMonth.month;
-      return '<button type="button" class="dp-month' + (active ? ' is-active' : '') + '" data-month="' + (i + 1) + '">' + n + '</button>';
-    }).join('');
+    var scale = state.scale, i;
+    if (pop) pop.setAttribute('data-mode', scale);
+    if (scale === 'year') {
+      if (title) title.textContent = cmpYear + '年 · 选择年份';
+      if (pop) pop.setAttribute('aria-label', '选择年份');
+      var years = [];
+      for (i = cmpYear - 5; i <= cmpYear + 6; i++) years.push(i);
+      box.innerHTML = '<div class="dp-months dp-years">' + years.map(function (y) {
+        return '<button type="button" class="dp-month' + (y === state.calMonth.year ? ' is-active' : '') +
+          '" data-year="' + y + '">' + y + '</button>';
+      }).join('') + '</div>';
+      return;
+    }
+    if (scale === 'month') {
+      if (title) title.textContent = cmpYear + '年';
+      if (pop) pop.setAttribute('aria-label', '选择月份');
+      box.innerHTML = '<div class="dp-months">' + MONTH_CN.map(function (n, ix) {
+        var active = cmpYear === state.calMonth.year && (ix + 1) === state.calMonth.month;
+        return '<button type="button" class="dp-month' + (active ? ' is-active' : '') +
+          '" data-month="' + (ix + 1) + '">' + n + '</button>';
+      }).join('') + '</div>';
+      return;
+    }
+    if (title) title.textContent = cmpYear + '年 ' + cmpMonth + '月';
+    if (scale === 'week') {
+      if (pop) pop.setAttribute('aria-label', '选择周');
+      var first = new Date(cmpYear, cmpMonth - 1, 1);
+      var last = new Date(cmpYear, cmpMonth, 0);
+      var cur = startOfWeek(first), n = 1, html = '';
+      var anchorWeek = dateKey(startOfWeek(anchorDate()));
+      while (cur <= last) {
+        var e = new Date(cur); e.setDate(e.getDate() + 6);
+        var k = dateKey(cur);
+        var label = (cur.getMonth() + 1) + '/' + cur.getDate() + ' — ' + (e.getMonth() + 1) + '/' + e.getDate();
+        html += '<button type="button" class="dp-week-btn' + (k === anchorWeek ? ' is-active' : '') +
+          '" data-week-start="' + k + '"><b>第 ' + n + ' 周</b><span>' + label + '</span></button>';
+        cur = new Date(cur); cur.setDate(cur.getDate() + 7); n++;
+      }
+      box.innerHTML = '<div class="dp-weeks">' + html + '</div>';
+      return;
+    }
+    /* day：与日历同款周一开头的迷你月历 */
+    if (pop) pop.setAttribute('aria-label', '选择日期');
+    var f = new Date(cmpYear, cmpMonth - 1, 1);
+    var offset = (f.getDay() + 6) % 7;
+    var dim = new Date(cmpYear, cmpMonth, 0).getDate();
+    var count = Math.ceil((offset + dim) / 7) * 7;
+    var today = todayStr(), sel = dateKey(anchorDate()), days = '';
+    for (i = 0; i < count; i++) {
+      var d = new Date(cmpYear, cmpMonth - 1, 1 - offset + i);
+      var key = dateKey(d), cls = 'dp-day';
+      if (d.getMonth() !== cmpMonth - 1) cls += ' is-other';
+      if (key === today) cls += ' is-today';
+      if (key === sel) cls += ' is-selected';
+      days += '<button type="button" class="' + cls + '" data-date="' + key + '" aria-label="' + key + '">' + d.getDate() + '</button>';
+    }
+    box.innerHTML = '<div class="dp-days"><div class="dp-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
+      '<div class="dp-grid">' + days + '</div></div>';
+  }
+  function shiftCmp(dir) {
+    if (state.scale === 'year' || state.scale === 'month') cmpYear += dir;
+    else {
+      cmpMonth += dir;
+      if (cmpMonth < 1) { cmpMonth = 12; cmpYear -= 1; }
+      else if (cmpMonth > 12) { cmpMonth = 1; cmpYear += 1; }
+    }
+    renderCmp();
   }
   function openCmp() {
     var pop = $('calMonthPop'), title = $('calTitle');
     if (!pop || !title) return;
-    cmpYear = state.calMonth.year;
+    var a = (state.scale === 'week' || state.scale === 'day')
+      ? anchorDate() : new Date(state.calMonth.year, state.calMonth.month - 1, 1);
+    cmpYear = state.scale === 'year' ? state.calMonth.year : a.getFullYear();
+    cmpMonth = a.getMonth() + 1;
     cmpOpen = true;
     pop.hidden = false;
     title.classList.add('is-open');
@@ -1695,11 +1718,16 @@
   /* 条少 —— 每条高一截，最多 48px；条多 —— 均分，压到 22px 为止；
      再多的部分折成 "+N 笔"，点格子或它都进当日明细。
      extraSel 用于底部还有固定条（周视图的汇总）时，把那段高度先扣掉。 */
-  function fitStack(cell, box, headSel, perRow, minRow, maxRow, extraSel) {
+  function fitStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside) {
     var nodes = box.querySelectorAll('.cal-item');
     var count = nodes.length;
-    var more = box.querySelector('.cal-more');
-    if (!count) { if (more) box.removeChild(more); return; }
+    var host = moreOutside ? cell : box;
+    var more = host.querySelector('.cal-more');
+    if (!count) {
+      if (more) more.parentNode.removeChild(more);
+      if (moreOutside) cell.classList.remove('has-more');
+      return;
+    }
 
     var head = headSel ? cell.querySelector(headSel) : null;
     var extra = extraSel ? cell.querySelector(extraSel) : null;
@@ -1714,10 +1742,11 @@
     var capacity = rowsFit * perRow;
     var overflow = count > capacity;
     /* "+N 笔" 自己占一格，所以溢出时先让出一条 */
-    var keep = overflow ? Math.max(1, capacity - 1) : count;
+    /* 月格：+N 笔 独立占底部整行，不再挤掉条目格；周格沿用旧的一格预留 */
+    var keep = overflow ? (moreOutside ? capacity : Math.max(1, capacity - 1)) : count;
     for (var k = keep; k < count; k++) box.removeChild(nodes[k]);
     var rest = count - keep;
-    var slots = keep + (rest > 0 ? 1 : 0);
+    var slots = keep + (overflow && !moreOutside ? 1 : 0);
     var rows = Math.ceil(slots / perRow);
     var rowH = Math.floor((avail - ENTRY_GAP * (rows - 1)) / rows);
 
@@ -1732,13 +1761,14 @@
         more.type = 'button';
         more.className = 'cal-more';
         more.setAttribute('data-more', cell.getAttribute('data-date'));
-        box.appendChild(more);
+        host.appendChild(more);
       }
       more.innerHTML = '<span class="cm-full">+' + rest + ' 笔</span><span class="cm-mini">+' + rest + '</span>';
       more.title = '查看 ' + cell.getAttribute('data-date') + ' 的全部 ' + count + ' 笔';
     } else if (more) {
-      box.removeChild(more);
+      more.parentNode.removeChild(more);
     }
+    if (moreOutside) cell.classList.toggle('has-more', rest > 0);
   }
 
   function fillMonthEntries(grid) {
@@ -1749,7 +1779,7 @@
       var box = cells[i].querySelector('.cal-items');
       if (!box) continue;
       /* 右下角 ＋ 常驻，先把那 28px 让出来，条目不会压到它下面 */
-      fitStack(cells[i], box, '.cal-cell-head', perRow, narrow ? 5 : ENTRY_MIN, narrow ? 6 : ENTRY_MAX, '.cal-add');
+      fitStack(cells[i], box, '.cal-cell-head', perRow, narrow ? 5 : ENTRY_MIN, narrow ? 6 : ENTRY_MAX, '.cal-add', true);
     }
   }
 
@@ -1845,7 +1875,7 @@
     for (var c = 0; c < box.children.length; c++) {
       var col = box.children[c];
       var list = col.querySelector('.cal-items');
-      if (list && list.querySelector('.cal-item')) fitStack(col, list, '.wk-head', 1, 28, 64, '.wk-foot');
+      if (list && list.querySelector('.cal-item')) fitStack(col, list, '.wk-head', 1, 28, 64, '.wk-foot', false);
     }
   }
 
@@ -2051,6 +2081,8 @@
       '<span>收入 <b class="c-income">' + fmtYuan(di) + '</b></span></div>' +
       '</div>' +
       '<div class="day-cat-list">' + catRowsHTML + '</div>' +
+      '</div>' +
+      '<div class="day-ins-col">' +
       '<div class="ins-title"><h3>关于这一天</h3><span>和最近这段时间比一比</span></div>' +
       dayInsightsHTML(p, key, items, de) +
       '</div>';
@@ -2741,14 +2773,28 @@
       e.stopPropagation();
       if (cmpOpen) closeCmp(); else openCmp();
     });
-    if ($('cmpPrev')) $('cmpPrev').addEventListener('click', function () { cmpYear -= 1; renderCmp(); });
-    if ($('cmpNext')) $('cmpNext').addEventListener('click', function () { cmpYear += 1; renderCmp(); });
+    if ($('cmpPrev')) $('cmpPrev').addEventListener('click', function () { shiftCmp(-1); });
+    if ($('cmpNext')) $('cmpNext').addEventListener('click', function () { shiftCmp(1); });
     var cmpMonths = $('cmpMonths');
     if (cmpMonths) cmpMonths.addEventListener('click', function (e) {
-      var b = e.target.closest('button[data-month]');
+      var b = e.target.closest('button');
       if (!b) return;
-      setCalMonth(cmpYear, Number(b.dataset.month));
-      closeCmp();
+      if (b.dataset.year) {
+        setCalMonth(Number(b.dataset.year), state.calMonth.month); closeCmp(); return;
+      }
+      if (b.dataset.month) {
+        setCalMonth(cmpYear, Number(b.dataset.month)); closeCmp(); return;
+      }
+      if (b.dataset.weekStart) {
+        state.scale = 'week';
+        setSegActive($('scaleSeg'), 'data-scale', 'week');
+        setAnchor(new Date(b.dataset.weekStart + 'T00:00:00'));
+        state.focusDate = '';
+        renderBoard(); renderCharts('calendar'); closeCmp(); return;
+      }
+      if (b.dataset.date) {
+        jumpToDay(b.dataset.date); closeCmp(); return;
+      }
     });
     document.addEventListener('click', function (e) {
       if (!cmpOpen) return;
@@ -2798,7 +2844,7 @@
       var qk = e.target.closest('button[data-quick]');
       if (qk) { applyQuick(qk.dataset.quick); return; }
       var spec = null;
-      ['amount', 'weekday', 'freq', 'part'].some(function (k) {
+      ['amount', 'weekday', 'avg', 'part'].some(function (k) {
         var b = e.target.closest('button[data-' + k + ']');
         if (b) { spec = { k: k, v: b.dataset[k] }; return true; }
         return false;
@@ -2811,12 +2857,8 @@
         syncFilterUI(); renderBoard();
       }
     });
-    if ($('activeChips')) $('activeChips').addEventListener('click', function (e) {
-      var c = e.target.closest('button[data-clear]');
-      if (c) clearOneFilter(c.dataset.clear);
-    });
     function resetBoardFilters() {
-      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' };
+      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', avg: 'all', part: 'all' };
       state.focusDate = '';
       syncFilterUI(); renderBoard();
     }
