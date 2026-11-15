@@ -201,7 +201,10 @@ svg { display: block; }
 .seg button.is-active { color: var(--text); }
 .seg-ind { position: absolute; z-index: 0; top: 4px; left: 4px; width: calc((100% - 8px) / var(--seg-n)); height: calc(100% - 8px); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-sm), 0 2px 6px rgba(24, 39, 75, .07); transform: translateX(calc(var(--seg-i, 0) * 100%)); transition: transform .42s var(--ease); }
 
-.side-foot { margin-top: auto; padding: 18px 6px 0; border-top: 1px solid var(--border); }
+.side-foot { margin-top: auto; padding: 18px 4px 0; border-top: 1px solid var(--border); }
+.side-today, .side-sync { gap: 8px; }
+.side-today svg, .side-sync svg { flex: 0 0 15px; }
+.side-today:hover, .side-sync:hover { color: var(--primary); border-color: var(--primary); }
 .link-btn { padding: 0; font-size: 11.5px; font-weight: 600; color: var(--primary); transition: opacity .2s; }
 .link-btn:hover { opacity: .72; text-decoration: underline; text-underline-offset: 3px; }
 
@@ -383,7 +386,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .seg-sm button { padding: 8px 2px; font-size: 13.5px; }
 .seg-sm .seg-ind { top: 3px; left: 3px; width: calc((100% - 6px) / var(--seg-n)); height: calc(100% - 6px); }
 /* 四段：日历粒度 年 / 月 / 周 / 天 */
-.seg-4 { --seg-n: 4; min-width: 136px; }
+.seg-4 { --seg-n: 4; min-width: 184px; }
 
 .chart { width: 100%; height: 270px; cursor: pointer; }
 .chart-lg { height: 300px; }
@@ -465,7 +468,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 
 /* 日期前进/后退整块做成有边框的范围框，两颗箭头各自带实底方格 */
 .ct-nav {
-  display: flex; align-items: center; gap: 1px; flex: 0 0 240px; width: 240px;
+  display: flex; align-items: center; gap: 1px; flex: 0 0 300px; width: 300px;
   padding: 3px; border: 1px solid var(--border); border-radius: 12px;
   background: var(--surface-3);
 }
@@ -493,7 +496,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .ct-filters {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: 46px 46px;
   gap: 8px; flex: 1 1 100%; min-width: 0;
 }
 .cat-seg { grid-column: 1; grid-row: 1; }
@@ -502,7 +505,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .fx-extra { grid-column: 2; grid-row: 2; }
 .fx-cell { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
 .fx-cell > .seg { flex: 1 1 0; min-width: 0; }
-.cat-seg, .sub-seg, .fx-seg { min-width: 0; padding: 4px; border-radius: 12px; }
+.cat-seg, .sub-seg, .fx-seg { min-width: 0; padding: 4px; border-radius: 12px; height: 100%; box-sizing: border-box; }
 .fx-seg { padding: 3px; border-radius: 10px; }
 .fx-seg button {
   font-size: 12px; padding: 7px 2px;
@@ -520,7 +523,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 /* 图表按某个具体星期跳转时，三段控件没有对应项，滑块收起来 */
 .fx-seg.is-custom .seg-ind { opacity: 0; }
 .fx-quick {
-  flex: 1 1 auto; min-width: 0;
+  flex: 1 1 auto; min-width: 0; height: 100%; box-sizing: border-box;
   display: flex; align-items: center; gap: 6px;
   padding: 4px 8px; border-radius: 12px;
   background: var(--surface-3); border: 1px solid var(--border);
@@ -760,7 +763,8 @@ html[data-theme="dark"] .cal-item:hover {
 .wk-col:last-child { border-right: 0; }
 .wk-col.is-weekend { background: color-mix(in srgb, var(--surface-2) 62%, var(--surface)); }
 .wk-col:hover { background: var(--surface-2); }
-.wk-col.is-today { background: color-mix(in srgb, var(--primary) 8%, var(--surface)); }
+.wk-col.is-today { background: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+.wk-col.is-today .wk-head { border-bottom-color: color-mix(in srgb, var(--primary) 28%, var(--border)); }
 .wk-head { flex: 0 0 auto; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px dashed var(--border); }
 .wk-head-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .wk-dow { font-size: 12px; font-weight: 650; color: var(--muted); }
@@ -959,10 +963,21 @@ html[data-theme="dark"] .cal-item:hover {
 /* 年视图的今日小格：直接铺满主色，不画 1.5px 的圈 */
 .ym-day.is-today { background: var(--primary) !important; color: #fff !important; font-weight: 700; }
 
-.board-empty { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; padding: 13px 18px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-size: 12px; }
-.board-empty strong { color: var(--text); }
-.board-empty span { color: var(--muted); }
-.board-empty .btn { padding: 5px 11px; font-size: 11.5px; }
+.cal-board { position: relative; }
+.board-empty { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; pointer-events: none; padding: 18px; }
+.be-card {
+  pointer-events: auto;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  max-width: min(380px, 90%); padding: 18px 22px; text-align: center;
+  border-radius: 14px; border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: var(--shadow-pop); backdrop-filter: blur(8px);
+  animation: beIn .28s var(--ease) both;
+}
+@keyframes beIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.be-card strong { font-size: 13.5px; color: var(--text); }
+.be-card span { font-size: 11.5px; line-height: 1.6; color: var(--muted); }
+.be-card .btn { padding: 6px 13px; font-size: 11.5px; }
 
 /* ---------------- 通用数值色 ---------------- */
 .c-expense { color: var(--expense); }
@@ -1103,9 +1118,8 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .ct-right .search-field { width: 108px; flex: 0 0 108px; }
   .ct-right .search-field input { padding: 0 8px 0 26px; }
   /* 1024 宽度下第一行收紧，筛选区仍在第二行 */
-  .ct-nav { flex: 0 0 210px; width: 210px; }
-  .ct-right .search-field { width: 100px; flex: 0 0 100px; }
-  #calToday { display: none; }
+  .ct-nav { flex: 0 0 250px; width: 250px; }
+  .ct-right .search-field { width: 92px; flex: 0 0 92px; }
 }
 @media (max-width: 940px) {
   .app-shell { grid-template-columns: 1fr; }
@@ -1122,6 +1136,8 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .side-tool-row { gap: 6px; }
   .side-tool-label { display: none; }
   .side-tool-btn { flex: 0 0 auto; width: 36px; padding: 0; justify-content: center; }
+  .side-today { width: 36px; padding: 0; }
+  .side-today-label { display: none; }
   .sync-mobile-btn { display: grid; }
   .main { padding: 12px 18px 48px; }
   .chart-grid { grid-template-columns: 1fr; }
@@ -1164,6 +1180,7 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .nav-item { padding: 7px 9px; font-size: 12.5px; }
   .nav-item svg { width: 16px; height: 16px; flex-basis: 16px; }
   .side-add { height: 34px; padding: 0 10px; font-size: 12px; }
+  .side-today { width: 34px; padding: 0; }
   .side-tool-btn, .sync-mobile-btn { height: 34px; width: 34px; }
   .stat-strip { grid-template-columns: 1fr; }
   .stat-cell { border-right: 0; border-bottom: 1px solid var(--border); padding: 11px 14px; }
@@ -1397,4 +1414,22 @@ body.is-ov-dragging { user-select: none; cursor: grabbing; }
 @media (max-width: 940px) {
   .fx-seg button { font-size: 10.5px; padding: 7px 1px; }
   .fx-quick { flex-wrap: wrap; }
+}
+
+/* ---------------- 已选筛选胶囊（第一行可伸缩，不新增行） ---------------- */
+.active-chips {
+  display: flex; align-items: center; gap: 4px;
+  flex: 1 1 0; min-width: 0; max-width: 320px;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.active-chips::-webkit-scrollbar { display: none; }
+.active-chips .chip { flex: 0 0 auto; white-space: nowrap; padding: 3px 7px; font-size: 10.5px; }
+.active-chips .chip-clear-all { color: var(--text-2); background: var(--surface-2); border-color: var(--border); }
+.cal-toolbar.has-chips .ct-right .search-field { width: 96px; flex: 0 0 96px; }
+/* 有胶囊时笔数让位（笔数在未筛选时照常显示），胶囊条独占这段伸缩空间 */
+.cal-toolbar.has-chips .ct-count { display: none; }
+@media (max-width: 1320px) {
+  .cal-toolbar.has-chips .ct-right .search-field { width: 96px; flex: 0 0 96px; }
+  .active-chips { max-width: 220px; }
 }

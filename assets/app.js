@@ -143,7 +143,7 @@
     compareMetric: 'expense',
     calendarYear: Y_LAST,
     annualScope: 'both',
-    filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', origin: 'all', part: 'all' },
+    filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' },
     editingId: null,
     entryType: 'expense',
     pendingDeleteId: null,
@@ -527,6 +527,20 @@
     var y = state.calMonth.year, m = state.calMonth.month;
     return allRecords().filter(function (r) { return r.year === y && r.month === m; });
   }
+  var freqCache = { key: '', map: {} };
+  function noteFreqMap() {
+    var b = rangeBounds();
+    var key = dateKey(b.from) + '|' + dateKey(b.to) + '|' + allRecords().length;
+    if (freqCache.key !== key) {
+      var map = {};
+      rangeRecords().forEach(function (r) {
+        var n = String(r.note || '').trim();
+        if (n) map[n] = (map[n] || 0) + 1;
+      });
+      freqCache = { key: key, map: map };
+    }
+    return freqCache.map;
+  }
   function matchFilters(r) {
     var f = state.filters;
     var q = f.q.trim().toLowerCase();
@@ -549,11 +563,11 @@
       if (f.amount === 'mid' && (a <= 20 || a >= 100)) return false;
       if (f.amount === 'large' && a < 100) return false;
     }
-    /* 来源：本地新增的 id 以 u 打头 */
-    if (f.origin && f.origin !== 'all') {
-      var isLocal = String(r.id || '').charAt(0) === 'u';
-      if (f.origin === 'local' && !isLocal) return false;
-      if (f.origin === 'seed' && isLocal) return false;
+    /* 频次：同名备注在当前范围出现的次数 */
+    if (f.freq && f.freq !== 'all') {
+      var cnt = noteFreqMap()[String(r.note || '').trim()] || 0;
+      if (f.freq === 'often' && cnt < 3) return false;
+      if (f.freq === 'once' && cnt !== 1) return false;
     }
     /* 时段：按每月的上 / 中 / 下旬切 */
     if (f.part && f.part !== 'all') {
@@ -572,7 +586,7 @@
     var f = state.filters;
     return f.category !== 'all' || f.sub !== 'all' || f.type !== 'all' ||
       (f.weekday !== 'all' && f.weekday !== '') || !!f.q.trim() ||
-      (f.amount && f.amount !== 'all') || (f.origin && f.origin !== 'all') || (f.part && f.part !== 'all');
+      (f.amount && f.amount !== 'all') || (f.freq && f.freq !== 'all') || (f.part && f.part !== 'all');
   }
   /* 当前筛选下命中最多（并列取最近）的年月，用于点击图表跳转后落在有数据的月份 */
   function bestMonthForFilters() {
@@ -699,30 +713,60 @@
     });
   }
 
-  /* ---------------- 图表 → 日历 跳转 ---------------- */
-  function syncWeekdayChip() {
-    var el = $('weekdayChip');
-    if (!el) return;
-    var wd = state.filters.weekday;
-    if (wd === 'all' || wd === '') { el.hidden = true; return; }
-    el.hidden = false;
-    var label = wd === 'workday' ? '工作日' : (wd === 'weekend' ? '周末' : WEEKDAYS[Number(wd)]);
-    el.innerHTML = (label || wd) + ' <b>×</b>';
+  /* ---------------- 已选筛选胶囊 ----------------
+     任何一项筛选生效都给一颗可点掉的胶囊，不再只有星期/子类两颗。
+     多项时末尾补一颗「全部清除」。容器本身参与第一行伸缩，不新增一行。 */
+  var CHIP_LABELS = {
+    type: { expense: '仅支出', income: '仅收入' },
+    amount: { small: '≤20', mid: '20~100', large: '≥100' },
+    weekday: { workday: '工作日', weekend: '周末' },
+    freq: { often: '高频', once: '单次' },
+    part: { early: '上旬', mid: '中旬', late: '下旬' }
+  };
+  function activeChipList() {
+    var f = state.filters, out = [];
+    if (f.q && f.q.trim()) out.push({ key: 'q', label: '搜索：' + f.q.trim() });
+    if (f.type && f.type !== 'all') out.push({ key: 'type', label: CHIP_LABELS.type[f.type] || f.type });
+    if (f.category && f.category !== 'all') out.push({ key: 'category', label: f.category });
+    if (f.sub && f.sub !== 'all') out.push({ key: 'sub', label: f.sub });
+    if (f.weekday && f.weekday !== 'all') {
+      var wd = String(f.weekday);
+      var l = CHIP_LABELS.weekday[wd] || (/^\d+$/.test(wd) ? WEEKDAYS[Number(wd)] : wd);
+      out.push({ key: 'weekday', label: l || wd });
+    }
+    ['amount', 'freq', 'part'].forEach(function (k) {
+      var v = f[k];
+      if (v && v !== 'all') out.push({ key: k, label: (CHIP_LABELS[k] && CHIP_LABELS[k][v]) || v });
+    });
+    return out;
   }
-  function syncSubChip() {
-    var el = $('subChip');
-    if (!el) return;
-    var s = state.filters.sub;
-    if (s === 'all') { el.hidden = true; return; }
-    el.hidden = false;
-    el.innerHTML = s + ' <b>×</b>';
+  function syncActiveChips() {
+    var box = $('activeChips');
+    if (!box) return;
+    var list = activeChipList();
+    var html = list.map(function (c) {
+      return '<button type="button" class="chip chip-clear" data-clear="' + esc(c.key) +
+        '" title="清除「' + esc(c.label) + '」">' + esc(c.label) + '<b>×</b></button>';
+    }).join('');
+    if (list.length > 1) html += '<button type="button" class="chip chip-clear chip-clear-all" data-clear="all" title="清除全部筛选">全部清除<b>×</b></button>';
+    box.innerHTML = html;
+    box.hidden = !list.length;
+    var tb = document.querySelector('.cal-toolbar');
+    if (tb) tb.classList.toggle('has-chips', list.length > 0);
+  }
+  function clearOneFilter(key) {
+    if (key === 'all') {
+      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' };
+    } else if (key === 'q') state.filters.q = '';
+    else state.filters[key] = 'all';
+    syncFilterUI(); renderBoard();
   }
   function syncFilterUI() {
     var f = state.filters;
     if ($('searchInput')) $('searchInput').value = f.q;
     setSegActive($('typeSeg'), 'data-type', f.type);
     setSegActive($('amountSeg'), 'data-amount', f.amount || 'all');
-    setSegActive($('originSeg'), 'data-origin', f.origin || 'all');
+    setSegActive($('freqSeg'), 'data-freq', f.freq || 'all');
     setSegActive($('partSeg'), 'data-part', f.part || 'all');
     var ws = $('weekdaySeg');
     if (ws) {
@@ -732,8 +776,7 @@
       if (numericWd) Array.prototype.forEach.call(ws.querySelectorAll('button'), function (b) { b.classList.remove('is-active'); });
     }
     syncChips();
-    syncWeekdayChip();
-    syncSubChip();
+    syncActiveChips();
     syncCalLegend();
     syncQuickActive();
   }
@@ -746,7 +789,7 @@
       var k = b.dataset.quick;
       var on = (k === 'large' && f.amount === 'large') ||
                (k === 'weekend' && f.weekday === 'weekend') ||
-               (k === 'local' && f.origin === 'local') ||
+               (k === 'often' && f.freq === 'often') ||
                (k === 'today' && f.q === todayStr());
       b.classList.toggle('is-active', !!on);
     });
@@ -755,7 +798,7 @@
     var f = state.filters;
     if (kind === 'large') f.amount = f.amount === 'large' ? 'all' : 'large';
     else if (kind === 'weekend') f.weekday = f.weekday === 'weekend' ? 'all' : 'weekend';
-    else if (kind === 'local') f.origin = f.origin === 'local' ? 'all' : 'local';
+    else if (kind === 'often') f.freq = f.freq === 'often' ? 'all' : 'often';
     else if (kind === 'today') f.q = f.q === todayStr() ? '' : todayStr();
     syncFilterUI(); renderBoard();
   }
@@ -788,7 +831,7 @@
   }
   function jumpToDetail(opts) {
     opts = opts || {};
-    if (opts.reset) state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all' };
+    if (opts.reset) state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' };
     if (opts.category !== undefined) state.filters.category = opts.category;
     if (opts.sub !== undefined) state.filters.sub = opts.sub;
     if (opts.type !== undefined) state.filters.type = opts.type;
@@ -2755,7 +2798,7 @@
       var qk = e.target.closest('button[data-quick]');
       if (qk) { applyQuick(qk.dataset.quick); return; }
       var spec = null;
-      ['amount', 'weekday', 'origin', 'part'].some(function (k) {
+      ['amount', 'weekday', 'freq', 'part'].some(function (k) {
         var b = e.target.closest('button[data-' + k + ']');
         if (b) { spec = { k: k, v: b.dataset[k] }; return true; }
         return false;
@@ -2768,14 +2811,12 @@
         syncFilterUI(); renderBoard();
       }
     });
-    if ($('weekdayChip')) $('weekdayChip').addEventListener('click', function () {
-      state.filters.weekday = 'all'; syncFilterUI(); renderBoard();
-    });
-    if ($('subChip')) $('subChip').addEventListener('click', function () {
-      state.filters.sub = 'all'; syncFilterUI(); renderBoard();
+    if ($('activeChips')) $('activeChips').addEventListener('click', function (e) {
+      var c = e.target.closest('button[data-clear]');
+      if (c) clearOneFilter(c.dataset.clear);
     });
     function resetBoardFilters() {
-      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', origin: 'all', part: 'all' };
+      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', freq: 'all', part: 'all' };
       state.focusDate = '';
       syncFilterUI(); renderBoard();
     }
