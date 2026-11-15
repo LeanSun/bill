@@ -717,10 +717,11 @@ html[data-theme="dark"] .cal-item:hover {
 .wk-col.is-today { background: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
 .wk-col.is-today .wk-head { border-bottom-color: color-mix(in srgb, var(--primary) 28%, var(--border)); }
 .wk-head { flex: 0 0 auto; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px dashed var(--border); }
-.wk-head-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
-.wk-dow { font-size: 12px; font-weight: 650; color: var(--muted); }
-.wk-day { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.035em; line-height: 1.05; }
-.wk-col.is-today .wk-day { color: #fff; background: var(--primary); border-radius: 9px; padding: 1px 9px; }
+/* 日号放大到 38px 之后，「周X」和数字离得太远会读成两件事，收到一起并排 */
+.wk-head-top { display: flex; align-items: baseline; justify-content: flex-start; gap: 7px; }
+.wk-dow { font-size: 12.5px; font-weight: 650; color: var(--muted); }
+.wk-day { font-size: 38px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.045em; line-height: 1.02; }
+.wk-col.is-today .wk-day { color: #fff; background: var(--primary); border-radius: 11px; padding: 0 10px; }
 .wk-head-sum { display: flex; flex-wrap: wrap; gap: 3px 8px; margin-top: 6px; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .wk-out { color: var(--expense); }
 .wk-in { color: var(--income); }
@@ -856,7 +857,7 @@ html[data-theme="dark"] .cal-item:hover {
 .dlc-recs .cal-item b { font-size: 12.5px; }
 .dlc-total { font-style: normal; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* 收入行垫底，跟上面五类之间空出一道，一眼分出「花出去的」和「进账的」 */
-.dl-cat.is-inc { margin-top: 8px; }
+.dl-cat.is-inc { margin-top: 14px; }
 .day-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 48px 18px; text-align: center; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 12px; }
 .day-empty strong { font-size: 15px; }
 .day-empty span { font-size: 12.5px; color: var(--muted); }
@@ -976,7 +977,12 @@ html[data-theme="dark"] .cal-item:hover {
 .modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(17, 26, 45, .42); backdrop-filter: blur(7px); animation: fadeIn .28s var(--ease-soft) both; }
 html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.modal { position: relative; width: min(440px, 100%); padding: 24px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-pop); animation: modalIn .42s var(--ease) both; }
+.modal { position: relative; width: min(440px, 100%); padding: 24px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-pop); animation: modalIn .26s var(--ease) both; }
+/* 矮窗口（手机横屏、分屏）：弹窗比视口高时改从顶部排、整层可滚，
+   不再居中裁掉底部的保存按钮 */
+@media (max-height: 780px) {
+  .modal-backdrop { align-items: start; overflow-y: auto; }
+}
 .modal-sm { width: min(360px, 100%); text-align: center; padding: 28px 26px 24px; }
 @keyframes modalIn { from { opacity: 0; transform: translateY(20px) scale(.955); } to { opacity: 1; transform: none; } }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
@@ -1171,15 +1177,16 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .field-row { grid-template-columns: 1fr; gap: 0; }
   .toast-stack { bottom: 12px; right: 12px; left: 12px; }
   /* 390px 一格只有 50px 宽，两块式也放不下名称：
-     条目收成一列同色细条（仍可点开编辑），金额交给天视图 */
+     条目收成一列同色细条（仍可点开编辑），金额交给天视图。
+     这条只针对月格 —— 周历一列 130px，横向还能滚，放得下名称和金额，不跟着收。 */
   .cal-grid { grid-template-rows: repeat(6, minmax(74px, 1fr)); }
   .cal-cell-head { margin-bottom: 4px; min-height: 21px; }
   .cal-daynum { min-width: 21px; height: 21px; font-size: 12px; }
   .cal-daysum { display: none; }
-  .cal-items { grid-template-columns: minmax(0, 1fr); gap: 2px; grid-auto-rows: var(--row-h, 4px); }
-  .cal-item { padding: 0; border: 0; border-radius: 2px; background: var(--c); }
-  .ci-name, .cal-item b { display: none; }
-  .cal-item:hover { background: var(--c); }
+  .cal-grid .cal-items { grid-template-columns: minmax(0, 1fr); gap: 2px; grid-auto-rows: var(--row-h, 4px); }
+  .cal-grid .cal-item { padding: 0; border: 0; border-radius: 2px; background: var(--c); }
+  .cal-grid .ci-name, .cal-grid .cal-item b { display: none; }
+  .cal-grid .cal-item:hover { background: var(--c); }
   .cal-more { padding: 0; background: none; font-size: 10px; }
   .cal-more .cm-full { display: none; }
   .cal-more .cm-mini { display: inline; }
@@ -1522,7 +1529,7 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
 @media (max-width: 940px) {
   .cal-daynum { min-width: 22px; height: 22px; padding: 0 4px; font-size: 12px; }
   .cal-cell-head { min-height: 22px; }
-  .wk-day { font-size: 24px; padding: 1px 8px; }
+  .wk-day { font-size: 30px; padding: 0 8px; }
   .ds-big b { font-size: 34px; padding: 0 8px; }
   .day-side { overflow: auto; }
   .day-insights { grid-template-columns: minmax(0, 1fr); }

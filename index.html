@@ -206,7 +206,7 @@
       <section class="view is-active" id="view-calendar" aria-label="日历" data-page-node-id="u9EMpYmemYlfB7LFDl6Upf">
         <div class="card cal-toolbar" data-page-node-id="EiXNDfNDskwHQSEUiCojZQ">
           <div class="ct-nav" data-page-node-id="39l9ETawRx4uXIxafyHa1I">
-            <button type="button" class="ct-nav-btn" id="calPrev" aria-label="上一段" data-page-node-id="dW956Srcylc4lUB6iLcZHt">
+            <button type="button" class="ct-nav-btn" id="calPrev" aria-label="上一段" title="上一段（←）" data-page-node-id="dW956Srcylc4lUB6iLcZHt">
               <svg viewBox="0 0 24 24" fill="none" data-page-node-id="3FqWTjhG9LVIE0oAokNApr"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="ZnylUGcxwWr5jBtVpEexMa"/></svg>
             </button>
             <div class="ct-title-wrap" data-page-node-id="7lkvKXq7sQqnqCjFyCfJZA">
@@ -223,7 +223,7 @@
                 <div class="cmp-body" id="cmpMonths" data-page-node-id="J88EMUnNpUNEmXyQTWkzGC"></div>
               </div>
             </div>
-            <button type="button" class="ct-nav-btn" id="calNext" aria-label="下一段" data-page-node-id="yAnIVco4RBuOnL1KKxHo64">
+            <button type="button" class="ct-nav-btn" id="calNext" aria-label="下一段" title="下一段（→）" data-page-node-id="yAnIVco4RBuOnL1KKxHo64">
               <svg viewBox="0 0 24 24" fill="none" data-page-node-id="ctQhQgyxLoUKpFBKkRzE5C"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="96PGktjg54w0LxZOL4IyqR"/></svg>
             </button>
           </div>
@@ -283,13 +283,13 @@
             </div>
             <div class="fx-cell fx-sub-slot" data-page-node-id="5OO2ujQ5yZ3QsvIHJKiXx1">
               <div class="seg sub-seg" id="subRow" role="group" aria-label="子类筛选" hidden data-page-node-id="HuS3BNPVzGP9rBV9x2Um8A"><span class="seg-ind" aria-hidden="true" data-page-node-id="3X0xGJZ0sDfiCI2KUHpcro"></span></div>
-                            <div class="seg sub-seg quick-seg" id="subQuick" role="group" aria-label="快捷筛选"><span class="seg-ind" aria-hidden="true"></span>
-                <button type="button" data-quick="all" class="is-active">不限</button>
-                <button type="button" data-quick="hasnote">有备注</button>
-                <button type="button" data-quick="nonote">无备注</button>
-                <button type="button" data-quick="repeat">常见名目</button>
-                <button type="button" data-quick="new">一次性</button>
-                <button type="button" data-quick="multi">多笔日</button>
+                            <div class="seg sub-seg quick-seg" id="subQuick" role="group" aria-label="快捷视角"><span class="seg-ind" aria-hidden="true"></span>
+                <button type="button" data-quick="all" class="is-active" title="不做切分，看当前范围的全部流水">不限</button>
+                <button type="button" data-quick="today" title="只留今天的记录，同时把日历跳到今天">今天</button>
+                <button type="button" data-quick="week" title="只留最近 7 天的记录，同时把日历跳到今天">近7天</button>
+                <button type="button" data-quick="often" title="当前范围里出现最多的十种名目 —— 你的常规消费">常买</button>
+                <button type="button" data-quick="above" title="单笔金额高于当前范围的平均单笔 —— 这笔记贵了">高于均值</button>
+                <button type="button" data-quick="top10" title="当前范围里金额最高的十笔">前10笔</button>
               </div>
             </div>
           </div>

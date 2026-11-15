@@ -480,8 +480,10 @@
   function saveStore() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state.store)); } catch (e) { /* 隐私模式下静默 */ }
     storeRev++;
-    NOTE_FREQ = null;
-    DAY_COUNT = null;
+    OFTEN_CACHE = null;
+    OFTEN_KEY = '';
+    AVG_CACHE = null;
+    AVG_CACHE_KEY = '';
     for (var i = 0; i < STORE_HOOKS.length; i++) {
       try { STORE_HOOKS[i](); } catch (e) { /* 通知失败不能拖垮记账 */ }
     }
@@ -711,25 +713,48 @@
     var y = state.calMonth.year, m = state.calMonth.month;
     return allRecords().filter(function (r) { return r.year === y && r.month === m; });
   }
-  /* 快捷筛选要的两张频次表：名目出现次数、每天记录条数。
-     全量算一次缓存住，saveStore() 里递增 storeRev 时一并清掉。 */
-  var NOTE_FREQ = null, DAY_COUNT = null;
-  function noteFreqOf(n) {
-    if (!NOTE_FREQ) {
-      NOTE_FREQ = Object.create(null);
-      allRecords().forEach(function (r) {
-        var k = canonNote(r.note) || r.sub || '';
-        if (k) NOTE_FREQ[k] = (NOTE_FREQ[k] || 0) + 1;
-      });
-    }
-    return NOTE_FREQ[n] || 0;
+  /* 快捷视角要的两张表：当前范围里最常出现的十个名目（常买）、平均单笔（高于均值）。
+     都按「范围 + storeRev」做键缓存，范围一变或改了账就重算。 */
+  var OFTEN_CACHE = null, OFTEN_KEY = '', AVG_CACHE = null, AVG_CACHE_KEY = '';
+  function rangeCacheKey() {
+    var b = rangeBounds();
+    return storeRev + '|' + dateKey(b.from) + '|' + dateKey(b.to);
   }
-  function dayCountOf(dt) {
-    if (!DAY_COUNT) {
-      DAY_COUNT = Object.create(null);
-      allRecords().forEach(function (r) { DAY_COUNT[r.date] = (DAY_COUNT[r.date] || 0) + 1; });
-    }
-    return DAY_COUNT[dt] || 0;
+  function oftenKeys() {
+    var key = rangeCacheKey();
+    if (OFTEN_CACHE && OFTEN_KEY === key) return OFTEN_CACHE;
+    var b = rangeBounds(), from = dateKey(b.from), to = dateKey(b.to);
+    var freq = Object.create(null);
+    allRecords().forEach(function (r) {
+      if (r.date < from || r.date > to) return;
+      var k = canonNote(r.note) || r.sub || '';
+      if (k) freq[k] = (freq[k] || 0) + 1;
+    });
+    /* 十种最常出现的名目，且至少出现 3 次 —— 一年里只买过两次的东西不算「常买」 */
+    var top = Object.keys(freq).filter(function (n) { return freq[n] >= 3; })
+      .sort(function (a, b2) { return freq[b2] - freq[a] || (a < b2 ? -1 : 1); })
+      .slice(0, 10);
+    OFTEN_CACHE = Object.create(null);
+    top.forEach(function (n) { OFTEN_CACHE[n] = 1; });
+    OFTEN_KEY = key;
+    return OFTEN_CACHE;
+  }
+  function avgTicket() {
+    var key = rangeCacheKey();
+    if (AVG_CACHE !== null && AVG_CACHE_KEY === key) return AVG_CACHE;
+    var b = rangeBounds(), from = dateKey(b.from), to = dateKey(b.to), sum = 0, n = 0;
+    allRecords().forEach(function (r) {
+      if (r.date < from || r.date > to) return;
+      sum += Math.abs(Number(r.amount) || 0); n++;
+    });
+    AVG_CACHE = n ? sum / n : 0;
+    AVG_CACHE_KEY = key;
+    return AVG_CACHE;
+  }
+  function daysAgoStr(n) {
+    var d = new Date();
+    d.setDate(d.getDate() - n);
+    return dateKey(d);
   }
   function matchFilters(r) {
     var f = state.filters;
@@ -753,20 +778,28 @@
       if (f.amount === 'mid' && (a <= 20 || a >= 100)) return false;
       if (f.amount === 'large' && a < 100) return false;
     }
-    /* 快捷标签：备注明细的重复度 / 当天的记录密度，跟金额、星期档位都不重叠 */
+    /* 快捷视角：时间切片（今天 / 近 7 天）、消费习惯（常买）、相对价格（高于均值）、
+       排行（前 10 笔，真正的截断在 boardRecords 里做），跟金额档位、星期互不重叠 */
     if (f.quick) {
-      var noteTxt = String(r.note || '').trim();
-      if (f.quick === 'hasnote' && !noteTxt) return false;
-      if (f.quick === 'nonote' && noteTxt) return false;
-      if (f.quick === 'repeat' && noteFreqOf(canonNote(r.note) || r.sub || '') < 3) return false;
-      if (f.quick === 'new' && noteFreqOf(canonNote(r.note) || r.sub || '') > 1) return false;
-      if (f.quick === 'multi' && dayCountOf(r.date) < 3) return false;
+      var amt = Math.abs(Number(r.amount) || 0);
+      if (f.quick === 'today' && r.date !== todayStr()) return false;
+      if (f.quick === 'week' && (r.date < daysAgoStr(6) || r.date > todayStr())) return false;
+      if (f.quick === 'often' && !oftenKeys()[canonNote(r.note) || r.sub || '']) return false;
+      if (f.quick === 'above' && amt <= avgTicket()) return false;
     }
     if (q && searchBlob(r).replace(/[\s'’"-]/g, '').indexOf(q) === -1) return false;
     return true;
   }
   function boardRecords() {
-    return sortedDesc(rangeRecords().filter(matchFilters));
+    var rows = rangeRecords().filter(matchFilters);
+    /* 「前 10 笔」按金额截断，截完再按日期降序摆回棋盘 —— 单条记录自己判断不了，
+       所以这一档不在 matchFilters 里做 */
+    if (state.filters.quick === 'top10') {
+      rows = rows.slice().sort(function (a, b) {
+        return Math.abs(Number(b.amount) || 0) - Math.abs(Number(a.amount) || 0);
+      }).slice(0, 10);
+    }
+    return sortedDesc(rows);
   }
   function filtersActive() {
     var f = state.filters;
@@ -905,8 +938,8 @@
     syncCalLegend();
     syncQuickActive();
   }
-  /* 快捷分段：和金额、星期、类型都是「并且」，谁也不覆盖谁。
-     这里的五个标签只做前面几行做不到的事：备注明细与当天密度。 */
+  /* 快捷视角：和金额、星期、类型都是「并且」，谁也不覆盖谁。
+     六档只做前面几行做不到的事 —— 时间切片、消费习惯、相对价格、金额排行。 */
   function activeQuickKey(f) {
     return f.quick || 'all';
   }
@@ -919,6 +952,12 @@
   function applyQuick(kind) {
     var f = state.filters;
     f.quick = (kind === 'all' || f.quick === kind) ? '' : kind;
+    /* 时间切片（今天 / 近 7 天）先把日历挪到今天 —— 不然在 2024 年里点「今天」，
+       切片和当前范围没有交集，只会得到一张空棋盘，看着像坏了 */
+    if (f.quick === 'today' || f.quick === 'week') {
+      setAnchor(new Date());
+      state.focusDate = '';
+    }
     syncFilterUI(); renderBoard();
   }
   function setCalMonth(y, m) {
@@ -3022,6 +3061,18 @@
         if (cmpOpen) { closeCmp(); return; }
         if (!$('confirmBackdrop').hidden) { closeConfirm(); return; }
         closeModal();
+        return;
+      }
+      /* ← → 翻页：年 / 月 / 周 / 天 四种粒度都走 shiftCalStep，和两颗箭头同一套逻辑 */
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (state.view !== 'calendar') return;
+        if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+        if (dp.open || cmpOpen || !$('modalBackdrop').hidden || !$('confirmBackdrop').hidden) return;
+        var t = e.target;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''))) return;
+        e.preventDefault();
+        closeCmp();
+        shiftCalStep(e.key === 'ArrowLeft' ? -1 : 1);
       }
     });
 
@@ -3193,13 +3244,19 @@
     });
 
     /* 双击格子 = 进当日明细。双击的前一下已经在队列里排了个「记一笔」，
-       这里先把它撤掉，再跳转，避免弹框闪一下又跳页。 */
+       这里先把它撤掉（慢双击连已经弹出的框一起收回），再跳转。 */
     if (boardEl) boardEl.addEventListener('dblclick', function (e) {
       var cell = e.target.closest('.cal-cell[data-date], .wk-col[data-date]');
       if (!cell || cell.dataset.other === '1') return;
-      cancelCellAdd();
+      absorbDoubleTap(cell.dataset.date);
       jumpToDay(cell.dataset.date);
     });
+
+    /* 判定窗内第二下按下去 = 一次双击正在进行：立刻撤掉挂起的弹框，
+       不用等 dblclick 事件到（这样快双击全程都不会闪出浮层）。 */
+    if (boardEl) boardEl.addEventListener('pointerdown', function () {
+      if (cellTapTimer) cancelCellAdd();
+    }, true);
 
     /* 天页内嵌表单是每次重绘都重建的，事件只能委托在稳定的 .cal-board 上 */
     if (boardEl) {
@@ -3245,17 +3302,29 @@
   }
 
   /* 单击格子 = 就地记一笔（弹出框，日期预填），双击格子 = 进当日明细。
-     两次单击之间留 260ms 判窗：第二下落在窗口内就把挂起的弹框撤掉。 */
-  var cellTapTimer = 0;
+     判窗压到 110ms —— 比一帧慢、比一次双击的间隔快，手指抬起后弹框基本同时到。
+     真正的双击靠两处兜住：第二次 pointerdown 一落就直接撤掉挂起的弹框（快双击不闪），
+     以及 dblclick 里把「刚刚就是这一格弹出来的」框收回（慢双击也不留残影）。 */
+  var CELL_TAP_MS = 110;
+  var CELL_TAP_FRESH = 450;
+  var cellTapTimer = 0, openByTap = { key: '', t: 0 };
   function queueCellAdd(key) {
     if (cellTapTimer) clearTimeout(cellTapTimer);
     cellTapTimer = setTimeout(function () {
       cellTapTimer = 0;
+      openByTap = { key: key, t: Date.now() };
       openModal(null, key);
-    }, 260);
+    }, CELL_TAP_MS);
   }
   function cancelCellAdd() {
     if (cellTapTimer) { clearTimeout(cellTapTimer); cellTapTimer = 0; }
+  }
+  /* 双击落地：撤挂起项，顺手把可能已经弹出来的那一格收回，再跳日 */
+  function absorbDoubleTap(key) {
+    cancelCellAdd();
+    var bd = $('modalBackdrop');
+    if (bd && !bd.hidden && openByTap.key === key && Date.now() - openByTap.t < CELL_TAP_FRESH) closeModal();
+    openByTap = { key: '', t: 0 };
   }
 
 
