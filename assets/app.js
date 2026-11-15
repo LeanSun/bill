@@ -1142,6 +1142,14 @@
       return /^\d{4}-\d{2}-\d{2}$/.test(k) && isFinite(Number(w[k]));
     }).sort();
     var vals = keys.map(function (k) { return Number(w[k]); });
+    var ts = keys.map(function (k) { return new Date(k + 'T00:00:00').getTime(); });
+    /* 隔了 45 天以上的两笔之间插一个空点，把线断开。
+       否则 2023-11 到 2024-08 那段 256 天的空档会被画成一条缓慢下滑的假曲线 */
+    var pts = [], ptKeys = [];
+    keys.forEach(function (k, i) {
+      if (i && ts[i] - ts[i - 1] > 45 * 864e5) { pts.push([(ts[i] + ts[i - 1]) / 2, null]); ptKeys.push(''); }
+      pts.push([ts[i], vals[i]]); ptKeys.push(k);
+    });
     var sub = $('weightSub');
     if (sub) {
       if (!keys.length) sub.textContent = '在天页「体重」里记下第一条';
@@ -1164,18 +1172,28 @@
       formatter: function (ps) {
         if (!ps || !ps.length) return '';
         var i = ps[0].dataIndex;
-        var k = keys[i] || '';
-        var v = ps[0].value;
+        var k = ptKeys[i] || '';
+        var v = Array.isArray(ps[0].value) ? ps[0].value[1] : ps[0].value;
         var d = new Date(k + 'T00:00:00');
         var wd = isNaN(d.getTime()) ? '' : ' 周' + '日一二三四五六'.charAt(d.getDay());
-        return '<div style="font-weight:700;margin-bottom:3px">' + k + wd + '</div>' +
+        return (k ? '<div style="font-weight:700;margin-bottom:3px">' + k + wd + '</div>' : '') +
           '<span style="color:' + p.primary + '">●</span> 体重 <b>' + Number(v).toFixed(1) + ' kg</b>';
       }
     });
-    o.xAxis = catAxis(p, keys.map(function (k) { return k.slice(5); }), {
-      boundaryGap: false,
-      axisLabel: { color: p.muted, fontSize: 10.5, fontFamily: p.font, hideOverlap: true }
-    });
+    /* 横轴改走时间轴：2022-08 到 2026-10 跨了四年多，MM-DD 挤在一起分不清是哪一年。
+       时间轴自己挑刻度，标签统一写成 25.03 这种「年.月」 */
+    o.xAxis = {
+      type: 'time', boundaryGap: false,
+      axisLine: { lineStyle: { color: p.border } }, axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: {
+        color: p.muted, fontSize: 10.5, fontFamily: p.font, hideOverlap: true,
+        formatter: function (v) {
+          var d = new Date(v);
+          return String(d.getFullYear()).slice(2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2);
+        }
+      }
+    };
     o.yAxis = valAxis(p, {
       scale: true,
       min: function (v) { return Math.floor(v.min - 1); },
@@ -1185,7 +1203,7 @@
     var avg = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0;
     o.series = [{
       name: '体重', type: 'line', smooth: .34, symbol: 'circle', symbolSize: 7,
-      showSymbol: vals.length <= 40, data: vals,
+      showSymbol: vals.length <= 40, data: pts,
       lineStyle: { width: 2.6, color: p.primary },
       itemStyle: { color: p.primary, borderColor: p.surface, borderWidth: 2 },
       areaStyle: { color: gradV(withAlpha(p.primary, .26), withAlpha(p.primary, 0)) },
