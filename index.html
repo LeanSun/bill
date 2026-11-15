@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light" data-page-node-id="DyKtkQoVvhoj867gtzttrx">
+<html lang="zh-CN" data-theme="light" data-dateplate="plate" data-page-node-id="DyKtkQoVvhoj867gtzttrx">
 <head data-page-node-id="3IGW7iSUaJLFO2lzbznZDM">
 <meta charset="UTF-8" data-page-node-id="atJsNRPOZ7cQnjmg3YsLyW">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" data-page-node-id="Gt9WWAqdh6bVMoQGN3YoDG">
@@ -54,6 +54,12 @@
             <svg class="ico-moon" viewBox="0 0 24 24" fill="none" data-page-node-id="Gntt4PxZqNetJFBMJncj2P"><path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5 8.6 8.6 0 1 0 20.5 14.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" data-page-node-id="wobAXtLJIipbKk635ELPmt"/></svg>
           </span>
           <span class="side-tool-label" data-page-node-id="5GYM66iD2lZNWW4mUdYF6i">深浅切换</span>
+        </button>
+        <button type="button" class="side-tool-btn" id="datePlateBtn" aria-pressed="true" aria-label="切换日期嵌入板效果" title="日期嵌入板：开">
+          <span class="side-tool-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="17" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 9.5h17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M8 14.5h3v3H8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="side-tool-label">日期嵌入</span>
         </button>
         <button type="button" class="icon-btn sync-mobile-btn" id="syncBtnM" aria-label="云同步设置" title="云同步" data-page-node-id="QY5FS2D1GlGHnhKAtMAckU">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" data-page-node-id="bhCE6QopXBBj5bprr8Px3f"><path d="M6.5 18a4.5 4.5 0 0 1-.42-8.98 6 6 0 0 1 11.7-1.06A4.5 4.5 0 0 1 17.5 18h-11Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" data-page-node-id="HjLkySfPkaw2dK78TWBD70"/><path d="m9.5 14.5 2.5 2.5 2.5-2.5M12 17v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="XZQ4YpzXdEXn8PK2FT3y6H"/></svg>
@@ -141,16 +147,6 @@
         </div>
 
         <div class="card stat-mini" style="--i:1" role="group" aria-label="本月速览" data-page-node-id="o2UHwJCZU47HzH5jCphCux">
-          <div class="sm-cell" data-page-node-id="GT9vXQCI9ZOxDr8EltPRGu">
-            <span class="sm-label" id="mmL1" data-page-node-id="v8NHn5C38hug5SEP1pQWuk">本月支出</span>
-            <b class="sm-value" id="mmExp" data-page-node-id="wgHzTez55OeMNAeSXkdEgy">¥0</b>
-            <i class="sm-note" id="mmExpD" data-page-node-id="CUUGxWIBj1s3KcWmDhDqGR">较上月 —</i>
-          </div>
-          <div class="sm-cell" data-page-node-id="SZCXRvGVNfERlvD2fBAyVK">
-            <span class="sm-label" id="mmL2" data-page-node-id="XFJxyTTOLPNZLlaTfUeh4y">本月结余</span>
-            <b class="sm-value" id="mmBal" data-page-node-id="jop9IB9Rb2uQuA9ueD2FDn">¥0</b>
-            <i class="sm-note" id="mmBalD" data-page-node-id="w2zoB1qL7WLWAhFBCKqVQE">储蓄率 0%</i>
-          </div>
           <div class="sm-cell" data-page-node-id="9gqz4Q8HpTzl75WgnG6d2G">
             <span class="sm-label" id="mmL3" data-page-node-id="V0DjvAiwHWDEmNQXmvFDOF">日均支出</span>
             <b class="sm-value" id="mmDaily" data-page-node-id="gUWuvND8OTKacThDjQK0h3">¥0</b>
@@ -209,26 +205,6 @@
         </article>
 
         <div class="chart-grid" data-page-node-id="OzM9fFthxf7lEac9ql6B5Z">
-          <article class="card chart-card stat-card" style="--i:1" data-oid="focus">
-            <div class="card-head"><div><h3>消费集中度</h3><p>前三类支出占比与餐饮权重</p></div></div>
-            <div class="ov-stat" id="statFocus"></div>
-          </article>
-
-          <article class="card chart-card stat-card" style="--i:2" data-oid="recur">
-            <div class="card-head"><div><h3>固定支出</h3><p>连续多月出现的固定名目</p></div></div>
-            <div class="ov-stat" id="statRecur"></div>
-          </article>
-
-          <article class="card chart-card stat-card span-2" style="--i:3" data-oid="rhythm">
-            <div class="card-head"><div><h3>记账节奏</h3><p>有账天数、连续记录与单日峰值</p></div></div>
-            <div class="ov-stat" id="statRhythm"></div>
-          </article>
-
-          <article class="card chart-card" style="--i:2" data-page-node-id="HMmKChNlMp71riaz9DqCUh">
-            <div class="card-head" data-page-node-id="BNkwIU0V4PzFzuGjI0Chr4"><div data-page-node-id="p8jqurhA6eh2m27oBzPA76"><h3 data-page-node-id="CtpILXqaozD6m9WttnbEzv">分类排行</h3><p data-page-node-id="bDNJfbzASXI2BnnoqPTo9s">累计支出金额</p></div></div>
-            <div class="chart chart-md" id="chartRank" data-page-node-id="uokEsLR1IDwRHxYKSrQi6w"></div>
-          </article>
-
           <article class="card chart-card span-2" style="--i:4" data-page-node-id="MjGJ8ZeE3oTMDs8EjPTR44">
             <div class="card-head" data-page-node-id="6bc5AO7BDjbew9yhiHDMcn">
               <div data-page-node-id="mi8lds5DuwjV8lqhUqIXs9"><h3 data-page-node-id="qwkaf4neWeFpGQ4WgPmiAb">消费日历</h3><p id="calendarSub" data-page-node-id="YBzrIuEN1rEMidmAUrIB3U">颜色越深，当日支出越高</p></div>
