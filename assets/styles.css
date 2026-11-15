@@ -488,17 +488,55 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .ct-count { flex: 0 0 70px; width: 70px; text-align: center; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .ct-vr { width: 1px; height: 28px; background: var(--border); flex: 0 0 1px; }
 
-/* 分类 / 子类：筛选区独占第二行，两条等宽分段控件并排。
-   段数写进 --seg-n，滑块靠 --seg-i 平移，和「全部 / 支 / 收」完全同款；
-   子类出现时主类收到 58%，两条都不再有隐藏按钮。 */
-.ct-filters { display: flex; gap: 8px; flex: 1 1 100%; min-width: 0; }
-.cat-seg { flex: 1 1 100%; min-width: 0; }
-.ct-filters.has-sub .cat-seg { flex: 0 0 58%; }
-.sub-seg { flex: 1 1 auto; min-width: 0; }
-.cat-seg, .sub-seg { padding: 4px; border-radius: 12px; }
+/* 大项第一行、子项第二行：两列栅格，左右边界上下严格对齐。
+   右侧空白区补四组独立筛选；左侧第二行在没有子类时给快捷项。 */
+.ct-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  grid-template-rows: auto auto;
+  gap: 8px; flex: 1 1 100%; min-width: 0;
+}
+.cat-seg { grid-column: 1; grid-row: 1; }
+.fx-main { grid-column: 2; grid-row: 1; }
+.fx-sub-slot { grid-column: 1; grid-row: 2; }
+.fx-extra { grid-column: 2; grid-row: 2; }
+.fx-cell { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.fx-cell > .seg { flex: 1 1 0; min-width: 0; }
+.cat-seg, .sub-seg, .fx-seg { min-width: 0; padding: 4px; border-radius: 12px; }
+.fx-seg { padding: 3px; border-radius: 10px; }
+.fx-seg button {
+  font-size: 12px; padding: 7px 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fx-seg button.is-active { color: var(--text); font-weight: 700; }
+.fx-seg .seg-ind {
+  top: 3px; left: 3px;
+  width: calc((100% - 6px) / var(--seg-n)); height: calc(100% - 6px);
+  background: color-mix(in srgb, var(--primary) 30%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  box-shadow: 0 1px 3px rgba(24, 39, 75, .08);
+  transition: transform .42s var(--ease), background-color .3s, border-color .3s;
+}
+/* 图表按某个具体星期跳转时，三段控件没有对应项，滑块收起来 */
+.fx-seg.is-custom .seg-ind { opacity: 0; }
+.fx-quick {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 12px;
+  background: var(--surface-3); border: 1px solid var(--border);
+}
+.fq-label { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.fx-quick button {
+  padding: 5px 10px; border-radius: 20px; white-space: nowrap;
+  font-size: 11.5px; font-weight: 600; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border);
+  transition: color .2s, background-color .2s, border-color .2s;
+}
+.fx-quick button:hover { color: var(--primary); border-color: var(--primary); }
+.fx-quick button.is-active { color: #fff; background: var(--primary); border-color: var(--primary); }
 .cat-seg button, .sub-seg button {
   font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  color: var(--ink, var(--text-2));
+  color: var(--ink, var(--text-2)); padding: 7px 2px;
 }
 .cat-seg button.is-active, .sub-seg button.is-active { color: var(--text); font-weight: 700; }
 .cat-seg .seg-ind, .sub-seg .seg-ind {
@@ -1097,9 +1135,12 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 }
 @media (max-width: 760px) {
   .cal-toolbar { gap: 8px; }
-  /* 手机上两条分段控件上下排，主类仍是 7 等分 */
-  .ct-filters, .ct-filters.has-sub { flex-direction: column; }
-  .ct-filters.has-sub .cat-seg { flex: 1 1 auto; }
+  /* 手机上筛选区两列塌成一列，仍是「大项 → 子项 → 附加项」上下两行 */
+  .ct-filters { grid-template-columns: minmax(0, 1fr); }
+  .cat-seg, .fx-main, .fx-sub-slot, .fx-extra { grid-column: 1; }
+  .cat-seg { grid-row: 1; } .fx-main { grid-row: 2; }
+  .fx-sub-slot { grid-row: 3; } .fx-extra { grid-row: 4; }
+  .fx-cell { flex-wrap: wrap; }
   .cat-seg button, .sub-seg button { font-size: 11.5px; padding: 8px 2px; }
   .ct-right { flex: 1 1 100%; justify-content: flex-end; margin-left: 0; }
   .ct-count { display: none; }
@@ -1278,3 +1319,82 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   animation: tipIn .14s ease both;
 }
 @keyframes tipIn { from { opacity: 0; transform: translate(-50%, calc(-100% + 5px)); } to { opacity: 1; transform: translate(-50%, -100%); } }
+
+/* ---------------- 总览：可拖拽 / 可缩放布局 ---------------- */
+.ov-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 14px; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2);
+}
+.ov-toolbar .btn { padding: 7px 12px; font-size: 12.5px; }
+.ov-edit svg { width: 15px; height: 15px; }
+.ov-edit.is-on { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.ov-hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.ov-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 46px;
+  grid-auto-flow: row dense;
+  gap: 12px; align-items: stretch;
+}
+.ov-grid > .ov-panel {
+  position: relative; min-width: 0; min-height: 0; margin: 0;
+  overflow: hidden;
+}
+.ov-grid > .stat-strip { grid-template-rows: 1fr; }
+.ov-grid > .stat-mini { grid-template-rows: 1fr; }
+.ov-grid > .chart-card, .ov-grid > .annual-card { display: flex; flex-direction: column; }
+.ov-grid > .chart-card > .chart { flex: 1 1 auto; height: auto !important; min-height: 0; }
+.ov-grid > .annual-card > .annual-grid { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.ov-grid > .merged-head { align-items: center; padding: 0 6px; border-top: 0; }
+.ov-grip, .ov-resize { display: none; }
+.is-editing .ov-panel { outline: 1px dashed color-mix(in srgb, var(--primary) 45%, var(--border)); outline-offset: -1px; }
+.is-editing .ov-panel:hover { outline-color: var(--primary); }
+.is-editing .ov-grip {
+  display: grid; place-items: center;
+  position: absolute; z-index: 6; top: 5px; left: 5px;
+  width: 27px; height: 27px; border-radius: 8px;
+  color: #fff; background: var(--primary); border: 0;
+  box-shadow: 0 4px 12px -4px var(--primary); cursor: grab;
+}
+.is-editing .ov-grip:active { cursor: grabbing; }
+.is-editing .ov-grip svg { width: 15px; height: 15px; }
+.is-editing .ov-resize {
+  display: block; position: absolute; z-index: 6; right: 4px; bottom: 4px;
+  width: 17px; height: 17px; border-radius: 0 0 6px 0;
+  border-right: 3px solid var(--primary); border-bottom: 3px solid var(--primary);
+  cursor: nwse-resize;
+}
+.ov-ghost {
+  position: fixed; z-index: 9998; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--primary); border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  font-size: 13px; font-weight: 700; color: var(--primary);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .45);
+}
+.ov-panel.is-drag-src { opacity: .32; }
+.ov-panel.is-drop-target { outline: 3px solid var(--primary) !important; outline-offset: -3px; }
+body.is-ov-dragging { user-select: none; cursor: grabbing; }
+/* 窄屏不排布：回到一列纵向流，顺序仍按保存的来 */
+@media (max-width: 940px) {
+  .ov-toolbar { display: none; }
+  .ov-grid { display: flex; flex-direction: column; gap: 14px; }
+  .ov-grid > .ov-panel { width: 100%; }
+  .ov-grid > .chart-card > .chart { flex: 0 0 auto; height: 270px !important; }
+  .ov-grid > .chart-card > .chart.chart-calendar { height: 300px !important; }
+  .ov-grid > .annual-card > .annual-grid { overflow: visible; }
+}
+
+/* 编辑态：手柄不压标题，正文让出左侧 32px */
+.is-editing .ov-grid > .chart-card > .card-head,
+.is-editing .ov-grid > .annual-card > .card-head { padding-left: 32px; }
+.is-editing .ov-grid > .stat-strip > .stat-cell:first-child,
+.is-editing .ov-grid > .stat-mini > .sm-cell:first-child { padding-left: 38px; }
+.is-editing .ov-grid > .merged-head { padding-left: 38px; }
+.ov-grid > .stat-strip > .stat-cell { justify-content: space-between; }
+@media (max-width: 940px) {
+  .fx-seg button { font-size: 10.5px; padding: 7px 1px; }
+  .fx-quick { flex-wrap: wrap; }
+}

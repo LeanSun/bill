@@ -245,14 +245,15 @@
       added: s.added || [],
       edited: s.edited || {},
       deleted: s.deleted || [],
-      theme: s.theme === 'dark' ? 'dark' : 'light'
+      theme: s.theme === 'dark' ? 'dark' : 'light',
+      layout: s.layout || null
     };
   }
   function hasContent(s) {
     if (!s) return false;
     return (s.added || []).length > 0 ||
       Object.keys(s.edited || {}).length > 0 ||
-      (s.deleted || []).length > 0;
+      (s.deleted || []).length > 0 || !!s.layout;
   }
 
   function adopt(remote, sha) {

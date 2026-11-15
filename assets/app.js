@@ -143,11 +143,12 @@
     compareMetric: 'expense',
     calendarYear: Y_LAST,
     annualScope: 'both',
-    filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all' },
+    filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', origin: 'all', part: 'all' },
     editingId: null,
     entryType: 'expense',
     pendingDeleteId: null,
-    store: { added: [], edited: {}, deleted: [] }
+    store: { added: [], edited: {}, deleted: [] },
+    layout: null
   };
 
   var charts = {};
@@ -527,15 +528,39 @@
     return allRecords().filter(function (r) { return r.year === y && r.month === m; });
   }
   function matchFilters(r) {
-    var q = state.filters.q.trim().toLowerCase();
-    var wd = state.filters.weekday;
-    var wdNum = (wd === 'all' || wd === '') ? -1 : Number(wd);
-    if (state.filters.type !== 'all' && r.type !== state.filters.type) return false;
-    if (state.filters.category !== 'all' && r.category !== state.filters.category) return false;
-    if (state.filters.sub !== 'all' && r.sub !== state.filters.sub) return false;
-    if (wdNum >= 0) {
-      var d = new Date(r.date + 'T00:00:00');
-      if (isNaN(d.getTime()) || (d.getDay() + 6) % 7 !== wdNum) return false;
+    var f = state.filters;
+    var q = f.q.trim().toLowerCase();
+    var wd = f.weekday;
+    if (f.type !== 'all' && r.type !== f.type) return false;
+    if (f.category !== 'all' && r.category !== f.category) return false;
+    if (f.sub !== 'all' && r.sub !== f.sub) return false;
+    /* 星期：数字来自图表点击（0=周一），workday / weekend 来自新增的分段控件 */
+    var d = new Date(r.date + 'T00:00:00');
+    if (wd && wd !== 'all') {
+      var dow = isNaN(d.getTime()) ? -1 : (d.getDay() + 6) % 7;
+      if (wd === 'workday' && !(dow >= 0 && dow < 5)) return false;
+      else if (wd === 'weekend' && dow < 5) return false;
+      else if (/^\d+$/.test(String(wd)) && dow !== Number(wd)) return false;
+    }
+    /* 金额档位 */
+    if (f.amount && f.amount !== 'all') {
+      var a = Math.abs(Number(r.amount) || 0);
+      if (f.amount === 'small' && a > 20) return false;
+      if (f.amount === 'mid' && (a <= 20 || a >= 100)) return false;
+      if (f.amount === 'large' && a < 100) return false;
+    }
+    /* 来源：本地新增的 id 以 u 打头 */
+    if (f.origin && f.origin !== 'all') {
+      var isLocal = String(r.id || '').charAt(0) === 'u';
+      if (f.origin === 'local' && !isLocal) return false;
+      if (f.origin === 'seed' && isLocal) return false;
+    }
+    /* 时段：按每月的上 / 中 / 下旬切 */
+    if (f.part && f.part !== 'all') {
+      var dom = Number(String(r.date).slice(8, 10)) || 0;
+      if (f.part === 'early' && !(dom >= 1 && dom <= 10)) return false;
+      if (f.part === 'mid' && !(dom >= 11 && dom <= 20)) return false;
+      if (f.part === 'late' && dom < 21) return false;
     }
     if (q && (r.note + ' ' + r.sub + ' ' + r.category + ' ' + r.date).toLowerCase().indexOf(q) === -1) return false;
     return true;
@@ -545,7 +570,9 @@
   }
   function filtersActive() {
     var f = state.filters;
-    return f.category !== 'all' || f.sub !== 'all' || f.type !== 'all' || (f.weekday !== 'all' && f.weekday !== '') || !!f.q.trim();
+    return f.category !== 'all' || f.sub !== 'all' || f.type !== 'all' ||
+      (f.weekday !== 'all' && f.weekday !== '') || !!f.q.trim() ||
+      (f.amount && f.amount !== 'all') || (f.origin && f.origin !== 'all') || (f.part && f.part !== 'all');
   }
   /* 当前筛选下命中最多（并列取最近）的年月，用于点击图表跳转后落在有数据的月份 */
   function bestMonthForFilters() {
@@ -679,7 +706,8 @@
     var wd = state.filters.weekday;
     if (wd === 'all' || wd === '') { el.hidden = true; return; }
     el.hidden = false;
-    el.innerHTML = WEEKDAYS[Number(wd)] + ' <b>×</b>';
+    var label = wd === 'workday' ? '工作日' : (wd === 'weekend' ? '周末' : WEEKDAYS[Number(wd)]);
+    el.innerHTML = (label || wd) + ' <b>×</b>';
   }
   function syncSubChip() {
     var el = $('subChip');
@@ -690,12 +718,46 @@
     el.innerHTML = s + ' <b>×</b>';
   }
   function syncFilterUI() {
-    if ($('searchInput')) $('searchInput').value = state.filters.q;
-    setSegActive($('typeSeg'), 'data-type', state.filters.type);
+    var f = state.filters;
+    if ($('searchInput')) $('searchInput').value = f.q;
+    setSegActive($('typeSeg'), 'data-type', f.type);
+    setSegActive($('amountSeg'), 'data-amount', f.amount || 'all');
+    setSegActive($('originSeg'), 'data-origin', f.origin || 'all');
+    setSegActive($('partSeg'), 'data-part', f.part || 'all');
+    var ws = $('weekdaySeg');
+    if (ws) {
+      var numericWd = /^\d+$/.test(String(f.weekday));
+      setSegActive(ws, 'data-weekday', numericWd ? 'all' : (f.weekday || 'all'));
+      ws.classList.toggle('is-custom', numericWd);
+      if (numericWd) Array.prototype.forEach.call(ws.querySelectorAll('button'), function (b) { b.classList.remove('is-active'); });
+    }
     syncChips();
     syncWeekdayChip();
     syncSubChip();
     syncCalLegend();
+    syncQuickActive();
+  }
+  /* 快捷项跟随当前生效的筛选高亮，再点一次即取消 */
+  function syncQuickActive() {
+    var box = $('subQuick');
+    if (!box) return;
+    var f = state.filters;
+    Array.prototype.forEach.call(box.querySelectorAll('button[data-quick]'), function (b) {
+      var k = b.dataset.quick;
+      var on = (k === 'large' && f.amount === 'large') ||
+               (k === 'weekend' && f.weekday === 'weekend') ||
+               (k === 'local' && f.origin === 'local') ||
+               (k === 'today' && f.q === todayStr());
+      b.classList.toggle('is-active', !!on);
+    });
+  }
+  function applyQuick(kind) {
+    var f = state.filters;
+    if (kind === 'large') f.amount = f.amount === 'large' ? 'all' : 'large';
+    else if (kind === 'weekend') f.weekday = f.weekday === 'weekend' ? 'all' : 'weekend';
+    else if (kind === 'local') f.origin = f.origin === 'local' ? 'all' : 'local';
+    else if (kind === 'today') f.q = f.q === todayStr() ? '' : todayStr();
+    syncFilterUI(); renderBoard();
   }
   function setCalMonth(y, m) {
     state.calMonth = { year: Number(y), month: Number(m) };
@@ -1434,8 +1496,9 @@
   /* ---------------- 日历：分类 / 子类筛选（与工具条同一行） ---------------- */
   var cmpYear = 2026, cmpOpen = false;
   /* 分类 / 子类各是一条独立的等宽分段控件，和「全部 / 支 / 收」完全同款：
-     段数写进 --seg-n，滑块靠 --seg-i 平移。两条各占筛选区的一行/一格，
-     子类出现时不再把主类挤出可视区，也不再有隐藏按钮。 */
+     段数写进 --seg-n，滑块靠 --seg-i 平移。
+     关键：按钮与 .seg-ind 只在「集合真的变了」时重建；同一次筛选切换
+     只改 is-active 与 --seg-i，滑块节点留在原地，transform 过渡才会跑。 */
   function syncFilterSeg(el) {
     if (!el) return;
     var bs = el.querySelectorAll('button[data-cat], button[data-sub]');
@@ -1451,51 +1514,70 @@
     el.dataset.active = String(idx);
     if (ac) el.style.setProperty('--ac', ac);
   }
+  function markActive(el, attr, value) {
+    if (!el) return;
+    Array.prototype.forEach.call(el.querySelectorAll('button[' + attr + ']'), function (b) {
+      b.classList.toggle('is-active', b.getAttribute(attr) === String(value));
+    });
+  }
   function renderCatBar(p) {
-    var catBox = $('catRow'), subBox = $('subRow'), wrap = $('ctFilters');
+    var catBox = $('catRow'), subBox = $('subRow'), wrap = $('ctFilters'), quick = $('subQuick');
     if (!catBox || !subBox) return;
     var cat = state.filters.category;
     var colors = catColors(p);
+    var theme = document.documentElement.getAttribute('data-theme') || 'light';
 
-    var html = '<span class="seg-ind" aria-hidden="true"></span>' +
-      '<button type="button" data-cat="all" style="--c:' + p.primary + ';--ink:' + catInk(p, p.primary) + '"' +
-      (cat === 'all' ? ' class="is-active"' : '') + '>全部</button>';
-    EXPENSE_CATS.forEach(function (c, i) {
-      html += '<button type="button" data-cat="' + esc(c) + '" style="--c:' + colors[i] + ';--ink:' + catInk(p, colors[i]) + '"' +
-        (cat === c ? ' class="is-active"' : '') + '>' + esc(c) + '</button>';
-    });
-    html += '<button type="button" data-cat="收入" style="--c:' + p.income + ';--ink:' + catInk(p, p.income) + '"' +
-      (cat === '收入' ? ' class="is-active"' : '') + '>收入</button>';
-    catBox.innerHTML = html;
+    /* 主类：只随换肤重建。筛选切换时节点保持不动，滑块真正滑过去。 */
+    var mainSig = theme + '|' + p.primary + '|' + p.income + '|' + EXPENSE_CATS.join(',');
+    if (catBox.dataset.sig !== mainSig) {
+      var html = '<span class="seg-ind" aria-hidden="true"></span>' +
+        '<button type="button" data-cat="all" style="--c:' + p.primary + ';--ink:' + catInk(p, p.primary) + '">全部</button>';
+      EXPENSE_CATS.forEach(function (c, i) {
+        html += '<button type="button" data-cat="' + esc(c) + '" style="--c:' + colors[i] + ';--ink:' + catInk(p, colors[i]) + '">' + esc(c) + '</button>';
+      });
+      html += '<button type="button" data-cat="收入" style="--c:' + p.income + ';--ink:' + catInk(p, p.income) + '">收入</button>';
+      catBox.innerHTML = html;
+      catBox.dataset.sig = mainSig;
+    }
+    markActive(catBox, 'data-cat', cat);
+    syncFilterSeg(catBox);
 
-    var sub = '';
+    /* 子类：换分类 / 换肤 / 笔数变化才重建；同一分类里换子类只挪滑块 */
+    var names = [], counts = {}, tot = 0;
     if (cat !== 'all') {
-      var base = catColor(p, cat);
-      var counts = {}, tot = 0;
       rangeRecords().forEach(function (r) {
         if (r.category !== cat) return;
         counts[r.sub] = (counts[r.sub] || 0) + 1;
         tot++;
       });
-      var names = subCatNames(cat);
-      sub = '<span class="seg-ind" aria-hidden="true"></span>';
-      sub += '<button type="button" class="ct-sub' + (state.filters.sub === 'all' ? ' is-active' : '') +
-        '" data-sub="all" style="--c:' + p.primary + ';--ink:' + catInk(p, p.primary) + '">全部<b>' + tot + '</b></button>';
-      names.forEach(function (s, i) {
-        var n = counts[s] || 0;
-        var on = state.filters.sub === s;
-        var step = names.length <= 1 ? .1 : (i / Math.max(1, names.length - 1)) * .5;
-        var col = mixColor(base, p.surface, .1 + step * .45);
-        sub += '<button type="button" class="ct-sub' + (on ? ' is-active' : '') + (n ? '' : ' is-empty') +
-          '" data-sub="' + esc(s) + '" style="--c:' + col + ';--ink:' + catInk(p, col) + '">' + esc(s) +
-          '<b>' + n + '</b></button>';
-      });
+      names = subCatNames(cat);
     }
-    subBox.innerHTML = sub;
-    subBox.hidden = !sub;
-    if (wrap) wrap.classList.toggle('has-sub', !!sub);
-    syncFilterSeg(catBox);
-    syncFilterSeg(subBox);
+    var subSig = names.length ? theme + '|' + p.primary + '|' + cat + '|' + names.join(',') + '|' +
+      names.map(function (n) { return counts[n] || 0; }).join(',') + '|' + tot : '';
+    if (subBox.dataset.sig !== subSig) {
+      var sub = '';
+      if (names.length) {
+        var base = catColor(p, cat);
+        sub = '<span class="seg-ind" aria-hidden="true"></span>';
+        sub += '<button type="button" class="ct-sub" data-sub="all" style="--c:' + p.primary + ';--ink:' + catInk(p, p.primary) + '">全部<b>' + tot + '</b></button>';
+        names.forEach(function (name, i) {
+          var n = counts[name] || 0;
+          var step = names.length <= 1 ? .1 : (i / Math.max(1, names.length - 1)) * .5;
+          var col = mixColor(base, p.surface, .1 + step * .45);
+          sub += '<button type="button" class="ct-sub' + (n ? '' : ' is-empty') + '" data-sub="' + esc(name) +
+            '" style="--c:' + col + ';--ink:' + catInk(p, col) + '">' + esc(name) + '<b>' + n + '</b></button>';
+        });
+      }
+      subBox.innerHTML = sub;
+      subBox.dataset.sig = subSig;
+    }
+    if (names.length) {
+      markActive(subBox, 'data-sub', state.filters.sub);
+      syncFilterSeg(subBox);
+    }
+    subBox.hidden = !names.length;
+    if (quick) quick.hidden = !!names.length;
+    if (wrap) wrap.classList.toggle('has-sub', !!names.length);
   }
   function syncCalLegend() { renderCatBar(palette()); }
 
@@ -2668,6 +2750,22 @@
       if (s) {
         state.filters.sub = (state.filters.sub === s.dataset.sub || s.dataset.sub === 'all') ? 'all' : s.dataset.sub;
         syncFilterUI(); renderBoard();
+        return;
+      }
+      var qk = e.target.closest('button[data-quick]');
+      if (qk) { applyQuick(qk.dataset.quick); return; }
+      var spec = null;
+      ['amount', 'weekday', 'origin', 'part'].some(function (k) {
+        var b = e.target.closest('button[data-' + k + ']');
+        if (b) { spec = { k: k, v: b.dataset[k] }; return true; }
+        return false;
+      });
+      if (spec) {
+        var f = state.filters;
+        var nv = spec.v === 'all' ? 'all' : (f[spec.k] === spec.v ? 'all' : spec.v);
+        f[spec.k] = nv;
+        if (spec.k === 'weekday') f.weekday = nv;
+        syncFilterUI(); renderBoard();
       }
     });
     if ($('weekdayChip')) $('weekdayChip').addEventListener('click', function () {
@@ -2677,7 +2775,7 @@
       state.filters.sub = 'all'; syncFilterUI(); renderBoard();
     });
     function resetBoardFilters() {
-      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all' };
+      state.filters = { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all', origin: 'all', part: 'all' };
       state.focusDate = '';
       syncFilterUI(); renderBoard();
     }
@@ -2833,6 +2931,282 @@
     });
   }
 
+  /* ---------------- 总览：可拖动 / 可缩放的板块布局 ----------------
+     12 列栅格，每块记 [列宽, 行高]；拖动改 DOM 顺序，右下角手柄改跨度。
+     保存后进 localStorage，并随云同步的 state.json 一起走 —— 换设备拿到
+     同一份排布；要固化成默认，把保存下来的 JSON 抄进 DEFAULT_LAYOUT 即可。 */
+  var LAYOUT_KEY = 'qingzhang.overview.layout.v1';
+  var OV_COLS = 12;
+  var DEFAULT_LAYOUT = {
+    v: 1,
+    order: ['kpi', 'mini', 'trend', 'donut', 'balance', 'divider', 'annual',
+      'compare', 'rank', 'weekday', 'calheat', 'stack', 'top'],
+    spans: {
+      kpi: [12, 3], mini: [12, 2], trend: [12, 7], donut: [6, 7], balance: [6, 7],
+      divider: [12, 1], annual: [12, 7], compare: [12, 7], rank: [6, 6], weekday: [6, 6],
+      calheat: [12, 8], stack: [12, 7], top: [12, 7]
+    }
+  };
+  var ovGrid = null, ovEditing = false;
+  var OV_CHART_IDS = {
+    chartTrend: 'trend', chartDonut: 'donut', chartBalance: 'balance',
+    chartCompare: 'compare', chartRank: 'rank', chartWeekday: 'weekday',
+    chartCalendar: 'calheat', chartStack: 'stack', chartTop: 'top'
+  };
+  function ovIdOf(el) {
+    var c = el.querySelector('.chart[id]');
+    if (c) return OV_CHART_IDS[c.id] || c.id;
+    if (el.classList.contains('stat-strip')) return 'kpi';
+    if (el.classList.contains('stat-mini')) return 'mini';
+    if (el.classList.contains('merged-head')) return 'divider';
+    if (el.classList.contains('annual-card')) return 'annual';
+    return 'p' + Math.random().toString(36).slice(2, 7);
+  }
+  function ovTitleOf(el) {
+    var h = el.querySelector('h3, h2');
+    if (h) return h.textContent.trim();
+    if (el.classList.contains('stat-strip')) return '收支总览';
+    if (el.classList.contains('stat-mini')) return '本月速览';
+    return '板块';
+  }
+  function validLayout(L) {
+    return !!(L && L.v === 1 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+  }
+  function readLayout() {
+    try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
+    return null;
+  }
+  function writeLayout(L) {
+    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(L)); } catch (e) { /* noop */ }
+  }
+  function setOvSpan(el, w, h) {
+    el.dataset.ovW = String(w);
+    el.dataset.ovH = String(h);
+    el.style.gridColumn = 'span ' + w;
+    el.style.gridRow = 'span ' + h;
+  }
+  function collectLayout() {
+    var L = { v: 1, order: [], spans: {} };
+    if (!ovGrid) return L;
+    Array.prototype.forEach.call(ovGrid.children, function (el) {
+      if (!el.classList || !el.classList.contains('ov-panel')) return;
+      var id = el.dataset.ovId;
+      L.order.push(id);
+      L.spans[id] = [Number(el.dataset.ovW) || 12, Number(el.dataset.ovH) || 6];
+    });
+    return L;
+  }
+  function applyLayout(L) {
+    if (!ovGrid || !validLayout(L)) return;
+    var byId = {}, i;
+    Array.prototype.forEach.call(ovGrid.children, function (el) {
+      if (el.dataset && el.dataset.ovId) byId[el.dataset.ovId] = el;
+    });
+    for (i = 0; i < L.order.length; i++) {
+      var el = byId[L.order[i]];
+      if (!el) continue;
+      ovGrid.appendChild(el);
+      delete byId[L.order[i]];
+    }
+    Object.keys(byId).forEach(function (id) { ovGrid.appendChild(byId[id]); });
+    Array.prototype.forEach.call(ovGrid.children, function (el) {
+      var sp = (L.spans && L.spans[el.dataset.ovId]) || [12, 6];
+      setOvSpan(el,
+        Math.max(3, Math.min(OV_COLS, Number(sp[0]) || 12)),
+        Math.max(1, Math.min(20, Number(sp[1]) || 6)));
+    });
+    requestAnimationFrame(resizeAll);
+  }
+  function initOverviewLayout() {
+    var view = $('view-overview');
+    if (!view) return;
+    var grid = document.createElement('div');
+    grid.className = 'ov-grid';
+    grid.id = 'overviewGrid';
+    var panels = [], wrappers = [];
+    Array.prototype.slice.call(view.children).forEach(function (node) {
+      if (!node.classList) return;
+      if (node.id === 'ovToolbar') return;
+      if (node.classList.contains('chart-grid')) {
+        wrappers.push(node);
+        Array.prototype.slice.call(node.children).forEach(function (c) { panels.push(c); });
+      } else panels.push(node);
+    });
+    panels.forEach(function (el) {
+      el.classList.add('ov-panel');
+      el.dataset.ovId = ovIdOf(el);
+      var grip = document.createElement('button');
+      grip.type = 'button';
+      grip.className = 'ov-grip';
+      grip.dataset.ovDrag = '1';
+      grip.title = '拖动调整位置';
+      grip.setAttribute('aria-label', '拖动调整「' + ovTitleOf(el) + '」的位置');
+      grip.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
+      var rz = document.createElement('span');
+      rz.className = 'ov-resize';
+      rz.dataset.ovResize = '1';
+      rz.title = '拖动调整大小';
+      el.appendChild(grip);
+      el.appendChild(rz);
+      grid.appendChild(el);
+    });
+    wrappers.forEach(function (w) { if (w.parentNode) w.parentNode.removeChild(w); });
+    view.appendChild(grid);
+    ovGrid = grid;
+    applyLayout(validLayout(state.layout) ? state.layout : DEFAULT_LAYOUT);
+    bindOverviewEditor();
+  }
+  function bindOverviewEditor() {
+    var editBtn = $('ovEditBtn'), saveBtn = $('ovSaveBtn'), resetBtn = $('ovResetBtn'),
+      copyBtn = $('ovCopyBtn'), hint = $('ovHint');
+    if (editBtn) editBtn.addEventListener('click', function () {
+      ovEditing = !ovEditing;
+      var view = $('view-overview');
+      if (view) view.classList.toggle('is-editing', ovEditing);
+      editBtn.setAttribute('aria-pressed', String(ovEditing));
+      editBtn.classList.toggle('is-on', ovEditing);
+      [saveBtn, resetBtn, copyBtn].forEach(function (b) { if (b) b.hidden = !ovEditing; });
+      if (hint) hint.textContent = ovEditing
+        ? '拖左上角手柄换位置，拖右下角改大小，排好点「保存布局」'
+        : '点「排列布局」可自由调整各板块的位置与大小';
+      requestAnimationFrame(resizeAll);
+    });
+    if (saveBtn) saveBtn.addEventListener('click', function () {
+      var L = collectLayout();
+      L.savedAt = new Date().toISOString();
+      state.layout = L;
+      writeLayout(L);
+      saveStore();                 /* 触发云同步钩子，layout 随 state.json 一起推走 */
+      toast('布局已保存，并已加入云同步', 'success');
+    });
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+      state.layout = null;
+      try { localStorage.removeItem(LAYOUT_KEY); } catch (e) { /* noop */ }
+      applyLayout(DEFAULT_LAYOUT);
+      saveStore();
+      toast('已恢复默认布局', 'info');
+    });
+    if (copyBtn) copyBtn.addEventListener('click', function () {
+      var txt = JSON.stringify(collectLayout());
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(
+          function () { toast('布局代码已复制', 'success'); },
+          function () { window.prompt('复制这段布局代码', txt); });
+      } else window.prompt('复制这段布局代码', txt);
+    });
+    bindOvPointer();
+  }
+  /* 指针拖拽：ghost 跟随光标，落点用 elementFromPoint 找目标板块，
+     插入前/后由光标相对目标中心决定；缩放按栅格列宽与行高换算跨度。 */
+  function bindOvPointer() {
+    if (!ovGrid) return;
+    var act = null, ghost = null;
+    function clearTargets() {
+      Array.prototype.forEach.call(ovGrid.querySelectorAll('.is-drop-target'),
+        function (x) { x.classList.remove('is-drop-target'); });
+    }
+    function moveGhost(e) {
+      if (!ghost || !act) return;
+      ghost.style.left = (e.clientX - act.ox) + 'px';
+      ghost.style.top = (e.clientY - act.oy) + 'px';
+    }
+    /* 页面很长：拖到视口上下边缘时自动滚，才能把底部的板块搬到顶上 */
+    function updateTarget(e) {
+      clearTargets();
+      act.target = null;
+      var under = document.elementFromPoint(e.clientX, e.clientY);
+      var t = under && under.closest ? under.closest('.ov-panel') : null;
+      if (t && t !== act.panel && t.parentNode === ovGrid) {
+        t.classList.add('is-drop-target');
+        act.target = t;
+        var tr = t.getBoundingClientRect();
+        var midY = tr.top + tr.height / 2, midX = tr.left + tr.width / 2;
+        act.after = e.clientY > midY || (Math.abs(e.clientY - midY) < tr.height / 3 && e.clientX > midX);
+      }
+    }
+    function autoScroll() {
+      if (!act || act.mode !== 'drag') return;
+      var y = act.lastY || 0;
+      if (y > window.innerHeight - 72) window.scrollBy(0, 16);
+      else if (y < 72 && window.scrollY > 0) window.scrollBy(0, -16);
+      if (act.lastX !== undefined) updateTarget({ clientX: act.lastX, clientY: act.lastY });
+      act.scrollTimer = setTimeout(autoScroll, 16);
+    }
+    function onDown(e) {
+      if (!ovEditing || !e.target || typeof e.target.closest !== 'function') return;
+      var g = e.target.closest('[data-ov-drag]'), r = e.target.closest('[data-ov-resize]');
+      if (!g && !r) return;
+      var panel = (g || r).closest('.ov-panel');
+      if (!panel) return;
+      e.preventDefault();
+      var rect = panel.getBoundingClientRect();
+      if (g) {
+        ghost = document.createElement('div');
+        ghost.className = 'ov-ghost';
+        ghost.textContent = ovTitleOf(panel);
+        ghost.style.width = rect.width + 'px';
+        ghost.style.height = rect.height + 'px';
+        document.body.appendChild(ghost);
+        panel.classList.add('is-drag-src');
+        act = {
+          mode: 'drag', panel: panel, ox: e.clientX - rect.left, oy: e.clientY - rect.top,
+          lastX: e.clientX, lastY: e.clientY, scrollTimer: null
+        };
+        moveGhost(e);
+        autoScroll();
+      } else {
+        var gr = ovGrid.getBoundingClientRect(), cs = window.getComputedStyle(ovGrid);
+        var gap = parseFloat(cs.columnGap) || 12;
+        var colU = (gr.width - gap * (OV_COLS - 1)) / OV_COLS + gap;
+        var rowU = (parseFloat(cs.gridAutoRows) || 46) + (parseFloat(cs.rowGap) || 12);
+        panel.classList.add('is-resizing');
+        act = {
+          mode: 'resize', panel: panel, x: e.clientX, y: e.clientY, colU: colU, rowU: rowU,
+          w: Number(panel.dataset.ovW) || 12, h: Number(panel.dataset.ovH) || 6
+        };
+      }
+      document.body.classList.add('is-ov-dragging');
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    }
+    function onMove(e) {
+      if (!act) return;
+      if (act.mode === 'drag') {
+        act.lastX = e.clientX; act.lastY = e.clientY;
+        moveGhost(e);
+        updateTarget(e);
+      } else {
+        var dw = Math.round((e.clientX - act.x) / act.colU);
+        var dh = Math.round((e.clientY - act.y) / act.rowU);
+        setOvSpan(act.panel,
+          Math.max(3, Math.min(OV_COLS, act.w + dw)),
+          Math.max(2, Math.min(18, act.h + dh)));
+        requestAnimationFrame(resizeAll);
+      }
+    }
+    function onUp() {
+      if (!act) return;
+      if (act.scrollTimer) clearTimeout(act.scrollTimer);
+      if (act.mode === 'drag' && act.target) {
+        var t = act.target, p = act.panel;
+        try {
+          if (act.after) t.parentNode.insertBefore(p, t.nextSibling);
+          else t.parentNode.insertBefore(p, t);
+        } catch (err) { /* 目标已脱离 DOM 时忽略 */ }
+      }
+      if (act.panel) act.panel.classList.remove('is-drag-src', 'is-resizing');
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      ghost = null;
+      clearTargets();
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.body.classList.remove('is-ov-dragging');
+      act = null;
+      requestAnimationFrame(resizeAll);
+    }
+    ovGrid.addEventListener('pointerdown', onDown);
+  }
+
   function init() {
     state.store = loadStore();
     var saved = null;
@@ -2847,6 +3221,9 @@
     bindEvents();
     bindDatePicker();
     bindHoverTip();
+    state.layout = readLayout();
+    initOverviewLayout();
+    syncFilterUI();
     setSegActive($('scaleSeg'), 'data-scale', state.scale);
     renderAll();
 
@@ -2872,7 +3249,8 @@
         added: state.store.added,
         edited: state.store.edited,
         deleted: state.store.deleted,
-        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+        layout: state.layout || null
       };
     },
     setStore: function (s) {
@@ -2882,6 +3260,11 @@
         edited: (s.edited && typeof s.edited === 'object' && !Array.isArray(s.edited)) ? s.edited : {},
         deleted: Array.isArray(s.deleted) ? s.deleted : []
       };
+      if (validLayout(s.layout)) {
+        state.layout = s.layout;
+        writeLayout(s.layout);
+        applyLayout(s.layout);
+      }
       saveStore();
       renderAll();
     },
