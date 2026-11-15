@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light" data-dateplate="plate" data-page-node-id="DyKtkQoVvhoj867gtzttrx">
+<html lang="zh-CN" data-theme="light" data-page-node-id="DyKtkQoVvhoj867gtzttrx">
 <head data-page-node-id="3IGW7iSUaJLFO2lzbznZDM">
 <meta charset="UTF-8" data-page-node-id="atJsNRPOZ7cQnjmg3YsLyW">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" data-page-node-id="Gt9WWAqdh6bVMoQGN3YoDG">
@@ -55,11 +55,11 @@
           </span>
           <span class="side-tool-label" data-page-node-id="5GYM66iD2lZNWW4mUdYF6i">深浅切换</span>
         </button>
-        <button type="button" class="side-tool-btn" id="datePlateBtn" aria-pressed="true" aria-label="切换日期嵌入板效果" title="日期嵌入板：开">
+        <button type="button" class="side-tool-btn" id="colorBtn" aria-haspopup="dialog" aria-expanded="false" aria-label="分类配色自定义" title="配色自定义">
           <span class="side-tool-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="17" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 9.5h17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M8 14.5h3v3H8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><circle cx="9.3" cy="9.6" r="1.6" fill="currentColor"/><circle cx="14.7" cy="9.6" r="1.6" fill="currentColor"/><circle cx="9.3" cy="15" r="1.6" fill="currentColor"/><circle cx="14.7" cy="15" r="1.6" fill="currentColor"/></svg>
           </span>
-          <span class="side-tool-label">日期嵌入</span>
+          <span class="side-tool-label">配色</span>
         </button>
         <button type="button" class="icon-btn sync-mobile-btn" id="syncBtnM" aria-label="云同步设置" title="云同步" data-page-node-id="QY5FS2D1GlGHnhKAtMAckU">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" data-page-node-id="bhCE6QopXBBj5bprr8Px3f"><path d="M6.5 18a4.5 4.5 0 0 1-.42-8.98 6 6 0 0 1 11.7-1.06A4.5 4.5 0 0 1 17.5 18h-11Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" data-page-node-id="HjLkySfPkaw2dK78TWBD70"/><path d="m9.5 14.5 2.5 2.5 2.5-2.5M12 17v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="XZQ4YpzXdEXn8PK2FT3y6H"/></svg>
@@ -146,19 +146,6 @@
           </button>
         </div>
 
-        <div class="card stat-mini" style="--i:1" role="group" aria-label="本月速览" data-page-node-id="o2UHwJCZU47HzH5jCphCux">
-          <div class="sm-cell" data-page-node-id="9gqz4Q8HpTzl75WgnG6d2G">
-            <span class="sm-label" id="mmL3" data-page-node-id="V0DjvAiwHWDEmNQXmvFDOF">日均支出</span>
-            <b class="sm-value" id="mmDaily" data-page-node-id="gUWuvND8OTKacThDjQK0h3">¥0</b>
-            <i class="sm-note" id="mmDailyD" data-page-node-id="cAwsfGAsyslhGte6Okx4sv">本月 · 0 天有账</i>
-          </div>
-          <div class="sm-cell" data-page-node-id="HhVwO2cBjDgtz5Gj0XYUQv">
-            <span class="sm-label" id="mmL4" data-page-node-id="edutg7cDWG1Fh3wqL5sWYN">单笔均值</span>
-            <b class="sm-value" id="mmAvg" data-page-node-id="T7lPs6POwrj4u7DoMP6eXB">¥0</b>
-            <i class="sm-note" id="mmAvgD" data-page-node-id="CfhY7FBpbogwyjiNwat8E7">最大 ¥0</i>
-          </div>
-        </div>
-
         <div class="chart-grid" data-page-node-id="nYmA6TVwOoi3t6loFj4msW">
           <article class="card chart-card span-2" style="--i:4" data-page-node-id="GmitIUHx7kCS9EyK4HDWTS">
             <div class="card-head" data-page-node-id="dUT1d6pDOnnsNV0gCF0dK6">
@@ -186,6 +173,11 @@
           <article class="card chart-card" style="--i:7">
             <div class="card-head"><div><h3>体重记录</h3><p id="weightSub">在天页记下第一条体重</p></div></div>
             <div class="chart chart-md" id="chartWeight"></div>
+          </article>
+
+          <article class="card chart-card span-2" style="--i:8" data-oid="metrics">
+            <div class="card-head"><div><h3>数据体检</h3><p id="ovmSub">十几项横向指标，看钱花在哪、节奏稳不稳</p></div></div>
+            <div class="ovm-grid" id="ovMetrics"></div>
           </article>
         </div>
       <div class="merged-head" data-page-node-id="MGIJos4HcWPrlZ5MY5LEDM"><h2 data-page-node-id="4ryvNDeyZnulW9oI9CPr1D">年度分析与对比</h2><span data-page-node-id="uQuLg4qWqOkoZoGpNxC5Co">逐月、逐年、分类与高频项目</span></div>
@@ -312,11 +304,12 @@
             <div class="fx-cell fx-sub-slot" data-page-node-id="5OO2ujQ5yZ3QsvIHJKiXx1">
               <div class="seg sub-seg" id="subRow" role="group" aria-label="子类筛选" hidden data-page-node-id="HuS3BNPVzGP9rBV9x2Um8A"><span class="seg-ind" aria-hidden="true" data-page-node-id="3X0xGJZ0sDfiCI2KUHpcro"></span></div>
                             <div class="seg sub-seg quick-seg" id="subQuick" role="group" aria-label="快捷筛选"><span class="seg-ind" aria-hidden="true"></span>
-                <button type="button" data-quick="all" class="is-active">快捷</button>
-                <button type="button" data-quick="large">大额支出</button>
-                <button type="button" data-quick="weekend">周末消费</button>
-                <button type="button" data-quick="small">小额支出</button>
-                <button type="button" data-quick="today">只看今天</button>
+                <button type="button" data-quick="all" class="is-active">不限</button>
+                <button type="button" data-quick="hasnote">有备注</button>
+                <button type="button" data-quick="nonote">无备注</button>
+                <button type="button" data-quick="repeat">常见名目</button>
+                <button type="button" data-quick="new">一次性</button>
+                <button type="button" data-quick="multi">多笔日</button>
               </div>
             </div>
           </div>
@@ -515,6 +508,15 @@
 </div>
 
 <div class="toast-stack" id="toastStack" aria-live="polite" data-page-node-id="HULjr2IpjoOyavuodIrgcO"></div>
+
+<div class="color-pop" id="colorPop" role="dialog" aria-label="分类配色自定义" hidden>
+  <div class="cp-head"><h3>配色自定义</h3><span>HEX / RGB 双向同步</span></div>
+  <div id="cpRows"></div>
+  <div class="cp-foot">
+    <button type="button" class="btn btn-ghost" id="cpReset">恢复默认</button>
+    <button type="button" class="btn btn-primary" id="cpClose">完成</button>
+  </div>
+</div>
 
 <div class="hover-tip" id="hoverTip" hidden data-page-node-id="EHiQ9FUqob4KNwXd57JLKc"></div>
 <script src="assets/echarts.min.js"></script>

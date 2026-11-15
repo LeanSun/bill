@@ -823,16 +823,31 @@ html[data-theme="dark"] .cal-item:hover {
 }
 .ds-quick h4 { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; font-weight: 700; }
 .ds-quick h4 span { font-size: 10.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
-.dq-types { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 9px; background: var(--surface-3); }
-.dq-types button { padding: 7px 4px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--muted); background: transparent; transition: background-color .2s, color .2s, box-shadow .2s; }
-.dq-types button[data-qtype="expense"] { color: color-mix(in srgb, var(--expense) 62%, var(--muted)); }
-.dq-types button[data-qtype="income"] { color: color-mix(in srgb, var(--income) 62%, var(--muted)); }
-.dq-types button[data-qtype="expense"].is-active {
-  background: color-mix(in srgb, var(--expense) 22%, var(--surface)); color: var(--expense);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--expense) 48%, transparent);
+/* 支出 / 收入：改成和筛选栏同款的滑块分段控件，
+   同一套指针拖拽 + 松手回弹，滑块底色随选中的方向在绿/红之间切 */
+.dq-seg {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr;
+  padding: 3px; border-radius: 10px; background: var(--surface-3);
+  height: 42px; box-sizing: border-box;
 }
-.dq-types button[data-qtype="income"].is-active {
-  background: color-mix(in srgb, var(--income) 22%, var(--surface)); color: var(--income);
+.dq-seg button {
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+  height: 36px; padding: 0 4px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  color: var(--muted); background: transparent;
+  transition: color .28s var(--ease-soft);
+}
+.dq-seg button[data-qtype="expense"] { color: color-mix(in srgb, var(--expense) 62%, var(--muted)); }
+.dq-seg button[data-qtype="income"] { color: color-mix(in srgb, var(--income) 62%, var(--muted)); }
+.dq-seg button.is-active[data-qtype="expense"] { color: var(--expense); }
+.dq-seg button.is-active[data-qtype="income"] { color: var(--income); }
+.dq-seg .seg-ind {
+  top: 3px; left: 3px; width: calc((100% - 6px) / 2); height: calc(100% - 6px);
+  background: color-mix(in srgb, var(--expense) 22%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--expense) 48%, transparent);
+  transition: transform .34s cubic-bezier(.16,.86,.3,1.04), background-color .3s var(--ease-soft), box-shadow .3s var(--ease-soft);
+}
+.dq-seg[data-active="1"] .seg-ind {
+  background: color-mix(in srgb, var(--income) 22%, var(--surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--income) 48%, transparent);
 }
 .dq-amount { position: relative; }
@@ -893,8 +908,10 @@ html[data-theme="dark"] .cal-item:hover {
 
 /* 关于这一天：三张图 */
 .ins-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 0; padding-top: 0; border-top: 0; flex: 0 0 auto; }
-.ins-title h3 { margin: 0; font-size: 15px; font-weight: 700; }
-.ins-title span { font-size: 11.5px; color: var(--muted); }
+.ins-title h3 { margin: 0; font-size: 15px; font-weight: 700; white-space: nowrap; }
+/* 右栏收窄后，标题和副标题并排放会互相挤：副标题让位，标题不再折行 */
+.ins-title span { font-size: 11.5px; color: var(--muted); min-width: 0; flex: 1 1 auto;
+  text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .day-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; flex: 0 0 auto; align-items: stretch; }
 .ins-card {
   padding: 10px 11px 10px; border-radius: 12px; background: var(--surface-2);
@@ -1526,7 +1543,6 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
 .dsc-row { gap: 7px; }
 .ds-quick { margin-top: 10px; padding: 9px; gap: 6px; }
 .ds-quick h4 { font-size: 12px; }
-.dq-types button { padding: 5px 4px; }
 .dq-amount input { height: 32px; font-size: 14px; }
 .ds-quick select, .ds-quick input[type="text"] { height: 28px; }
 .dq-row label, .dq-note { gap: 2px; }
@@ -1562,43 +1578,8 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
 }
 .seg.is-dragging button { transition: none; }
 
-/* 日期数字：默认「嵌入板」模式 —— 浅色底 + 放大 + 内嵌（inset）效果。
-   注意：整块由 html[data-dateplate="plate"] 控制，切到 plain 就回退到纯数字，
-   文案与滚动都保留，随时可以整条回退。今日仍是实心主色，不描边。 */
-html[data-dateplate="plate"] .cal-cell-head { min-height: 32px; }
-html[data-dateplate="plate"] .cal-daynum {
-  min-width: 32px; height: 30px; padding: 0 7px; font-size: 16.5px; border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-3) 74%, var(--surface) 26%);
-  box-shadow: inset 0 1.5px 3px rgba(16, 24, 40, .16), inset 0 -1px 0 rgba(255, 255, 255, .9), 0 1px 0 rgba(255, 255, 255, .5);
-  transition: transform .18s var(--ease), box-shadow .2s, background-color .2s;
-}
-html[data-dateplate="plate"][data-theme="dark"] .cal-daynum {
-  background: color-mix(in srgb, var(--surface-3) 78%, #fff 22%);
-  box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, .5), inset 0 -1px 0 rgba(255, 255, 255, .09);
-}
-html[data-dateplate="plate"] .cal-cell:hover .cal-daynum { transform: scale(1.06); }
-.cal-cell.is-today .cal-daynum { background: var(--primary); color: #fff; box-shadow: 0 0 14px -2px rgba(var(--neon), .8); }
-html[data-dateplate="plate"] .wk-day {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 2px 10px; border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-2) 68%, var(--surface-3));
-  box-shadow: inset 0 1px 2px rgba(16, 24, 40, .08);
-}
-.wk-col.is-today .wk-day { background: var(--primary); color: #fff; padding: 2px 10px; box-shadow: 0 0 14px -2px rgba(var(--neon), .8); }
-html[data-dateplate="plate"] .ds-big b {
-  padding: 0 10px; border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-2) 68%, var(--surface-3));
-  box-shadow: inset 0 1px 2px rgba(16, 24, 40, .08);
-}
-/* plain 回退：去掉底板与内阴影，只留数字本身 */
-html[data-dateplate="plain"] .cal-daynum {
-  background: transparent; box-shadow: none; border-radius: 0;
-  min-width: 22px; height: 24px; padding: 0 2px; font-size: 14px;
-}
-html[data-dateplate="plain"] .cal-cell-head { min-height: 24px; }
-html[data-dateplate="plain"] .wk-day,
-html[data-dateplate="plain"] .ds-big b { background: transparent; box-shadow: none; padding: 0; }
-html[data-dateplate="plain"] .cal-cell.is-today .cal-daynum { background: var(--primary); color: #fff; border-radius: 7px; padding: 0 5px; }
+/* 日期嵌入板整条已回滚：日期回到第 646 行那套基础样式（纯数字 + 今日实心主色）。
+   下面只保留拖动中的视觉反馈，不再有任何 data-dateplate 分支。 */
 
 /* 下拉框选项：内联分类色 + 淡底，展开框里也带颜色 */
 .ds-quick select option, .field select option { padding: 6px 8px; font-weight: 600; }
@@ -1661,14 +1642,15 @@ html[data-dateplate="plain"] .cal-cell.is-today .cal-daynum { background: var(--
 
 /* 记一笔：按图里的纵向顺序排——类型 / 金额 / 分类子类 / 备注 / 保存。
    支出绿色的选中配色保留，备注与保存各自占满一行。
-   所有条目（类型 / 金额 / 分类 / 子类 / 备注 / 保存）统一 42px 高，与备注栏齐平。 */
-.dq-top { grid-template-columns: 1fr; }
-.dq-types { padding: 3px; }
-.dq-types button { height: 36px; padding: 0 4px; display: flex; align-items: center; justify-content: center; }
+   所有条目（类型 / 金额 / 分类 / 子类 / 备注 / 保存）统一 42px 高，与备注栏齐平。
+   行与行、标签与输入之间统一放宽一档，整块不再挤在一起。 */
+.ds-quick { gap: 13px; }
+.dq-top { grid-template-columns: 1fr; gap: 9px; }
 .dq-amount input { height: 42px; font-size: 15px; }
-.dq-row { gap: 7px; }
+.dq-row { gap: 9px; }
+.dq-row label, .dq-note { gap: 6px; }
 .dq-row select { height: 42px; padding: 0 10px; font-size: 12.5px; border-radius: 9px; }
-.dq-bottom { grid-template-columns: 1fr; gap: 7px; }
+.dq-bottom { grid-template-columns: 1fr; gap: 11px; }
 .dq-note input[type="text"] { height: 42px; font-size: 12px; padding: 0 11px; }
 .dq-bottom .btn { height: 42px; font-size: 12.5px; }
 
@@ -1691,14 +1673,14 @@ html[data-dateplate="plain"] .cal-cell.is-today .cal-daynum { background: var(--
 /* 当前月 / 当前年剩余 */
 .ins-left-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ins-left-row > div { min-width: 0; }
-.ins-left-row span { display: block; font-size: 9px; color: var(--muted); }
-.ins-left-row b { display: block; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ins-left-row span { display: block; font-size: 8.5px; line-height: 1.15; color: var(--muted); white-space: nowrap; }
+.ins-left-row b { display: block; font-size: 12px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ins-left-row b.is-over { color: var(--expense); }
-.ins-left-bar { height: 4px; margin-top: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.ins-left-bar { height: 3px; margin-top: 3px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
 .ins-left-bar.is-year { margin-top: 2px; }
 .ins-left-bar i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
 .ins-left-bar.is-year i { background: var(--amber); }
-.ins-left .ins-foot { font-size: 8.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ins-left .ins-foot { font-size: 8px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 工具条里的回到今天：紧挨 年/月/周/天，高度与分段控件完全一致 */
 .cal-toolbar #scaleSeg { height: 40px; }
@@ -1720,7 +1702,8 @@ html[data-dateplate="plain"] .cal-cell.is-today .cal-daynum { background: var(--
 @media (max-width: 940px) {
   .cal-day { grid-template-columns: 1fr; }
   /* 窄屏也统一 40px，六项齐平 */
-  .dq-types button, .dq-amount input, .dq-row select,
+  .dq-seg { height: 40px; }
+  .dq-seg button, .dq-amount input, .dq-row select,
   .dq-note input[type="text"], .dq-bottom .btn { height: 40px; }
 }
 
@@ -1746,5 +1729,82 @@ html[data-dateplate="plain"] .cal-cell.is-today .cal-daynum { background: var(--
 .ovs-kpi span { font-size: 10.5px; color: var(--muted); }
 .ovs-kpi b { font-size: 22px; font-weight: 750; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
 .ovs-kpi i { font-style: normal; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#statRhythm { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding-top: 10px; }
-@media (max-width: 760px) { #statRhythm { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 今天的位置：两列对比 + 一根比例条 + 一行排名，压进一格高度 */
+.ins-cmp { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ins-cmp-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ins-cmp-top > div { min-width: 0; }
+.ins-cmp-top span { display: block; font-size: 8.5px; line-height: 1.15; color: var(--muted); white-space: nowrap; }
+.ins-cmp-top b { display: block; font-size: 11px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ins-cmp-top b.is-up { color: var(--expense); }
+.ins-cmp-top b.is-down { color: var(--income); }
+.ins-cmp-bar { height: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; cursor: help; }
+.ins-cmp-bar i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.ins-cmp-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; line-height: 1.2; }
+.ins-cmp-foot span { font-size: 8.5px; color: var(--muted); white-space: nowrap; }
+.ins-cmp-foot b { font-size: 10.5px; font-weight: 700; color: var(--text-2); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+
+/* ==================== 本轮：周末粉底 / 数据体检 / 配色自定义 ==================== */
+/* 日期摘要栏：周六周日整块铺一层浅粉，一眼认出这是休息日。
+   粉是低饱和的，正文与金额的对比度都还在。 */
+.day-side.is-weekend {
+  background: color-mix(in srgb, #ff7f9e 14%, var(--surface-2));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, #ff7f9e 48%, transparent);
+}
+.day-side.is-weekend .ds-dow { color: color-mix(in srgb, #d94572 68%, var(--text-2)); }
+html[data-theme="dark"] .day-side.is-weekend {
+  background: color-mix(in srgb, #ff7f9e 17%, var(--surface-2));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, #ff7f9e 40%, transparent);
+}
+html[data-theme="dark"] .day-side.is-weekend .ds-dow { color: color-mix(in srgb, #ffb3c6 70%, var(--text-2)); }
+
+/* 数据体检：一张卡里排十几块小指标，四列自适应 */
+.ovm-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; background: var(--border); border-radius: 12px; overflow: hidden; }
+.ovm-cell { background: var(--surface); padding: 12px 13px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ovm-cell:hover { background: var(--surface-2); }
+.ovm-cell .ovm-k { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ovm-cell .ovm-v { font-size: 20px; font-weight: 750; letter-spacing: -.028em; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.ovm-cell .ovm-v.pos { color: var(--income); }
+.ovm-cell .ovm-v.neg { color: var(--expense); }
+.ovm-cell .ovm-n { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ovm-bar { height: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; margin-top: 2px; }
+.ovm-bar i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.ovm-cell.is-off { opacity: .55; }
+@media (max-width: 1240px) { .ovm-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .ovm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 配色自定义：侧栏按钮唤出的浮层 */
+.color-pop {
+  position: fixed; z-index: 90; left: 236px; top: 50%; transform: translateY(-50%) scale(.97);
+  width: 318px; max-height: min(76vh, 640px); overflow: auto;
+  padding: 16px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 24px 60px -18px rgba(16, 24, 40, .28), var(--shadow-sm);
+  opacity: 0; transition: opacity .18s var(--ease), transform .22s var(--ease);
+}
+.color-pop[hidden] { display: none; }
+.color-pop.is-open { opacity: 1; transform: translateY(-50%) scale(1); }
+.cp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.cp-head h3 { margin: 0; font-size: 13.5px; font-weight: 750; }
+.cp-head span { font-size: 10px; color: var(--muted); }
+.cp-row { display: grid; grid-template-columns: 18px 1fr; gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.cp-row:last-of-type { border-bottom: 0; }
+.cp-swatch { width: 18px; height: 18px; border-radius: 6px; border: 1px solid var(--border); position: relative; overflow: hidden; cursor: pointer; }
+.cp-swatch input[type="color"] { position: absolute; inset: -6px; width: 40px; height: 40px; border: 0; padding: 0; background: none; cursor: pointer; }
+.cp-name { font-size: 11.5px; font-weight: 650; color: var(--text); }
+.cp-fields { grid-column: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cp-fields label { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: var(--muted); }
+.cp-fields input {
+  width: 100%; min-width: 0; box-sizing: border-box; height: 26px; padding: 0 7px;
+  border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2);
+  font-size: 10.5px; font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--text);
+}
+.cp-fields input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.cp-fields input.is-bad { border-color: var(--danger); }
+.cp-foot { display: flex; gap: 8px; margin-top: 12px; }
+.cp-foot .btn { flex: 1 1 0; height: 32px; font-size: 11.5px; justify-content: center; }
+@media (max-width: 940px) {
+  .color-pop { left: 12px; right: 12px; width: auto; top: auto; bottom: 16px; transform: none; }
+  .color-pop.is-open { transform: none; }
+}
