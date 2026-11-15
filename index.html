@@ -202,35 +202,38 @@
 
           <article class="card chart-card span-2 pay-card" style="--i:7" data-oid="salary">
             <div class="card-head">
-              <div><h3>工资与五险一金</h3><p id="paySub">基数、比例、工资都能改，右边记报销</p></div>
+              <div><h3>社保</h3><p id="paySub">基数、比例、工资都能改，改完立刻重算</p></div>
               <button type="button" class="btn btn-ghost pay-reset" id="payReset" title="恢复成原始那组数字">恢复默认</button>
             </div>
-            <div class="pay-wrap">
-              <div class="pay-calc">
-                <div class="pay-fields">
-                  <label><span>基数</span><input type="number" id="payBase" step="1" min="0" autocomplete="off"></label>
-                  <label><span>工资</span><input type="number" id="payWage" step="0.01" min="0" autocomplete="off"></label>
-                  <label><span>绩效</span><input type="number" id="payPerf" step="0.01" min="0" autocomplete="off"></label>
-                  <label><span>补贴</span><input type="number" id="paySubsidy" step="0.01" min="0" autocomplete="off"></label>
-                  <label><span>差距</span><input type="number" id="payGap" step="0.001" autocomplete="off"></label>
-                </div>
-                <table class="pay-table">
-                  <thead><tr><th>项目</th><th>比例<i>个人 / 公司</i></th><th>个人缴费</th><th>公司缴费</th><th>共计</th></tr></thead>
-                  <tbody id="payRows"></tbody>
-                  <tfoot id="payFoot"></tfoot>
-                </table>
+            <div class="pay-calc">
+              <div class="pay-fields">
+                <label><span>缴费基数</span><input type="number" id="payBase" step="1" min="0" autocomplete="off"></label>
+                <label><span>工资</span><input type="number" id="payWage" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>绩效</span><input type="number" id="payPerf" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>补贴</span><input type="number" id="paySubsidy" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>差距</span><input type="number" id="payGap" step="0.001" autocomplete="off"></label>
               </div>
-              <div class="pay-reimb">
-                <div class="pay-reimb-head"><h4>报销费用</h4><b id="payReimbTotal">¥0.00</b></div>
-                <form class="pay-reimb-add" id="payReimbForm" novalidate>
-                  <input type="text" id="payReimbNote" placeholder="内容，例如：打车、差旅" maxlength="24" autocomplete="off">
-                  <input type="number" id="payReimbAmount" step="0.01" min="0.01" placeholder="0.00" autocomplete="off">
-                  <button type="submit" class="btn btn-primary">添加</button>
-                </form>
-                <ul class="pay-reimb-list" id="payReimbList"></ul>
-                <p class="pay-reimb-hint" id="payReimbHint">还没有报销记录</p>
-              </div>
+              <table class="pay-table">
+                <thead><tr><th>项目</th><th>比例<i>个人 / 公司</i></th><th>个人缴费</th><th>公司缴费</th><th>共计</th></tr></thead>
+                <tbody id="payRows"></tbody>
+                <tfoot id="payFoot"></tfoot>
+              </table>
             </div>
+          </article>
+
+          <article class="card chart-card span-2 reimb-card" style="--i:8" data-oid="reimb">
+            <div class="card-head">
+              <div><h3>报销费用</h3><p id="payReimbSub">垫出去的钱、回来的钱，一条一条记</p></div>
+              <div class="reimb-total"><span>合计</span><b id="payReimbTotal">¥0.00</b></div>
+            </div>
+            <form class="pay-reimb-add" id="payReimbForm" novalidate>
+              <label class="ri-date"><span>日期</span><input type="date" id="payReimbDate" autocomplete="off"></label>
+              <label class="ri-note"><span>内容</span><input type="text" id="payReimbNote" placeholder="例如：打车、差旅、打印" maxlength="24" autocomplete="off"></label>
+              <label class="ri-amt"><span>金额</span><input type="number" id="payReimbAmount" step="0.01" min="0.01" placeholder="0.00" autocomplete="off"></label>
+              <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+            <ul class="pay-reimb-list" id="payReimbList"></ul>
+            <p class="pay-reimb-hint" id="payReimbHint">还没有报销记录</p>
           </article>
         </div>
       </section>
@@ -346,22 +349,20 @@
 <div class="modal-backdrop" id="modalBackdrop" hidden data-page-node-id="FYbNWtdtItsB5VmufHRIN7">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" data-page-node-id="6cKHXMkwL6CPv4NGtEQy5R">
     <div class="modal-head" data-page-node-id="qxhra1JGz9psKKXXeqmPPM">
-      <div data-page-node-id="Z7KEfpXU75zbbn6ILcA27j"><h2 id="modalTitle" data-page-node-id="x6M9OzxY68T1NfBMwI3yfz">记一笔</h2><p id="modalDesc" data-page-node-id="IrnHziRU6BfMRmG2pkOhBO">记录一条新的收支流水</p></div>
+      <div data-page-node-id="Z7KEfpXU75zbbn6ILcA27j"><h2 id="modalTitle" data-page-node-id="x6M9OzxY68T1NfBMwI3yfz">记一笔</h2><p id="modalDesc" data-page-node-id="IrnHziRU6BfMRmG2pkOhBO">记录一条新的收支流水</p><span class="mc-date" id="modalChip" hidden></span></div>
       <button type="button" class="icon-btn" id="modalClose" aria-label="关闭" data-page-node-id="vrlACoBH1cyJARcQ9cZ6wa">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" data-page-node-id="0XJyiJQ8zoghs6a8XA9045"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" data-page-node-id="cltNYlEFq7D3vbes17edq6"/></svg>
       </button>
     </div>
     <form id="entryForm" novalidate data-page-node-id="P3eebNmrrHzd3DrFe0Wnr4">
-      <div class="type-toggle" id="typeToggle" role="group" aria-label="收支类型" data-page-node-id="mSZzv2pQeEpxWYgHKKHDDa">
+      <div class="type-toggle" id="typeToggle" role="group" aria-label="收支类型" data-active="0" style="--seg-n:2;--seg-i:0" data-page-node-id="mSZzv2pQeEpxWYgHKKHDDa">
+        <span class="seg-ind" aria-hidden="true"></span>
         <button type="button" data-type="expense" class="is-active" data-page-node-id="heUJhvEUt0Fxo4C2UwUExN">− 支出</button>
         <button type="button" data-type="income" data-page-node-id="WjVUDXndQKFJA9o1h4wmnT">＋ 收入</button>
       </div>
-      <label class="field" data-page-node-id="5KeO03fZaE8bXQKgjshOT3">
-        <span data-page-node-id="vEZoDVSNmhQVZF2nJ2twSj">金额 <em data-page-node-id="etEIbW1xpAvJ7bMpVDBKVQ">*</em></span>
-        <div class="amount-input" data-page-node-id="vmGuxgiqYd0Fv3OKcJkVTp"><i data-page-node-id="fcbDbqR1B2cCQyZJodIEHE">¥</i><input type="number" id="fAmount" step="0.01" min="0.01" placeholder="0.00" required autocomplete="off" data-page-node-id="N1lMCCKjjJKGWT6cJZO95c"></div>
-      </label>
-      <div class="field-row fr-date" data-page-node-id="uc9rcuhW5hDY4gjxshMJyx">
-        <div class="field date-wrap" id="dateWrap" data-page-node-id="6nGMu4iN6yI2WaI8zr2grR">
+      <div class="entry-grid">
+      <label class="field ef-note" data-page-node-id="QIWixAV01ZiBd9eHjdEvz0"><span data-page-node-id="ifdBdthQoUZnz6wj6lqgCl">内容</span><input type="text" id="fNote" maxlength="40" placeholder="例如：午餐、房租、工资" autocomplete="off" data-page-node-id="cC5fCCazNpgzszjIz8nLOe"></label>
+      <div class="field ef-date date-wrap" id="dateWrap" data-page-node-id="6nGMu4iN6yI2WaI8zr2grR">
           <span data-page-node-id="iFx6gBADBLatIBaSuCef2p">日期 <em data-page-node-id="8Et2gfq0xazzfzSVrEtdZ3">*</em></span>
           <input type="hidden" id="fDate" value="" data-page-node-id="l0pC0OZoDaHGm0EyZadtqL">
           <button type="button" class="date-field" id="dateField" aria-haspopup="dialog" aria-expanded="false" aria-label="选择日期" data-page-node-id="8jUfibK66iyiWDXxqL4dhI">
@@ -393,11 +394,12 @@
             </div>
           </div>
         </div>
-        <label class="field" data-page-node-id="E3GBmjJFPOjwkTSXcVlcNi"><span data-page-node-id="wqNu2OQGZsd2sjKo5MmZBH">分类 <em data-page-node-id="pDLx3THHl1vLHgkzabp6R6">*</em></span><select id="fCategory" data-page-node-id="RVhHNygV03tnpQYqiHqNAo"></select></label>
-      </div>
-      <div class="field-row fr-note" data-page-node-id="RCeONvpc2umJdrCO4bArEO">
-        <label class="field" data-page-node-id="gI9sPqdOaunr7MZw2g0OaS"><span data-page-node-id="I47FJB5uPQmSr45M1b7UEl">子类</span><select id="fSub" data-page-node-id="M8cPYp4c3VsHERofnooBL5"></select><i class="field-note" id="fSubNote" data-page-node-id="nGO8iRQyAariDGOo6rymBA">留空自动识别</i></label>
-        <label class="field" data-page-node-id="QIWixAV01ZiBd9eHjdEvz0"><span data-page-node-id="ifdBdthQoUZnz6wj6lqgCl">内容</span><input type="text" id="fNote" maxlength="40" placeholder="例如：午餐、房租、工资" autocomplete="off" data-page-node-id="cC5fCCazNpgzszjIz8nLOe"></label>
+        <label class="field ef-cat" data-page-node-id="E3GBmjJFPOjwkTSXcVlcNi"><span data-page-node-id="wqNu2OQGZsd2sjKo5MmZBH">分类 <em data-page-node-id="pDLx3THHl1vLHgkzabp6R6">*</em></span><select id="fCategory" data-page-node-id="RVhHNygV03tnpQYqiHqNAo"></select></label>
+        <label class="field ef-sub" data-page-node-id="gI9sPqdOaunr7MZw2g0OaS"><span data-page-node-id="I47FJB5uPQmSr45M1b7UEl">子类</span><select id="fSub" data-page-node-id="M8cPYp4c3VsHERofnooBL5"></select><i class="field-note" id="fSubNote" data-page-node-id="nGO8iRQyAariDGOo6rymBA">留空自动识别</i></label>
+        <label class="field ef-amount" data-page-node-id="5KeO03fZaE8bXQKgjshOT3">
+          <span data-page-node-id="vEZoDVSNmhQVZF2nJ2twSj">金额 <em data-page-node-id="etEIbW1xpAvJ7bMpVDBKVQ">*</em></span>
+          <div class="amount-input" data-page-node-id="vmGuxgiqYd0Fv3OKcJkVTp"><i data-page-node-id="fcbDbqR1B2cCQyZJodIEHE">¥</i><input type="number" id="fAmount" step="0.01" min="0.01" placeholder="0.00" required autocomplete="off" data-page-node-id="N1lMCCKjjJKGWT6cJZO95c"></div>
+        </label>
       </div>
       <p class="form-error" id="formError" hidden data-page-node-id="qk1d3CLCzwFHdDEUaFCCiU"></p>
       <div class="modal-foot" data-page-node-id="vDgheVbrmBJ3nKiQOp4iqy">

@@ -78,33 +78,36 @@
   })();
 
   /* 二级分类：一级分类下的语义细分。
-     顺序即优先级——先列的子类先抢关键词，所以具体词在上、泛指词在下 */
+     顺序即优先级——先列的子类先抢关键词，所以具体词在上、泛指词在下。
+     关键词这一层刻意写宽：同义词、口语、简称、外卖平台、常见菜名都收进来，
+     记一笔时写字的人不用管"标准词"是哪两个字（午饭 / 中饭 / 盒饭 都归三餐）。 */
   var SUBCATS = {
     '餐饮': [
-      { name: '三餐', keys: ['早餐', '午餐', '晚餐', '夜宵', '包子', '馅饼', '面条', '热干面', '葱油饼', '炸鸡', '烧鸡', '鸡肉卷', 'KFC', '麦当劳', '饿了么', '美团', '火锅', '汤圆', '饺子', '牛排', '腊肠', '培根', '牛板筋', '豆腐', '玉米', '燕麦', '外卖', '快餐'] },
-      { name: '零食', keys: ['零食', '薯片', '锅巴', '辣条', '干脆面', '饼干', '泡芙', '沙琪玛', '华夫饼', '牛角包', '面包', '面饼', '口香糖', '巧克力', '果冻', '坚果', '蟹棒', '鱼豆腐', '素肉', '手撕'] },
-      { name: '饮料', keys: ['饮料', '可乐', '汽水', '奶茶', '咖啡', '牛奶', '果汁', '柠檬水', '冰红茶', '绿茶', '乌龙茶', '蜂蜜茶', '柠檬茶', '气泡水', '苏打水', '葡萄糖水', '菠萝啤', '格瓦斯', '奶啤', '啤酒', '酸奶', '西梅饮', '果茶', 'DHA', '水'] },
-      { name: '水果', keys: ['水果', '桃子', '苹果', '香蕉', '西瓜', '橙', '葡萄', '梨', '草莓', '蓝莓', '西梅'] },
-      { name: '超市', keys: ['超市', '菜市场', '买菜', '购物', '调料', '酱', '蘸料', '香油', '花生油', '核桃油', '白砂糖', '可可粉', '碱水面', '脱水', '底料', '料包', '鸡蛋', '面粉'] },
+      { name: '三餐', keys: ['早餐', '午餐', '晚餐', '夜宵', '早饭', '早点', '午饭', '中饭', '晚饭', '夜饭', '宵夜', '盒饭', '便当', '食堂', '下馆子', '聚餐', '吃饭', '包子', '馅饼', '面条', '热干面', '葱油饼', '炸鸡', '烧鸡', '鸡肉卷', 'KFC', '麦当劳', '饿了么', '美团', '火锅', '汤圆', '饺子', '馄饨', '牛排', '腊肠', '培根', '牛板筋', '豆腐', '玉米', '燕麦', '外卖', '快餐', '米线', '米粉', '螺蛳粉', '拉面', '拌面', '炒饭', '盖饭', '炒粉', '烧烤', '烤串', '炸串', '麻辣烫', '冒菜', '串串', '汉堡', '披萨', '寿司', '粥', '饼', '饭'] },
+      { name: '零食', keys: ['零食', '薯片', '锅巴', '辣条', '干脆面', '饼干', '泡芙', '沙琪玛', '华夫饼', '牛角包', '面包', '面饼', '口香糖', '巧克力', '果冻', '坚果', '蟹棒', '鱼豆腐', '素肉', '手撕', '冰棍', '雪糕', '冰淇淋', '蛋糕', '蛋卷', '薯条', '爆米花', '鸡爪', '鸭脖', '瓜子', '糖果'] },
+      { name: '饮料', keys: ['饮料', '可乐', '汽水', '奶茶', '咖啡', '牛奶', '果汁', '柠檬水', '冰红茶', '绿茶', '乌龙茶', '蜂蜜茶', '柠檬茶', '气泡水', '苏打水', '葡萄糖水', '菠萝啤', '格瓦斯', '奶啤', '啤酒', '酸奶', '西梅饮', '果茶', 'DHA', '矿泉水', '纯净水', '拿铁', '美式', '雪碧', '芬达', '脉动', '红牛', '水'] },
+      { name: '水果', keys: ['水果', '桃子', '苹果', '香蕉', '西瓜', '橙', '葡萄', '梨', '草莓', '蓝莓', '西梅', '榴莲', '芒果', '樱桃', '车厘子', '柚子', '哈密瓜', '火龙果', '猕猴桃'] },
+      { name: '超市', keys: ['超市', '菜市场', '买菜', '购物', '调料', '酱', '蘸料', '香油', '花生油', '核桃油', '白砂糖', '可可粉', '碱水面', '脱水', '底料', '料包', '鸡蛋', '面粉', '酱油', '醋', '食盐', '大米'] },
       { name: '其它', keys: [] }
     ],
     '日常': [
       { name: '房租', keys: ['房租', '物业'] },
       { name: '水电费', keys: ['水电费', '水费', '电费', '燃气', '煤气', '取暖', '采暖', '宽带', '网费', '物业费'] },
-      { name: '酒店', keys: ['酒店'] },
+      { name: '酒店', keys: ['酒店', '民宿', '宾馆', '住宿'] },
       { name: '电子产品', keys: ['手机壳', '数据线', '电池', '鼠标垫', '手写笔', '平板', '显示器', '键盘', '鼠标', '充电', '耳机', '摄像', '补光灯', '镜头', '硬盘', '内存', '主板', '机箱', '电源', '散热', '固态', '钢化膜', '保护壳', '手柄', '连接线'] },
-      { name: '家居百货', keys: ['抽纸', '卷纸', '纸巾', '毛巾', '洗衣液', '洗衣粉', '洁厕', '泡沫剂', '百洁布', '垃圾袋', '收纳', '衣架', '锅', '勺', '剪刀', '刀', '老虎钳', '指甲刀', '手套', '雨衣', '伞', '床单', '枕', '被', '床垫', '地毯', '垫', '马桶', '地漏', '填缝剂', '防油贴纸', '墙布', '除湿', '湿巾', '洗手液', '沐浴露', '洗发水', '洗面奶', '素颜霜', '面膜', '香薰', '喷雾', '口罩', '创可贴', '褪黑素', '打气筒', '胶水', '夹子', '瓶子', '盒子', '花盆', '花土', '花籽', '种子', '绿萝', '龟背竹', '君子兰', '文竹', '九里香', '鞋套', '鞋垫', '行李箱', '笔', '尺'] },
+      { name: '家居百货', keys: ['抽纸', '卷纸', '纸巾', '毛巾', '洗衣液', '洗衣粉', '洁厕', '泡沫剂', '百洁布', '垃圾袋', '收纳', '衣架', '锅', '勺', '剪刀', '刀', '老虎钳', '指甲刀', '手套', '雨衣', '伞', '床单', '枕', '被', '床垫', '地毯', '垫', '马桶', '地漏', '填缝剂', '防油贴纸', '墙布', '除湿', '湿巾', '洗手液', '沐浴露', '洗发水', '洗面奶', '素颜霜', '面膜', '香薰', '喷雾', '口罩', '创可贴', '褪黑素', '打气筒', '胶水', '夹子', '瓶子', '盒子', '花盆', '花土', '花籽', '种子', '绿萝', '龟背竹', '君子兰', '文竹', '九里香', '鞋套', '鞋垫', '行李箱', '笔', '尺', '牙膏', '牙刷', '牙线', '护发素', '香皂', '肥皂', '柔顺剂', '拖把', '扫把', '簸箕', '抹布', '垃圾桶', '保鲜膜', '棉签', '灯泡', '插座'] },
       { name: '其它', keys: [] }
     ],
     '交通': [
-      { name: '地铁', keys: ['地铁', '公交', '轨道'] },
+      { name: '地铁', keys: ['地铁', '公交', '轨道', '轻轨'] },
       { name: '共享单车', keys: ['共享单车'] },
-      { name: '火车票', keys: ['火车票'] },
+      { name: '火车票', keys: ['火车票', '高铁', '动车', '机票', '航班'] },
+      { name: '打车', keys: ['打车', '打的', '滴滴', '网约车', '的士', '出租', '顺风车', '拼车', '停车', '过路费', '高速费', '加油', '油费', '洗车', '保养', '修车', '违章'] },
       { name: '其它', keys: [] }
     ],
     '服饰': [
-      { name: '衣服', keys: ['短袖', 'T恤', '卫衣', '衬衫', '夹克', '外套', '冲锋衣', '防晒服', '雨披', '内裤', '袜', '帽', '围巾', '腰带', '背包', '吊坠', '挂件'] },
-      { name: '裤子', keys: ['裤子', '短裤', '裙'] },
+      { name: '衣服', keys: ['短袖', 'T恤', '卫衣', '衬衫', '夹克', '外套', '冲锋衣', '防晒服', '雨披', '内裤', '袜', '帽', '围巾', '腰带', '背包', '吊坠', '挂件', '羽绒服', '大衣', '毛衣', '开衫', '马甲'] },
+      { name: '裤子', keys: ['裤子', '短裤', '裙', '牛仔', '长裤', '运动裤'] },
       { name: '鞋', keys: ['鞋', '靴'] },
       { name: '床上用品', keys: ['床单', '枕', '被', '床垫', '毛毯', '毯', '凉席', '四件套'] },
       { name: '其它', keys: [] }
@@ -113,17 +116,17 @@
       { name: '魔方', keys: ['魔方', '魔表', '五阶', '六七阶', '天马', '威龙', '傲速', '补件', '磁铁', '贴纸'] },
       { name: '订阅服务', keys: ['iCloud', '会员', '网盘', '迅雷', '订阅'] },
       { name: '话费', keys: ['话费', '短信费', '流量'] },
-      { name: '学习', keys: ['教材', '考试报名', '资料费', '书籍', '荧光笔', '涂卡笔', '印台', '网课', '课程'] },
+      { name: '学习', keys: ['教材', '考试报名', '资料费', '书籍', '荧光笔', '涂卡笔', '印台', '网课', '课程', '课本', '试卷', '打印', '复印', '文具', '笔袋', '学费', '培训', '报名', '书'] },
       { name: '比赛', keys: ['比赛', '台球', '扑克', '俄挺', '单杠', '握力器'] },
       { name: '电子产品', keys: ['平板', 'RTX', 'I5', '主板', '内存条', '固态硬盘', '移动硬盘', '机箱', '电源', '散热', '摄像', '手写笔', '数据线', '鼠标垫', '电池', '补光灯', '显示器', '键盘', '手柄', '保护壳', '钢化膜', '连接线', '扎带', '修打印机'] },
       { name: '人情往来', keys: ['随礼', '红包', '生日', '妇女节', '母亲节', '一日捐', '人情'] },
       { name: '其它', keys: [] }
     ],
     '收入': [
-      { name: '工资', keys: ['工资'] },
-      { name: '津贴', keys: ['津贴', '补贴', '高温费', '过节费', '过节'] },
-      { name: '绩效', keys: ['绩效', '奖金', '年终奖', '加班费', '裁判费'] },
-      { name: '其它', keys: [] }
+      { name: '工资', keys: ['工资', '薪资', '薪水', '月薪', '发薪', '基本工资', '薪酬', '劳务'] },
+      { name: '津贴', keys: ['津贴', '补贴', '高温费', '过节费', '过节', '饭补', '餐补', '车补', '房补', '补助'] },
+      { name: '绩效', keys: ['绩效', '奖金', '年终奖', '加班费', '裁判费', '提成', '分红', '奖励', '全勤', '季度奖', '十三薪'] },
+      { name: '其它', keys: ['报销', '报销款', '利息', '返现', '中奖', '收入', '转入', '收到'] }
     ]
   };
   /* 子类展示顺序照他给的清单来；自动识别的优先级走 SUBCATS 的排列，两者各管一段 */
@@ -526,10 +529,20 @@
     SEARCH_CACHE[cacheKey] = text;
     return text;
   }
+  /* 口语 → 标准词。NOTE_ALIAS 是双向可用的：
+     归一账目名目用它，反向识别也用它 —— 写"午饭"先被翻成"午餐"再匹配，
+     于是"三餐"这一类的同义词不用在 SUBCATS 里重复维护一遍 */
+  function expandText(s) {
+    var t = String(s || '');
+    Object.keys(NOTE_ALIAS).forEach(function (k) {
+      if (t.indexOf(k) !== -1) t += ' ' + NOTE_ALIAS[k];
+    });
+    return t;
+  }
   /* 关键词归属：命中第一个子类的关键词即归入该子类，全不中则落「其它」 */
   function guessSub(cat, note) {
     var list = SUBCATS[cat] || [];
-    var s = String(note || '');
+    var s = expandText(note);
     for (var i = 0; i < list.length; i++) {
       var item = list[i];
       if (!item.keys.length) continue;
@@ -565,15 +578,8 @@
     HINT_REV = storeRev;
     return m;
   }
-  function guessCat(text, type) {
-    var s2 = String(text || '').trim();
-    if (!s2) return '';
-    var known = hintMap()[s2];
-    if (known) {
-      if (type === 'income' && known === '收入') return '收入';
-      if (type !== 'income' && known !== '收入') return known;
-    }
-    var cats = type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+  /* 最长关键词命中：在给定的一级分类集合里，谁命中的关键词最长就归谁 */
+  function matchCat(s2, cats) {
     var best = '', bestLen = 0;
     cats.forEach(function (cat) {
       (SUBCATS[cat] || []).forEach(function (item) {
@@ -583,7 +589,32 @@
         }
       });
     });
-    return best;
+    return { cat: best, len: bestLen };
+  }
+  function guessCat(text, type) {
+    var s2 = expandText(String(text || '').trim());
+    if (!s2) return '';
+    var known = hintMap()[String(text).trim()];
+    if (known) {
+      if (type === 'income' && known === '收入') return '收入';
+      if (type !== 'income' && known !== '收入') return known;
+    }
+    return matchCat(s2, type === 'income' ? INCOME_CATS : EXPENSE_CATS).cat;
+  }
+  /* 内容 → 收支方向 + 分类，一次算完。
+     支出表和收入表各算一遍，谁的关键词更长就听谁的；平手时按支出走
+     （"红包"这种两边都沾的词，默认仍是花出去的）。
+     命中收入词就顺手把表单切到收入 —— 写"工资 / 津贴 / 报销"不用先点类型。 */
+  function guessEntry(text) {
+    var raw = String(text || '').trim();
+    if (!raw) return null;
+    var known = hintMap()[raw];
+    if (known) return { type: known === '收入' ? 'income' : 'expense', cat: known };
+    var s2 = expandText(raw);
+    var inc = matchCat(s2, INCOME_CATS), exp = matchCat(s2, EXPENSE_CATS);
+    if (inc.cat && inc.len >= exp.len) return { type: 'income', cat: inc.cat };
+    if (exp.cat) return { type: 'expense', cat: exp.cat };
+    return null;
   }
   function normalize(r) {
     var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(r.date || ''));
@@ -1322,8 +1353,8 @@
          不写的话 ECharts 默认取末维（笔数），整张图会被笔数染色 */
       dimension: 1,
       min: 0, max: 100, calculable: false, orient: 'horizontal',
-      left: 'center', bottom: 0, itemWidth: 11, itemHeight: 130,
-      text: ['贵', '省'], textGap: 8,
+      left: 'center', bottom: 0, itemWidth: 12, itemHeight: 390,
+      text: ['贵', '省'], textGap: 10,
       textStyle: { color: p.muted, fontSize: 10, fontFamily: p.font },
       inRange: {
         color: [
@@ -1649,10 +1680,10 @@
       markActive(subBox, 'data-sub', state.filters.sub);
       syncFilterSeg(subBox);
     }
-    /* 子类行只在选了具体分类之后才出现；「全部」时整行收起，
-       筛选区塌成一行，把省下的高度还给棋盘 */
+    /* 子类行只在选了具体分类之后才有内容；「全部」时整行空着，
+       但行高留着 —— 工具条不跟着筛选变高变矮，棋盘不上下抖 */
     subBox.hidden = !names.length;
-    if (wrap) wrap.classList.toggle('has-sub', !!names.length);
+    if (wrap) wrap.classList.add('has-sub');
   }
   function syncCalLegend() { renderCatBar(palette()); }
 
@@ -2256,16 +2287,16 @@
     box.innerHTML =
       '<aside class="day-side' + (isWeekend ? ' is-weekend' : '') + '">' +
       '<div class="ds-inner">' +
-      '<div class="ds-head"><span class="ds-ym">' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月</span>' +
-      '<span class="ds-dow">' + WEEK_CN[d.getDay()] + '</span></div>' +
+      '<div class="ds-head"><span class="ds-dow">' + WEEK_CN[d.getDay()] + '</span>' +
+      '<span class="ds-ym">' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月</span></div>' +
       '<div class="ds-big"><b>' + d.getDate() + '</b><i>日</i></div>' +
       '<div class="ds-net" style="--ds:' + (Math.abs(net) < .005 ? p.muted : net > 0 ? p.income : p.expense) + '">' +
       '<span>当日净额</span><b>' + (net >= 0 ? '+' : '−') + fmtYuan(Math.abs(net)).slice(1) + '</b></div>' +
       '<div class="ds-meta"><div><span>支出</span><b class="c-expense">' + fmtYuan(de) + '</b></div>' +
       '<div><span>收入</span><b class="c-income">' + fmtYuan(di) + '</b></div>' +
       '<div><span>笔数</span><b>' + items.length + '</b></div></div>' +
-      weightHTML +
       quickHTML +
+      weightHTML +
       '</div>' +
       '</aside>' +
       '<div class="day-list">' +
@@ -2294,20 +2325,21 @@
     var box = $('calYearBoard');
     if (!box) return;
     var y = state.calMonth.year;
-    var byDate = groupByDate(board);
-    /* 年历的热度算法：筛支出就看支出、筛收入就看收入，
-       选「全部」仍按支出（消费日历的原始口径），不会因为混进收入而失真。
-       早年这里硬写 r.type !== 'expense' 直接 return，
-       所以切到收入时整张年历全空 —— 现在按筛选方向取数。 */
-    var wantInc = state.filters.type === 'income';
-    var tone = wantInc ? p.income : p.expense;
-    var monthTot = [], daySum = {}, peak = 1;
+    /* 一天里可能既有支出又有收入，所以两本账分开累计：
+       支出染绿、收入染红，两样都有就把格子上下分色。
+       早年版按筛选方向二选一，切到收入整张年历全空 —— 现在不分方向，各算各的。 */
+    var de = {}, di = {}, monthDe = {}, monthDi = {}, peakE = 1, peakI = 1;
     board.forEach(function (r) {
-      if ((r.type === 'income') !== wantInc) return;
-      monthTot[r.month] = (monthTot[r.month] || 0) + r.amount;
-      daySum[r.date] = (daySum[r.date] || 0) + r.amount;
-      if (daySum[r.date] > peak) peak = daySum[r.date];
+      var inc = r.type === 'income';
+      var day = inc ? di : de, mon = inc ? monthDi : monthDe;
+      day[r.date] = round((day[r.date] || 0) + r.amount);
+      mon[r.month] = round((mon[r.month] || 0) + r.amount);
+      if (day[r.date] > (inc ? peakI : peakE)) { if (inc) peakI = day[r.date]; else peakE = day[r.date]; }
     });
+    function alphaOf(v, peak) {
+      var t = peak > 0 ? Math.min(1, v / peak) : 0;
+      return v > 0 ? .16 + t * .74 : 0;
+    }
     var today = todayStr();
     var html = '';
     for (var m = 1; m <= 12; m++) {
@@ -2320,17 +2352,33 @@
         var d = new Date(y, m - 1, 1 - offset + i);
         if (d.getMonth() !== m - 1) { grid += '<i class="ym-blank"></i>'; continue; }
         var key = dateKey(d);
-        var sum = daySum[key] || 0;
-        var t = peak > 0 ? Math.min(1, sum / peak) : 0;
-        var alpha = sum ? .16 + t * .74 : 0;
-        var bgc = sum ? withAlpha(tone, alpha) : mixColor(p.surface3, p.surface, .45);
-        var ink = sum && alpha > .42 ? '#ffffff' : (sum ? catInk(p, tone) : p.muted);
-        var cls = 'ym-day' + (sum ? ' has' : '') + (key === today ? ' is-today' : '');
-        grid += '<button type="button" class="' + cls + '" data-date="' + key + '" style="background:' + bgc + ';color:' + ink +
-          '" title="' + key + ' · ' + (sum ? fmtBig(sum) : (wantInc ? '无收入' : '无支出')) + '">' + d.getDate() + '</button>';
+        var e = de[key] || 0, inc = di[key] || 0;
+        var ae = alphaOf(e, peakE), ai = alphaOf(inc, peakI);
+        var bg = mixColor(p.surface3, p.surface, .45), ink = p.muted, tip = key + ' · 无记录';
+        if (e && inc) {
+          bg = 'linear-gradient(155deg,' + withAlpha(p.expense, ae) + ' 0 47%,' +
+            withAlpha(p.income, ai) + ' 53% 100%)';
+          ink = Math.max(ae, ai) > .42 ? '#ffffff' : p.text2;
+        } else if (e) {
+          bg = withAlpha(p.expense, ae);
+          ink = ae > .42 ? '#ffffff' : catInk(p, p.expense);
+        } else if (inc) {
+          bg = withAlpha(p.income, ai);
+          ink = ai > .42 ? '#ffffff' : catInk(p, p.income);
+        }
+        if (e || inc) tip = key + ' · ' + (e ? '支 ' + fmtBig(e) : '') + (e && inc ? ' · ' : '') + (inc ? '收 ' + fmtBig(inc) : '');
+        var cls = 'ym-day' + ((e || inc) ? ' has' : '') + (key === today ? ' is-today' : '') +
+          (inc ? ' is-in' : '') + (e ? ' is-out' : '');
+        grid += '<button type="button" class="' + cls + '" data-date="' + key +
+          '" style="background:' + bg + ';color:' + ink +
+          '" title="' + esc(tip) + '">' + d.getDate() + '</button>';
       }
+      var mde = monthDe[m] || 0, mid = monthDi[m] || 0;
+      var msum = (mde ? '<i class="c-expense">−' + fmtBig(mde).slice(1) + '</i>' : '') +
+        (mid ? '<i class="c-income">+' + fmtBig(mid).slice(1) + '</i>' : '');
       html += '<article class="ym">' +
-        '<button type="button" class="ym-head" data-month="' + m + '"><b>' + m + '月</b><span>' + fmtBig(monthTot[m] || 0) + '</span></button>' +
+        '<button type="button" class="ym-head" data-month="' + m + '"><b>' + m + '月</b>' +
+        '<span class="ym-msum">' + (msum || '<i>—</i>') + '</span></button>' +
         '<div class="ym-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
         '<div class="ym-grid">' + grid + '</div></article>';
     }
@@ -2522,6 +2570,13 @@
     if (hidden) hidden.value = s || '';
     var disp = $('dateDisplay');
     if (disp) disp.textContent = s ? (s + ' · ' + weekLabel(s)) : '选择日期';
+    /* 格子弹窗里日期收成标题下一颗胶囊：点的就是那一格，不用再占一行 */
+    var chip = $('modalChip');
+    if (chip && s) {
+      var mm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+      chip.textContent = mm ? (Number(mm[1]) + ' 年 ' + Number(mm[2]) + ' 月 ' + Number(mm[3]) + ' 日 · ' + weekLabel(s))
+        : (s + ' · ' + weekLabel(s));
+    }
     dp.selected = s || '';
     if (s) {
       var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(s);
@@ -2776,6 +2831,11 @@
     if (box) {
       var bs = box.querySelectorAll('button[data-type]');
       for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('is-active', bs[i].dataset.type === state.entryType);
+      /* 滑块靠 --seg-i 平移，和日历顶栏那几组分段控件同一套机制 */
+      var idx = state.entryType === 'income' ? 1 : 0;
+      box.dataset.active = String(idx);
+      box.style.setProperty('--seg-i', String(idx));
+      resetSegInd(box);
     }
     fillCategoryOptions();
   }
@@ -2789,6 +2849,7 @@
     /* cell：从月历 / 周历格子弹出来的，用天页那套「内容在上、金额在下」的排布；
        default：侧栏「记一笔」，保持原来的顺序 */
     document.body.classList.toggle('modal-cell', mode === 'cell');
+    if ($('modalChip')) $('modalChip').hidden = mode !== 'cell';
     modalCatManual = false;
     setEntryType(record ? record.type : 'expense');
     if ($('fAmount')) $('fAmount').value = record ? String(record.amount) : '';
@@ -3045,10 +3106,11 @@
     box.innerHTML = pay.rows.map(function (r, i) {
       return '<tr data-row="' + i + '">' +
         '<th>' + esc(r.name) + '</th>' +
-        '<td class="pay-rate">' +
+        /* 比例格里再包一层：td 一旦改成 flex 就不再是表格单元格，列宽会塌 */
+        '<td class="pay-rate-cell"><div class="pay-rate">' +
         '<label><input type="number" data-i="' + i + '" data-k="p" step="0.01" min="0" value="' + r.p + '" aria-label="' + esc(r.name) + '个人比例"><i>%</i></label>' +
         '<label><input type="number" data-i="' + i + '" data-k="c" step="0.01" min="0" value="' + r.c + '" aria-label="' + esc(r.name) + '公司比例"><i>%</i></label>' +
-        '</td>' +
+        '</div></td>' +
         '<td class="pay-ip" data-cell="ip">—</td>' +
         '<td class="pay-ic" data-cell="ic">—</td>' +
         '<td class="pay-sum" data-cell="sum">—</td>' +
@@ -3091,6 +3153,12 @@
         '<i>应发 − 差距 ' + fmtYuan(gap) + ' · 绩效 ' + fmtYuan(payVal('payPerf', pay.perf)) +
         ' · 补贴 ' + fmtYuan(payVal('paySubsidy', pay.subsidy)) + '</i></td></tr>';
     }
+    /* 卡头一行说清结论：个人一共扣多少、公司一共承担多少、最后到手多少 */
+    var sub = $('paySub');
+    if (sub) {
+      sub.textContent = '个人 ' + fmtYuan(ip) + ' · 公司 ' + fmtYuan(ic) +
+        ' · 实发 ' + fmtYuan(net);
+    }
   }
   function renderReimb() {
     var list = $('payReimbList'), hint = $('payReimbHint'), total = $('payReimbTotal');
@@ -3101,17 +3169,20 @@
       return '<li data-rid="' + esc(r.id) + '">' +
         '<span class="pr-note">' + esc(r.note || '报销') + '</span>' +
         '<em class="pr-amt">' + fmtYuan(r.amount) + '</em>' +
-        '<span class="pr-date">' + esc((r.date || '').slice(5)) + '</span>' +
+        /* 每行自带日期：直接改，改完就落盘 */
+        '<input type="date" class="pr-date" data-reimb-date="' + esc(r.id) + '" value="' + esc(r.date || '') +
+        '" aria-label="' + esc(r.note || '报销') + '的日期">' +
         '<button type="button" class="pr-del" data-reimb-del="' + esc(r.id) + '" title="删除这条" aria-label="删除 ' + esc(r.note || '报销') + '">×</button>' +
         '</li>';
     }).join('');
     list.hidden = !pay.reimb.length;
     if (hint) hint.hidden = !!pay.reimb.length;
     if (total) total.textContent = fmtYuan(sum);
-    if ($('paySub')) {
-      $('paySub').textContent = pay.reimb.length
-        ? pay.reimb.length + ' 条报销 · 合计 ' + fmtYuan(sum) + ' · 基数 / 比例 / 工资都能改'
-        : '基数、比例、工资都能改，右边记报销';
+    var sub = $('payReimbSub');
+    if (sub) {
+      sub.textContent = pay.reimb.length
+        ? pay.reimb.length + ' 条 · 合计 ' + fmtYuan(sum) + ' · 日期可改'
+        : '垫出去的钱、回来的钱，一条一条记';
     }
   }
   function renderPay() {
@@ -3125,13 +3196,17 @@
     e.preventDefault();
     var note = ($('payReimbNote') && $('payReimbNote').value || '').trim();
     var amt = Number($('payReimbAmount') && $('payReimbAmount').value);
+    var day = ($('payReimbDate') && $('payReimbDate').value) || '';
     if (!isFinite(amt) || amt <= 0) { toast('报销金额要大于 0', 'warn'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) day = todayStr();
     pay.reimb.unshift({
       id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       note: note || '报销',
       amount: round(amt),
-      date: todayStr()
+      date: day
     });
+    /* 新的排在最上面：按日期倒序，同一天按记的顺序 */
+    pay.reimb.sort(function (a, b) { return a.date === b.date ? 0 : (a.date < b.date ? 1 : -1); });
     savePay();
     if ($('payReimbNote')) $('payReimbNote').value = '';
     if ($('payReimbAmount')) $('payReimbAmount').value = '';
@@ -3141,10 +3216,10 @@
   function initPay() {
     loadPay();
     renderPay();
+    if ($('payReimbDate') && !$('payReimbDate').value) $('payReimbDate').value = todayStr();
     var wrap = document.querySelector('.pay-card');
-    if (!wrap) return;
-    /* 所有输入都委托在一个口子上：改比例立刻重算，改基数/工资也一样 */
-    wrap.addEventListener('input', function (e) {
+    /* 社保卡：所有输入都委托在一个口子上，改比例立刻重算，改基数/工资也一样 */
+    if (wrap) wrap.addEventListener('input', function (e) {
       var t = e.target;
       if (!t) return;
       if (t.dataset && t.dataset.i !== undefined) {
@@ -3158,21 +3233,34 @@
       savePay();
       renderPayNumbers();
     });
-    wrap.addEventListener('click', function (e) {
-      var del = e.target.closest && e.target.closest('[data-reimb-del]');
-      if (del) {
-        var id = del.getAttribute('data-reimb-del');
-        pay.reimb = pay.reimb.filter(function (r) { return r.id !== id; });
-        savePay();
-        renderReimb();
-        return;
-      }
+    if (wrap) wrap.addEventListener('click', function (e) {
       if (e.target.closest && e.target.closest('#payReset')) {
         pay = payDefaults();
         savePay();
         renderPay();
+        if ($('payReimbDate') && !$('payReimbDate').value) $('payReimbDate').value = todayStr();
         toast('已恢复默认数字', 'info');
       }
+    });
+    /* 报销卡：删除、改日期都是自己的口子，和社保互不干扰 */
+    var rbox = document.querySelector('.reimb-card');
+    if (rbox) rbox.addEventListener('click', function (e) {
+      var del = e.target.closest && e.target.closest('[data-reimb-del]');
+      if (!del) return;
+      var id = del.getAttribute('data-reimb-del');
+      pay.reimb = pay.reimb.filter(function (r) { return r.id !== id; });
+      savePay();
+      renderReimb();
+    });
+    if (rbox) rbox.addEventListener('change', function (e) {
+      var inp = e.target;
+      if (!inp || !inp.dataset || !inp.dataset.reimbDate) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(inp.value)) return;
+      pay.reimb.forEach(function (r) { if (r.id === inp.dataset.reimbDate) r.date = inp.value; });
+      pay.reimb.sort(function (a, b) { return a.date === b.date ? 0 : (a.date < b.date ? 1 : -1); });
+      savePay();
+      renderReimb();
+      toast('日期已改到 ' + inp.value, 'info');
     });
     var form = $('payReimbForm');
     if (form) form.addEventListener('submit', addReimb);
@@ -3232,13 +3320,14 @@
     });
     if ($('fSub')) $('fSub').addEventListener('change', updateSubHint);
     if ($('fNote')) $('fNote').addEventListener('input', function () {
-      /* 边打边认分类：认出来就直接改选，认不出来保持原样；
-         自己手点过分类之后这条自动线就停手，直到下次打开表单 */
-      if (!modalCatManual) {
-        var hit = guessCat(this.value, state.entryType);
+      /* 边打边认：连收支方向一起认 —— 写「工资」自动切收入，
+         写「午饭」自动切回支出并选餐饮。自己手点过分类之后只锁分类，方向照认 */
+      var hit = guessEntry(this.value);
+      if (hit) {
+        if (hit.type !== state.entryType) setEntryType(hit.type);
         var sel2 = $('fCategory');
-        if (hit && sel2 && sel2.value !== hit) {
-          sel2.value = hit;
+        if (!modalCatManual && sel2 && sel2.value !== hit.cat) {
+          sel2.value = hit.cat;
           paintSelect(sel2);
           fillSubOptions();
           return;
@@ -3278,6 +3367,7 @@
 
     /* 日历：粒度 / 步进 / 筛选 / 交互 */
     bindSeg($('scaleSeg'), 'data-scale', function (v) { setScale(v); });
+    bindWheelPaging();
     if ($('calPrev')) $('calPrev').addEventListener('click', function () { closeCmp(); shiftCalStep(-1); });
     if ($('calNext')) $('calNext').addEventListener('click', function () { closeCmp(); shiftCalStep(1); });
     if ($('calToday')) $('calToday').addEventListener('click', function () {
@@ -3464,10 +3554,25 @@
       });
       boardEl.addEventListener('input', function (e) {
         if (!e.target || e.target.id !== 'qNote') return;
-        if (quickCatManual) return;
-        var hit = guessCat(e.target.value, quickType);
-        var sel = $('qCategory');
-        if (hit && sel && sel.value !== hit) { sel.value = hit; paintSelect(sel); fillQuickSubs(); }
+        /* 天页表单同理：认方向 + 认分类，手选过分类就不再覆盖分类 */
+        var hit = guessEntry(e.target.value);
+        if (hit) {
+          if (hit.type !== quickType) {
+            quickType = hit.type;
+            var seg = $('qTypeSeg');
+            if (seg) {
+              var qi = quickType === 'income' ? 1 : 0;
+              seg.dataset.active = String(qi);
+              seg.style.setProperty('--seg-i', String(qi));
+              resetSegInd(seg);
+            }
+            fillQuickCats();
+          }
+          if (!quickCatManual) {
+            var sel = $('qCategory');
+            if (sel && sel.value !== hit.cat) { sel.value = hit.cat; paintSelect(sel); fillQuickSubs(); }
+          }
+        }
       });
       boardEl.addEventListener('change', function (e) {
         if (e.target && e.target.id === 'qCategory') { quickCatManual = true; paintSelect($('qCategory')); fillQuickSubs(); }
@@ -3532,6 +3637,51 @@
     openByTap = { key: '', t: 0 };
   }
 
+  /* ---------------- 滚轮翻页 ----------------
+     月历竖向翻（一次一整月）、周历横向翻（一次一整周）、当日明细淡入淡出。
+     翻完给新内容一段方向明确的入场动画 —— 眼睛得知道换了哪一屏。 */
+  var wheelAcc = 0, wheelLock = 0;
+  function pageByWheel(dir) {
+    wheelLock = Date.now() + 430;
+    var scale = state.scale;
+    closeCmp();
+    shiftCalStep(dir);
+    var el = scale === 'month' ? $('calGrid')
+      : scale === 'week' ? $('calWeekGrid') : $('calDayBoard');
+    if (!el) return;
+    var cls = scale === 'month' ? (dir > 0 ? 'fx-up' : 'fx-down')
+      : scale === 'week' ? (dir > 0 ? 'fx-left' : 'fx-right') : 'fx-fade';
+    el.classList.remove('fx-up', 'fx-down', 'fx-left', 'fx-right', 'fx-fade');
+    void el.offsetWidth;                 /* 强制重排，同方向连滚也能重放入场 */
+    el.classList.add(cls);
+  }
+  function bindWheelPaging() {
+    [
+      { el: $('calGrid'), skip: '' },
+      { el: $('calWeekGrid'), skip: '' },
+      { el: $('calDayBoard'), skip: '.day-side' }   /* 左栏表单自己要能滚，不抢它的滚轮 */
+    ].forEach(function (z) {
+      if (!z.el) return;
+      z.el.addEventListener('wheel', function (e) {
+        if (state.view !== 'calendar') return;
+        if (!$('modalBackdrop').hidden || !$('confirmBackdrop').hidden) return;
+        if (dp.open || cmpOpen) return;
+        if (z.skip && e.target.closest && e.target.closest(z.skip)) return;
+        /* 横着滚认横、竖着滚认竖：鼠标滚轮和触控板两个方向都吃得下 */
+        var d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (!d) return;
+        e.preventDefault();
+        if (Date.now() < wheelLock) { wheelAcc = 0; return; }
+        wheelAcc += d;
+        /* 累积过阈值才翻一屏，触控板上一点点滑动不会连翻好几页 */
+        if (Math.abs(wheelAcc) < 34) return;
+        var dir = wheelAcc > 0 ? 1 : -1;
+        wheelAcc = 0;
+        pageByWheel(dir);
+      }, { passive: false });
+    });
+  }
+
 
   function jumpFromKpi(kind) {
     if (kind === 'income') { jumpToDetail({ reset: true, type: 'income', label: '已筛选：全部收入' }); return; }
@@ -3591,11 +3741,12 @@
   var LAYOUT_KEY = 'qingzhang.overview.layout.v1';
   var OV_COLS = 12;
   var DEFAULT_LAYOUT = {
-    v: 1,
-    order: ['kpi', 'trend', 'donut', 'balance', 'weight', 'calheat', 'stack', 'top', 'salary'],
+    /* v2：工资板块拆成「社保 + 报销」两张，旧的坐标不能复用，版本号顶一格让老布局自动作废 */
+    v: 2,
+    order: ['kpi', 'trend', 'donut', 'balance', 'weight', 'calheat', 'stack', 'top', 'salary', 'reimb'],
     spans: {
       kpi: [12, 3], trend: [12, 7], donut: [6, 7], balance: [6, 7], weight: [12, 6],
-      calheat: [12, 8], stack: [12, 7], top: [12, 7], salary: [12, 9]
+      calheat: [12, 8], stack: [12, 7], top: [12, 7], salary: [12, 11], reimb: [12, 6]
     }
   };
   var ovGrid = null, ovEditing = false;
@@ -3618,7 +3769,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 1 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 2 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -3634,7 +3785,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 1, order: [], spans: {} };
+    var L = { v: 2, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;
