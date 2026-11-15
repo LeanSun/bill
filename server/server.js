@@ -62,7 +62,34 @@ let PASSWORD = ensurePassword();
 const SECRET = ensureSecret();
 
 /* ---------------- 存储 ---------------- */
-const EMPTY = () => ({ rev: 0, updatedAt: null, added: [], edited: {}, deleted: [], theme: 'light' });
+const RE_WDATE = /^\d{4}-\d{2}-\d{2}$/;
+function cleanWeights(w) {
+  const out = {};
+  if (!w || typeof w !== 'object' || Array.isArray(w)) return out;
+  for (const k of Object.keys(w).slice(0, 5000)) {
+    if (!RE_WDATE.test(k)) continue;
+    const v = Number(w[k]);
+    if (Number.isFinite(v) && v >= 20 && v <= 300) out[k] = Math.round(v * 10) / 10;
+  }
+  return out;
+}
+function cleanLayout(L) {
+  if (!L || typeof L !== 'object' || L.v !== 1 || !Array.isArray(L.order)) return null;
+  const order = L.order.map(x => String(x).slice(0, 32)).slice(0, 40);
+  const spans = {};
+  if (L.spans && typeof L.spans === 'object') {
+    for (const k of Object.keys(L.spans).slice(0, 40)) {
+      const a = L.spans[k];
+      if (!Array.isArray(a)) continue;
+      spans[String(k).slice(0, 32)] = [
+        Math.max(3, Math.min(12, Number(a[0]) || 12)),
+        Math.max(1, Math.min(20, Number(a[1]) || 6))
+      ];
+    }
+  }
+  return { v: 1, order, spans };
+}
+const EMPTY = () => ({ rev: 0, updatedAt: null, added: [], edited: {}, deleted: [], theme: 'light', layout: null, weights: {} });
 
 function readState() {
   try {
@@ -74,7 +101,9 @@ function readState() {
       added: Array.isArray(o.added) ? o.added : [],
       edited: (o.edited && typeof o.edited === 'object' && !Array.isArray(o.edited)) ? o.edited : {},
       deleted: Array.isArray(o.deleted) ? o.deleted : [],
-      theme: o.theme === 'dark' ? 'dark' : 'light'
+      theme: o.theme === 'dark' ? 'dark' : 'light',
+      layout: cleanLayout(o.layout),
+      weights: cleanWeights(o.weights)
     };
   } catch (e) {
     return EMPTY();
@@ -162,7 +191,13 @@ function validatePayload(body) {
   }
 
   const theme = body.theme === 'dark' ? 'dark' : 'light';
-  return { value: { added: outAdded, edited: outEdited, deleted, theme } };
+  return {
+    value: {
+      added: outAdded, edited: outEdited, deleted, theme,
+      layout: cleanLayout(body.layout),
+      weights: cleanWeights(body.weights)
+    }
+  };
 }
 
 /* ---------------- 令牌 ---------------- */

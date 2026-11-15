@@ -246,14 +246,16 @@
       edited: s.edited || {},
       deleted: s.deleted || [],
       theme: s.theme === 'dark' ? 'dark' : 'light',
-      layout: s.layout || null
+      layout: s.layout || null,
+      weights: s.weights || {}
     };
   }
   function hasContent(s) {
     if (!s) return false;
     return (s.added || []).length > 0 ||
       Object.keys(s.edited || {}).length > 0 ||
-      (s.deleted || []).length > 0 || !!s.layout;
+      (s.deleted || []).length > 0 || !!s.layout ||
+      Object.keys(s.weights || {}).length > 0;
   }
 
   function adopt(remote, sha) {
@@ -322,7 +324,17 @@
         setStatus('云端还没有数据');
         return;
       }
-      if (!dirty) return adopt(s, res.sha);
+      if (!dirty) {
+        /* rev 没变就只记时间：adopt 会 setStore → renderAll，天页整块重建、
+           「关于这一天」的入场动画重播一遍，看起来就是页面在自动闪烁。
+           每分钟轮询、切回标签页都走这条路，所以这一层必须挡住。 */
+        if (Number(s.rev) === Number(cfg.rev)) {
+          lastSync = Date.now();
+          setStatus('已连接 · rev ' + cfg.rev);
+          return;
+        }
+        return adopt(s, res.sha);
+      }
       if (Number(s.rev) === Number(cfg.rev)) return push(cfg.rev, res.sha);
       return askConflict(s, res.sha);
     }).catch(function (e) { setStatus('拉取失败：' + e.message, 'warn'); })

@@ -1463,3 +1463,183 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
 .dp-week-btn.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .dp-week-btn.is-active b, .dp-week-btn.is-active span { color: #fff; }
 .dp-days .dp-week span { font-size: 10px; }
+
+/* ==================== 本轮：天页单列 / 体重 / 拖动 / 日期嵌入 ==================== */
+
+/* 删掉均值、时段后，第二行让子类 / 快捷段独占整行，左右边界仍与第一行对齐 */
+.fx-sub-slot { grid-column: 1 / -1; }
+
+/* 「关于这一天」：一列竖向，六张卡压进一屏，不产生纵向滚动 */
+.day-insights { grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 7px; }
+.day-ins-col { gap: 8px; padding: 14px 16px; }
+.ins-title { margin-top: 0; }
+.ins-card { padding: 8px 11px; border-radius: 11px; }
+.ins-card h4 { margin: 0 0 5px; font-size: 11.5px; }
+.ins-bars { height: 40px; }
+.ins-bar span { font-size: 9.5px; }
+.ins-ring-wrap { min-height: 46px; }
+.ins-ring { width: 44px; height: 44px; flex: 0 0 44px; }
+.ins-ring i { inset: 7px; }
+.ins-ring-txt b { font-size: 12px; }
+.ins-ring-txt span { font-size: 10px; }
+.ins-mtd > b { font-size: 16px; }
+.ins-prog { height: 6px; margin-top: 5px; }
+.ins-foot { margin-top: 4px; }
+/* 内容签名没变时复用旧 DOM；即便新建节点也不重播入场动画 */
+.day-insights[data-static="1"] .ins-card { animation: none; }
+
+/* 新图一：当日分类构成 */
+.ins-stack { display: flex; height: 12px; border-radius: 8px; overflow: hidden; background: var(--surface-3); }
+.ins-stack i { display: block; height: 100%; min-width: 2px; transition: filter .2s; }
+.ins-stack i:hover { filter: brightness(1.14); }
+.ins-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 10px; color: var(--text-2); }
+.ins-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.ins-legend i { width: 7px; height: 7px; border-radius: 2px; }
+.ins-legend b { font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* 新图二：单笔金额分布 */
+.ins-abs { display: flex; align-items: flex-end; gap: 10px; height: 48px; }
+.ins-ab { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; }
+.ins-ab b { width: 100%; border-radius: 4px 4px 2px 2px; background: color-mix(in srgb, var(--primary) 34%, var(--surface)); transition: background-color .2s, transform .2s var(--ease); transform-origin: bottom; }
+.ins-ab:hover b { background: var(--primary); transform: scaleY(1.06); }
+.ins-ab span { font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.ins-ab em { font-style: normal; font-size: 10px; font-weight: 700; color: var(--text-2); }
+
+/* 新图三：体重记录 */
+.ins-weight { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.ins-weight > b { font-size: 20px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.ins-weight > b i { font-style: normal; font-size: 11px; margin-left: 2px; color: var(--muted); }
+.ins-weight > span { font-size: 10px; line-height: 1.4; color: var(--muted); min-width: 0; }
+.ins-wspark { width: min(150px, 42%); height: 32px; margin-left: auto; flex: 0 1 150px; }
+
+/* 左栏：账单 + 支出构成 + 体重 + 记一笔表单，全部压进一屏不再滚动 */
+.day-side { padding: 12px 14px 10px; overflow: hidden; }
+.day-side > * { flex: 0 0 auto; }
+.ds-head { line-height: 1.2; }
+.ds-big { margin-top: 2px; }
+.ds-big b { font-size: 38px; line-height: 1; }
+.ds-big i { font-size: 12px; }
+.ds-net { margin: 9px 0 8px; padding: 8px 11px; }
+.ds-net b { font-size: 22px; }
+.ds-meta > div { padding: 7px 9px; }
+.ds-meta b { font-size: 12.5px; }
+.ds-cats { margin-top: 10px; gap: 6px; }
+.dsc-row { gap: 7px; }
+.ds-quick { margin-top: 10px; padding: 9px; gap: 6px; }
+.ds-quick h4 { font-size: 12px; }
+.dq-types button { padding: 5px 4px; }
+.dq-amount input { height: 32px; font-size: 14px; }
+.ds-quick select, .ds-quick input[type="text"] { height: 28px; }
+.dq-row label, .dq-note { gap: 2px; }
+.ds-quick .btn { height: 30px; }
+
+/* 体重输入行 */
+.ds-weight {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 9px; padding: 6px 8px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.dw-label { flex: 0 0 auto; font-size: 11px; font-weight: 650; color: var(--text-2); }
+.ds-weight input[type="number"] {
+  flex: 1 1 auto; min-width: 0; height: 26px; padding: 0 7px;
+  border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-size: 12px; font-family: var(--font);
+}
+.dw-unit { flex: 0 0 auto; font-size: 10.5px; color: var(--muted); }
+.dw-save, .dw-clear { border: 0; cursor: pointer; font-family: var(--font); }
+.dw-save { flex: 0 0 auto; padding: 4px 9px; border-radius: 7px; font-size: 11px; font-weight: 650; color: #fff; background: var(--primary); transition: background-color .2s; }
+.dw-save:hover { background: var(--primary-2); }
+.dw-clear { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 6px; font-size: 13px; line-height: 1; color: var(--muted); background: var(--surface-2); }
+.dw-clear:hover { color: var(--danger); }
+.ds-weight input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+
+/* 分段控件：按住拖动，滑块跟手、松手不回弹 */
+.seg { cursor: grab; }
+.seg .seg-ind { cursor: grab; }
+.seg.is-dragging, .seg.is-dragging button { cursor: grabbing; }
+.seg.is-dragging .seg-ind {
+  transition: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 42%, transparent), var(--shadow-sm);
+}
+.seg.is-dragging button { transition: none; }
+
+/* 日期数字：浅色底 + 放大 + 内嵌（inset）效果。今日仍是实心主色，不描边 */
+.cal-cell-head { min-height: 30px; }
+.cal-daynum {
+  min-width: 30px; height: 30px; padding: 0 6px; font-size: 16px; border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-2) 68%, var(--surface-3));
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, .08), inset 0 -1px 0 rgba(255, 255, 255, .6);
+  transition: transform .18s var(--ease), box-shadow .2s, background-color .2s;
+}
+html[data-theme="dark"] .cal-daynum {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), inset 0 -1px 0 rgba(255, 255, 255, .05);
+}
+.cal-cell:hover .cal-daynum { transform: scale(1.06); }
+.cal-cell.is-today .cal-daynum { background: var(--primary); color: #fff; box-shadow: 0 0 14px -2px rgba(var(--neon), .8); }
+.wk-day {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 10px; border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 68%, var(--surface-3));
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, .08);
+}
+.wk-col.is-today .wk-day { background: var(--primary); color: #fff; padding: 2px 10px; box-shadow: 0 0 14px -2px rgba(var(--neon), .8); }
+.ds-big b {
+  padding: 0 10px; border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 68%, var(--surface-3));
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, .08);
+}
+
+/* 下拉框选项：内联分类色 + 淡底，展开框里也带颜色 */
+.ds-quick select option, .field select option { padding: 6px 8px; font-weight: 600; }
+
+@media (max-width: 940px) {
+  .cal-daynum { min-width: 22px; height: 22px; padding: 0 4px; font-size: 12px; }
+  .cal-cell-head { min-height: 22px; }
+  .wk-day { font-size: 18px; padding: 1px 8px; }
+  .ds-big b { font-size: 34px; padding: 0 8px; }
+  .day-side { overflow: auto; }
+  .day-insights { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- 高度收口：左栏自适应、右栏六卡等分 ---- */
+.day-side { padding: 0; overflow: hidden; }
+.ds-inner { padding: 12px 14px 10px; transform-origin: top left; }
+.ds-inner > * { flex: 0 0 auto; }
+.ds-cats { margin-top: 8px; gap: 4px; }
+.ds-cats h4 { font-size: 11px; margin-bottom: 0; }
+.dsc-row { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 6px; font-size: 11px; }
+.dsc-track { height: 6px; }
+.ds-quick { margin-top: 8px; padding: 8px; gap: 5px; }
+.dq-top { display: grid; grid-template-columns: 1fr 1.1fr; gap: 6px; }
+.dq-bottom { display: grid; grid-template-columns: minmax(0, 1fr) 78px; gap: 6px; align-items: end; }
+.dq-bottom .btn { width: 100%; height: 28px; padding: 0 4px; font-size: 11.5px; }
+.dq-amount input { height: 30px; }
+.ds-quick select, .ds-quick input[type="text"] { height: 26px; }
+.dq-error { font-size: 10px; }
+
+.day-ins-col { overflow: hidden; }
+.day-insights {
+  flex: 1 1 auto; min-height: 0; gap: 6px;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+}
+.ins-card { min-height: 0; overflow: hidden; padding: 6px 10px; }
+.ins-card h4 { margin: 0 0 3px; font-size: 11px; }
+.ins-bars { height: 32px; }
+.ins-abs { height: 40px; }
+.ins-ring-wrap { min-height: 40px; }
+.ins-ring { width: 40px; height: 40px; flex: 0 0 40px; }
+.ins-ring i { inset: 6px; }
+.ins-wspark { height: 28px; }
+.ins-mtd > b { font-size: 15px; }
+.ins-mtd span { font-size: 9.5px; }
+.ins-prog { height: 5px; margin-top: 4px; }
+.ins-foot { margin-top: 2px; font-size: 9.5px; }
+.ins-legend { margin-top: 4px; }
+.ins-stack { height: 10px; }
+@media (max-width: 940px) {
+  .day-side { overflow: auto; }
+  .ds-inner { transform: none !important; width: 100% !important; }
+  .day-insights { flex: 0 0 auto; grid-template-rows: none; }
+  .day-ins-col { overflow: auto; }
+  .ins-card { overflow: visible; }
+}
