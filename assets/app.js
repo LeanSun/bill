@@ -1546,26 +1546,27 @@
 
   /* 一条条目的最小/最大高度。15px 是 "色点 + 11px 字" 还看得清的底线；
      46px 是两块式再高也只是空，不如把空间留给下面的行 */
-  var ENTRY_GAP = 3, ENTRY_MIN = 15, ENTRY_MAX = 46;
+  var ENTRY_GAP = 3, ENTRY_MIN = 22, ENTRY_MAX = 48;
   function narrowGrid() {
     return !!(window.matchMedia && window.matchMedia('(max-width: 620px)').matches);
   }
-  /* 行高不固定：量出这一格扣掉表头之后还剩多少高度，
-     有几个条目、要排几行，就把高度均分下去。
-     条少 —— 每条高一截，最多 46px；条多 —— 均分，压到 15px 为止；
-     再多的部分折成 "+N 笔"，点开看浮层。 */
-  function fitStack(cell, box, headSel, perRow, minRow, maxRow) {
+  /* 条少 —— 每条高一截，最多 48px；条多 —— 均分，压到 22px 为止；
+     再多的部分折成 "+N 笔"，点格子或它都进当日明细。
+     extraSel 用于底部还有固定条（周视图的汇总）时，把那段高度先扣掉。 */
+  function fitStack(cell, box, headSel, perRow, minRow, maxRow, extraSel) {
     var nodes = box.querySelectorAll('.cal-item');
     var count = nodes.length;
     var more = box.querySelector('.cal-more');
     if (!count) { if (more) box.removeChild(more); return; }
 
     var head = headSel ? cell.querySelector(headSel) : null;
+    var extra = extraSel ? cell.querySelector(extraSel) : null;
     var cs = window.getComputedStyle(cell);
     var padT = parseFloat(cs.paddingTop) || 0;
     var padB = parseFloat(cs.paddingBottom) || 0;
     var headH = head ? head.offsetHeight + (parseFloat(window.getComputedStyle(head).marginBottom) || 0) : 30;
-    var avail = Math.max(minRow, cell.clientHeight - padT - padB - headH);
+    var extraH = extra ? extra.offsetHeight + (parseFloat(window.getComputedStyle(extra).marginTop) || 0) : 0;
+    var avail = Math.max(minRow, cell.clientHeight - padT - padB - headH - extraH);
 
     var rowsFit = Math.max(1, Math.floor((avail + ENTRY_GAP) / (minRow + ENTRY_GAP)));
     var capacity = rowsFit * perRow;
@@ -1605,7 +1606,8 @@
     for (var i = 0; i < cells.length; i++) {
       var box = cells[i].querySelector('.cal-items');
       if (!box) continue;
-      fitStack(cells[i], box, '.cal-cell-head', perRow, narrow ? 5 : ENTRY_MIN, narrow ? 6 : ENTRY_MAX);
+      /* 右下角 ＋ 常驻，先把那 28px 让出来，条目不会压到它下面 */
+      fitStack(cells[i], box, '.cal-cell-head', perRow, narrow ? 5 : ENTRY_MIN, narrow ? 6 : ENTRY_MAX, '.cal-add');
     }
   }
 
@@ -1656,23 +1658,43 @@
       var items = byDate[key] || [];
       var de = 0, di = 0;
       items.forEach(function (r) { if (r.type === 'income') di += r.amount; else de += r.amount; });
+      var tot = de + di, net = round(di - de);
       var cls = 'wk-col';
       if (key === today) cls += ' is-today';
       if (i >= 5) cls += ' is-weekend';
       html += '<div class="' + cls + '" data-date="' + key + '">' +
-        '<div class="wk-head"><span class="wk-dow">' + WEEKDAYS[i] + '</span><b class="wk-day">' + d.getDate() + '</b>' +
-        '<span class="wk-sum">' + (de ? '−' + fmtChip(de) : '') + (de && di ? ' / ' : '') + (di ? '+' + fmtChip(di) : '') + '</span></div>' +
-        '<div class="cal-items wk-items">' + items.map(function (r) { return itemHTML(p, r); }).join('') +
-        (items.length ? '' : '<span class="wk-empty">无记录</span>') + '</div>' +
+        '<div class="wk-head">' +
+        '<div class="wk-head-top"><span class="wk-dow">' + WEEKDAYS[i] + '</span>' +
+        '<b class="wk-day">' + d.getDate() + '</b></div>' +
+        '<div class="wk-head-sum">' +
+        (de ? '<span class="wk-out">−' + fmtChip(de) + '</span>' : '') +
+        (di ? '<span class="wk-in">+' + fmtChip(di) + '</span>' : '') +
+        (!de && !di ? '<span class="wk-none">暂无流水</span>' : '') +
+        '</div></div>' +
+        '<div class="cal-items wk-items' + (items.length ? '' : ' is-empty') + '">' +
+        (items.length
+          ? items.map(function (r) { return itemHTML(p, r); }).join('')
+          : '<div class="wk-empty"><b>无记录</b><span>点右下角 ＋ 记一笔</span></div>') +
+        '</div>' +
+        '<div class="wk-foot">' +
+        '<div class="wk-bar">' +
+        (tot ? '<i class="wkb-out" style="width:' + (de / tot * 100).toFixed(1) + '%"></i>' +
+          '<i class="wkb-in" style="width:' + (di / tot * 100).toFixed(1) + '%"></i>' : '') +
+        '</div>' +
+        '<span class="wk-foot-txt">' + (items.length
+          ? items.length + ' 笔 · 净 ' + (net >= 0 ? '+' : '−') + fmtChip(Math.abs(net))
+          : '暂无流水') + '</span>' +
+        '</div>' +
         '<button type="button" class="cal-add" data-add="' + key + '" aria-label="在 ' + key + ' 新增">+</button>' +
         '</div>';
     }
     box.innerHTML = html;
-    /* 周视图的列比月格子高得多，同样按可用高度摊开条目，别让下面空半屏 */
+    /* 一列不到 200px，两块式塞不下名称：整列一行一条，底部汇总条的高度先扣掉。
+       行高上限放到 64px，条少时把整列铺满，条多时也不至于挤成一条线。 */
     for (var c = 0; c < box.children.length; c++) {
       var col = box.children[c];
       var list = col.querySelector('.cal-items');
-      if (list && list.querySelector('.cal-item')) fitStack(col, list, '.wk-head', narrowGrid() ? 1 : 2, 22, 44);
+      if (list && list.querySelector('.cal-item')) fitStack(col, list, '.wk-head', 1, 28, 64, '.wk-foot');
     }
   }
 
@@ -1698,6 +1720,14 @@
     }).join('');
 
     var d = new Date(key + 'T00:00:00');
+    var rowsHTML = items.length
+      ? items.map(function (r) {
+        var c = r.type === 'income' ? p.income : catColor(p, r.category);
+        return '<button type="button" class="day-row" data-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '">' +
+          '<i></i><div class="dr-main"><b>' + esc(r.note || r.sub) + '</b><span>' + esc(r.category) + ' · ' + esc(r.sub) + '</span></div>' +
+          '<em>' + (r.type === 'income' ? '+' : '−') + fmtYuan(r.amount) + '</em></button>';
+      }).join('')
+      : '<div class="day-empty"><strong>这天还没有记录</strong><span>点左侧按钮，或者回到月视图点格子右下角的 ＋。</span></div>';
     box.innerHTML =
       '<aside class="day-side">' +
       '<div class="ds-head"><span class="ds-ym">' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月</span>' +
@@ -1708,18 +1738,16 @@
       '<div class="ds-meta"><div><span>支出</span><b class="c-expense">' + fmtYuan(de) + '</b></div>' +
       '<div><span>收入</span><b class="c-income">' + fmtYuan(di) + '</b></div>' +
       '<div><span>笔数</span><b>' + items.length + '</b></div></div>' +
-      (bars ? '<div class="ds-cats">' + bars + '</div>' : '') +
-      '<button type="button" class="btn btn-ghost ds-add" data-add="' + key + '">这天记一笔</button>' +
+      (bars ? '<div class="ds-cats"><h4>支出构成</h4>' + bars + '</div>' : '') +
+      '<button type="button" class="btn btn-primary ds-add" data-add="' + key + '">＋ 这天记一笔</button>' +
       '</aside>' +
       '<div class="day-list">' +
-      (items.length
-        ? items.map(function (r) {
-          var c = r.type === 'income' ? p.income : catColor(p, r.category);
-          return '<button type="button" class="day-row" data-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '">' +
-            '<i></i><div class="dr-main"><b>' + esc(r.note || r.sub) + '</b><span>' + esc(r.category) + ' · ' + esc(r.sub) + '</span></div>' +
-            '<em>' + (r.type === 'income' ? '+' : '−') + fmtYuan(r.amount) + '</em></button>';
-        }).join('')
-        : '<div class="day-empty"><strong>这天还没有记录</strong><span>点上面的按钮，或者去月视图点空白格。</span></div>') +
+      '<div class="day-list-head">' +
+      '<div><h3>当日明细</h3><span>' + key + ' · 共 ' + items.length + ' 笔</span></div>' +
+      '<div class="dlh-sum"><span>支出 <b class="c-expense">' + fmtYuan(de) + '</b></span>' +
+      '<span>收入 <b class="c-income">' + fmtYuan(di) + '</b></span></div>' +
+      '</div>' +
+      '<div class="day-list-grid">' + rowsHTML + '</div>' +
       '</div>';
   }
 
@@ -2187,7 +2215,7 @@
   function openConfirm(id) {
     state.pendingDeleteId = id;
     var rec = allRecords().filter(function (r) { return r.id === id; })[0];
-    if ($('confirmDesc') && rec) $('confirmDesc').textContent = rec.date + ' · ' + rec.note + ' · ' + fmtYuan(rec.amount) + '，删除后可从「恢复初始数据」找回。';
+    if ($('confirmDesc') && rec) $('confirmDesc').textContent = rec.date + ' · ' + rec.note + ' · ' + fmtYuan(rec.amount) + '，删除后不可撤销。';
     var back = $('confirmBackdrop');
     if (back) back.hidden = false;
   }
@@ -2307,13 +2335,6 @@
 
     if ($('themeBtn')) $('themeBtn').addEventListener('click', function () {
       setTheme(state.theme === 'dark' ? 'light' : 'dark');
-    });
-
-    if ($('resetBtn')) $('resetBtn').addEventListener('click', function () {
-      state.store = { added: [], edited: {}, deleted: [] };
-      saveStore();
-      renderAll();
-      toast('已恢复到两份原始账单数据', 'info');
     });
 
     /* 概览条格子 → 跳转（本身就是 button，回车/空格天然可用） */
@@ -2478,6 +2499,10 @@
 
       var item = e.target.closest('[data-id]');
       if (item) {
+        /* 月/周格子里的条目也算格子的一部分：进当日明细，
+           在明细页里点具体那一笔才编辑。天视图的列表行仍是直达编辑。 */
+        var holder = item.closest('.cal-cell[data-date], .wk-col[data-date]');
+        if (holder) { openDayPop(holder.dataset.date); return; }
         var rec = allRecords().filter(function (r) { return r.id === item.dataset.id; })[0];
         if (rec) openModal(rec);
         return;
@@ -2526,9 +2551,9 @@
      格子是扫描用的，不是归档用的。装不下的那截不该被裁掉，
      所以点格子直接把这天摊开：大字号、全部条目、点一行就能改。 */
   var dayPopKey = '';
+  /* 格子默认动作 = 打开当日明细（哪怕这天一笔都没有，明细页里也能直接记一笔）。
+     只有格子右下角的 ＋ 才直接弹「记一笔」，两条路彻底分开。 */
   function tapDay(key) {
-    var rows = allRecords().filter(function (r) { return r.date === key; });
-    if (!rows.length) { openModal(null, key); return; }
     openDayPop(key);
   }
   function openDayPop(key) {
