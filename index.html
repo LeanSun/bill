@@ -219,6 +219,7 @@
           <span class="ct-vr" aria-hidden="true"></span>
 
           <div class="ct-chips">
+            <span class="ct-ind" aria-hidden="true"></span>
             <span class="ct-group" id="catRow" role="group" aria-label="分类筛选"></span>
             <span class="ct-group" id="subRow" role="group" aria-label="子类筛选"></span>
             <button type="button" class="chip chip-clear" id="weekdayChip" hidden></button>
@@ -414,29 +415,6 @@
       <button type="button" class="btn btn-ghost" id="confirmCancel">再想想</button>
       <button type="button" class="btn btn-danger" id="confirmOk">确认删除</button>
     </div>
-  </div>
-</div>
-
-<!-- ============ 当日明细浮层 ============ -->
-<div class="day-mask" id="dayMask" hidden></div>
-<div class="day-pop" id="dayPop" role="dialog" aria-modal="true" aria-labelledby="dayPopTitle" hidden>
-  <div class="day-pop-head">
-    <div class="dph-left">
-      <h3 id="dayPopTitle">—</h3>
-      <p id="dayPopSub">—</p>
-    </div>
-    <button type="button" class="icon-btn" id="dayPopClose" aria-label="关闭当日明细">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-    </button>
-  </div>
-  <div class="day-pop-totals">
-    <span class="dpt-item"><i>−</i><b id="dayPopExp">¥0</b></span>
-    <span class="dpt-item"><i>＋</i><b id="dayPopInc">¥0</b></span>
-    <span class="dpt-item dpt-net"><i>＝</i><b id="dayPopNet">¥0</b></span>
-  </div>
-  <div class="day-pop-list" id="dayPopList"></div>
-  <div class="day-pop-foot">
-    <button type="button" class="btn btn-primary" id="dayPopAdd">＋ 在这一天记一笔</button>
   </div>
 </div>
 

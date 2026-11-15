@@ -643,6 +643,8 @@
   }
   function resizeAll() {
     Object.keys(charts).forEach(function (id) { if (charts[id]) charts[id].resize(); });
+    /* 断点会改胶囊内边距，滑块位置得跟着重算 */
+    updateCatIndicator();
   }
   function bindClick(id, handler) {
     if (!hasEcharts) return;
@@ -1439,14 +1441,14 @@
     var cat = state.filters.category;
     var colors = catColors(p);
 
-    var html = '<button type="button" data-cat="all" style="--c:' + p.primary + ';--ink:' + p.primary + '"' +
-      (cat === 'all' ? ' class="is-active"' : '') + '><i></i>全部</button>';
+    var html = '<button type="button" data-cat="all" style="--c:' + p.primary + ';--ink:' + catInk(p, p.primary) + '"' +
+      (cat === 'all' ? ' class="is-active"' : '') + '>全部</button>';
     EXPENSE_CATS.forEach(function (c, i) {
       html += '<button type="button" data-cat="' + esc(c) + '" style="--c:' + colors[i] + ';--ink:' + catInk(p, colors[i]) + '"' +
-        (cat === c ? ' class="is-active"' : '') + '><i></i>' + esc(c) + '</button>';
+        (cat === c ? ' class="is-active"' : '') + '>' + esc(c) + '</button>';
     });
     html += '<button type="button" data-cat="收入" style="--c:' + p.income + ';--ink:' + catInk(p, p.income) + '"' +
-      (cat === '收入' ? ' class="is-active"' : '') + '><i></i>收入</button>';
+      (cat === '收入' ? ' class="is-active"' : '') + '>收入</button>';
     catBox.innerHTML = html;
 
     var sub = '';
@@ -1479,6 +1481,30 @@
     if (strip && strip.classList && strip.classList.contains('ct-chips')) {
       strip.classList.toggle('is-scrollable', strip.scrollWidth - strip.clientWidth > 2);
     }
+    updateCatIndicator();
+  }
+  /* 分类筛选的滑块：量出当前生效那颗按钮在轨道里的真实位置，把指示器平移过去。
+     主类与子类共用一条轨道，选中最具体的那一颗；位置写在内容坐标系里，
+     横向滚动时指示器会跟着按钮一起走，不用额外监听 scroll。 */
+  function updateCatIndicator() {
+    var strip = document.querySelector('.ct-chips');
+    var ind = strip ? strip.querySelector('.ct-ind') : null;
+    if (!strip || !ind) return;
+    var act = null;
+    if (state.filters.sub !== 'all') {
+      var subs = strip.querySelectorAll('#subRow button[data-sub].is-active');
+      for (var si = 0; si < subs.length; si++) {
+        if (subs[si].dataset.sub !== 'all') { act = subs[si]; break; }
+      }
+    }
+    if (!act) act = strip.querySelector('#catRow button.is-active');
+    if (!act) act = strip.querySelector('#catRow button');
+    if (!act) return;
+    strip.style.setProperty('--ind-x', act.offsetLeft + 'px');
+    strip.style.setProperty('--ind-w', act.offsetWidth + 'px');
+    strip.style.setProperty('--ind-h', act.offsetHeight + 'px');
+    strip.style.setProperty('--ac', act.style.getPropertyValue('--c') || 'var(--primary)');
+    ind.classList.add('is-ready');
   }
   function syncCalLegend() { renderCatBar(palette()); }
 
@@ -1698,6 +1724,82 @@
     }
   }
 
+  /* 天页下方的趣味统计：全部用内联 SVG / CSS 画，不依赖 ECharts 的尺寸与 resize。
+     三张卡：近 30 天走势（含日均线与今日排名）、近 7 日柱状、最大一笔占比环。 */
+  function dayInsightsHTML(p, key, items, de) {
+    var byDate = {};
+    allRecords().forEach(function (r) {
+      if (r.type === 'income') return;
+      byDate[r.date] = (byDate[r.date] || 0) + r.amount;
+    });
+    var d0 = new Date(key + 'T00:00:00');
+    function at(off) {
+      var d = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() - off);
+      var k = dateKey(d);
+      return { k: k, v: round(byDate[k] || 0), d: d };
+    }
+    var hist = [], max30 = 1, sum30 = 0;
+    for (var i = 29; i >= 0; i--) {
+      var x = at(i);
+      hist.push(x);
+      if (x.v > max30) max30 = x.v;
+      sum30 += x.v;
+    }
+    var avg30 = sum30 / 30;
+    var todayV = hist[29].v;
+    var rank = 1;
+    for (var j = 0; j < 29; j++) if (hist[j].v > todayV) rank++;
+    var ratio = avg30 > 0 ? (todayV / avg30 - 1) * 100 : 0;
+    var badge = avg30 <= 0 ? '近 30 天没有其他支出'
+      : (ratio >= 0 ? '高于日均 ' + Math.round(ratio) + '%' : '低于日均 ' + Math.round(-ratio) + '%');
+    var badgeCls = avg30 > 0 && ratio < 0 ? ' is-good' : '';
+
+    var W = 300, H = 62, PAD = 4;
+    var pts = hist.map(function (h, i2) {
+      var px = PAD + i2 * (W - PAD * 2) / 29;
+      var py = H - PAD - (h.v / max30) * (H - PAD * 2);
+      return px.toFixed(1) + ',' + py.toFixed(1);
+    }).join(' ');
+    var avgY = (H - PAD - (avg30 / max30) * (H - PAD * 2)).toFixed(1);
+    var lastY = (H - PAD - (todayV / max30) * (H - PAD * 2)).toFixed(1);
+    var spark = '<svg class="ins-spark" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<polygon points="' + PAD + ',' + (H - PAD) + ' ' + pts + ' ' + (W - PAD) + ',' + (H - PAD) + '" fill="' + p.primary + '" opacity=".10"/>' +
+      '<line x1="' + PAD + '" y1="' + avgY + '" x2="' + (W - PAD) + '" y2="' + avgY + '" stroke="' + p.muted + '" stroke-width="1" stroke-dasharray="4 4" opacity=".7"/>' +
+      '<polyline points="' + pts + '" fill="none" stroke="' + p.primary + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+      '<circle cx="' + (W - PAD) + '" cy="' + lastY + '" r="3.6" fill="' + p.income + '" stroke="' + p.surface + '" stroke-width="1.5"/>' +
+      '</svg>';
+
+    var WD = ['日', '一', '二', '三', '四', '五', '六'];
+    var week = [], max7 = 1;
+    for (var w = 6; w >= 0; w--) { var y = at(w); week.push(y); if (y.v > max7) max7 = y.v; }
+    var bars = week.map(function (h, i3) {
+      var bh = Math.max(3, Math.round(h.v / max7 * 54));
+      return '<div class="ins-bar' + (i3 === 6 ? ' is-today' : '') + '" title="' + h.k + ' ' + fmtYuan(h.v) + '">' +
+        '<b style="height:' + bh + 'px"></b><span>' + WD[h.d.getDay()] + '</span></div>';
+    }).join('');
+
+    var biggest = items.filter(function (r) { return r.type !== 'income'; })
+      .sort(function (aa, bb) { return bb.amount - aa.amount; })[0];
+    var share = de > 0 && biggest ? Math.min(100, biggest.amount / de * 100) : 0;
+    var ring = biggest
+      ? '<div class="ins-ring" style="--pct:' + share.toFixed(1) + '%;--rc:' + catColor(p, biggest.category) + '"><i></i></div>' +
+        '<div class="ins-ring-txt"><b>' + esc(biggest.note || biggest.sub) + '</b>' +
+        '<span>' + fmtYuan(biggest.amount) + ' · 占当日支出 ' + share.toFixed(0) + '%</span></div>'
+      : '<div class="ins-none">今天还没有支出记录</div>';
+
+    return '<div class="day-insights">' +
+      '<div class="ins-card">' +
+      '<h4>近 30 天支出走势</h4>' + spark +
+      '<div class="ins-foot"><span>今日 <b>' + fmtYuan(todayV) + '</b></span>' +
+      '<span>日均 <b>' + fmtYuan(avg30) + '</b></span>' +
+      '<span>近 30 天第 <b>' + rank + '</b> 高</span></div>' +
+      '<div class="ins-badge' + badgeCls + '">' + badge + '</div>' +
+      '</div>' +
+      '<div class="ins-card"><h4>近 7 日支出</h4><div class="ins-bars">' + bars + '</div></div>' +
+      '<div class="ins-card"><h4>最大一笔</h4><div class="ins-ring-wrap">' + ring + '</div></div>' +
+      '</div>';
+  }
+
   function renderDayBoard(p, board) {
     var box = $('calDayBoard');
     if (!box) return;
@@ -1719,15 +1821,51 @@
         '<em>' + fmtYuan(byCat[c]) + '</em></div>';
     }).join('');
 
+    /* 当日明细：一个种类占一整行，行内把该类的每一笔做成可编辑的小胶囊 */
+    var groups = {};
+    items.forEach(function (r) {
+      var g = r.type === 'income' ? '收入' : (r.category || '其它');
+      if (!groups[g]) groups[g] = { name: g, rows: [], total: 0 };
+      groups[g].rows.push(r);
+      groups[g].total += r.amount;
+    });
+    var order = Object.keys(groups).sort(function (a, b) { return groups[b].total - groups[a].total; });
+    var catRowsHTML = order.map(function (g) {
+      var gr = groups[g];
+      var col = g === '收入' ? p.income : catColor(p, g);
+      var ink = catInk(p, col);
+      var chips = gr.rows.map(function (r) {
+        return '<button type="button" class="dlc-rec" data-id="' + esc(r.id) + '" title="点击编辑这笔">' +
+          esc(r.note || r.sub) + '<b>' + (r.type === 'income' ? '+' : '−') + fmtChip(r.amount) + '</b></button>';
+      }).join('');
+      return '<div class="dl-cat" style="--c:' + col + ';--ink:' + ink + '">' +
+        '<span class="dlc-bar"></span>' +
+        '<div class="dlc-name"><b>' + esc(g) + '</b><i>' + gr.rows.length + ' 笔</i></div>' +
+        '<div class="dlc-recs">' + chips + '</div>' +
+        '<em class="dlc-total">' + (g === '收入' ? '+' : '−') + fmtYuan(gr.total) + '</em>' +
+        '</div>';
+    }).join('');
+    if (!catRowsHTML) catRowsHTML = '<div class="day-empty"><strong>这天还没有记录</strong><span>用左侧的表单记下第一笔。</span></div>';
+
+    var quickHTML =
+      '<form class="ds-quick" id="quickEntryForm" novalidate>' +
+      '<h4>＋ 记一笔 <span>' + esc(key) + '</span></h4>' +
+      '<input type="hidden" id="qDate" value="' + esc(key) + '">' +
+      '<div class="dq-types">' +
+      '<button type="button" data-qtype="expense"' + (quickType === 'expense' ? ' class="is-active"' : '') + '>− 支出</button>' +
+      '<button type="button" data-qtype="income"' + (quickType === 'income' ? ' class="is-active"' : '') + '>＋ 收入</button>' +
+      '</div>' +
+      '<div class="dq-amount"><i>¥</i><input type="number" id="qAmount" step="0.01" min="0.01" placeholder="0.00" required autocomplete="off" aria-label="金额"></div>' +
+      '<div class="dq-row">' +
+      '<label><span>分类</span><select id="qCategory"></select></label>' +
+      '<label><span>子类</span><select id="qSub"></select></label>' +
+      '</div>' +
+      '<label class="dq-note"><span>备注</span><input type="text" id="qNote" maxlength="40" placeholder="例如：午餐、房租" autocomplete="off"></label>' +
+      '<p class="dq-error" id="qError" hidden></p>' +
+      '<button type="submit" class="btn btn-primary">保存这笔</button>' +
+      '</form>';
+
     var d = new Date(key + 'T00:00:00');
-    var rowsHTML = items.length
-      ? items.map(function (r) {
-        var c = r.type === 'income' ? p.income : catColor(p, r.category);
-        return '<button type="button" class="day-row" data-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '">' +
-          '<i></i><div class="dr-main"><b>' + esc(r.note || r.sub) + '</b><span>' + esc(r.category) + ' · ' + esc(r.sub) + '</span></div>' +
-          '<em>' + (r.type === 'income' ? '+' : '−') + fmtYuan(r.amount) + '</em></button>';
-      }).join('')
-      : '<div class="day-empty"><strong>这天还没有记录</strong><span>点左侧按钮，或者回到月视图点格子右下角的 ＋。</span></div>';
     box.innerHTML =
       '<aside class="day-side">' +
       '<div class="ds-head"><span class="ds-ym">' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月</span>' +
@@ -1739,16 +1877,19 @@
       '<div><span>收入</span><b class="c-income">' + fmtYuan(di) + '</b></div>' +
       '<div><span>笔数</span><b>' + items.length + '</b></div></div>' +
       (bars ? '<div class="ds-cats"><h4>支出构成</h4>' + bars + '</div>' : '') +
-      '<button type="button" class="btn btn-primary ds-add" data-add="' + key + '">＋ 这天记一笔</button>' +
+      quickHTML +
       '</aside>' +
       '<div class="day-list">' +
       '<div class="day-list-head">' +
-      '<div><h3>当日明细</h3><span>' + key + ' · 共 ' + items.length + ' 笔</span></div>' +
+      '<div><h3>当日明细</h3><span>' + key + ' · 共 ' + items.length + ' 笔 · ' + order.length + ' 类</span></div>' +
       '<div class="dlh-sum"><span>支出 <b class="c-expense">' + fmtYuan(de) + '</b></span>' +
       '<span>收入 <b class="c-income">' + fmtYuan(di) + '</b></span></div>' +
       '</div>' +
-      '<div class="day-list-grid">' + rowsHTML + '</div>' +
+      '<div class="day-cat-list">' + catRowsHTML + '</div>' +
+      '<div class="ins-title"><h3>关于这一天</h3><span>和最近这段时间比一比</span></div>' +
+      dayInsightsHTML(p, key, items, de) +
       '</div>';
+    fillQuickCats();
   }
 
   function renderYearBoard(p, board) {
@@ -2097,6 +2238,39 @@
   }
 
   /* ---------------- 弹窗：记账 ---------------- */
+  /* 天页内嵌记账表单：与弹窗共用一套落库逻辑，只是字段前缀不同。
+     用独立前缀避免和弹窗的 id 撞车，两个入口可以同时存在于 DOM 里。 */
+  var quickType = 'expense';
+  function fillQuickCats() {
+    var sel = $('qCategory');
+    if (!sel) return;
+    var cats = quickType === 'income' ? INCOME_CATS : EXPENSE_CATS;
+    sel.innerHTML = cats.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    fillQuickSubs();
+  }
+  function fillQuickSubs() {
+    var sel = $('qSub');
+    if (!sel) return;
+    var cat = ($('qCategory') && $('qCategory').value) || '餐饮';
+    sel.innerHTML = '<option value="">自动识别</option>' + subCatNames(cat).map(function (n) {
+      return '<option value="' + esc(n) + '">' + esc(n) + '</option>';
+    }).join('');
+  }
+  function submitQuick(e) {
+    e.preventDefault();
+    var err = $('qError');
+    var msg = commitEntry({
+      amount: $('qAmount') ? $('qAmount').value : '',
+      date: $('qDate') ? $('qDate').value : '',
+      type: quickType,
+      category: $('qCategory') ? $('qCategory').value : '',
+      sub: $('qSub') ? $('qSub').value : '',
+      note: $('qNote') ? $('qNote').value : ''
+    });
+    if (msg) { if (err) { err.textContent = msg; err.hidden = false; } return; }
+    if (err) { err.hidden = true; err.textContent = ''; }
+  }
+
   function fillCategoryOptions() {
     var sel = $('fCategory');
     if (!sel) return;
@@ -2179,36 +2353,48 @@
     if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
     lastFocused = null;
   }
-  function submitEntry(e) {
-    e.preventDefault();
-    var amount = Number($('fAmount') && $('fAmount').value);
-    var date = $('fDate') && $('fDate').value;
-    var err = $('formError');
-    function fail(msg) { if (err) { err.textContent = msg; err.hidden = false; } }
-    if (!isFinite(amount) || amount <= 0) { fail('请输入大于 0 的金额。'); return; }
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { fail('请选择有效日期。'); return; }
-    var rawNote = (($('fNote') && $('fNote').value) || '').trim();
+  /* 弹窗与天页内嵌表单共用的落库入口：校验、组装、存增量层、重绘。
+     返回空串表示成功，否则返回可直接展示的错误文案。 */
+  function commitEntry(v) {
+    var amount = Number(v.amount);
+    if (!isFinite(amount) || amount <= 0) return '请输入大于 0 的金额。';
+    if (!v.date || !/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return '请选择有效日期。';
+    var rawNote = String(v.note || '').trim();
     var rec = {
-      id: state.editingId || ('u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
-      date: date, type: state.entryType,
-      category: ($('fCategory') && $('fCategory').value) || (state.entryType === 'income' ? '收入' : '娱乐'),
+      id: v.editingId || ('u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+      date: v.date, type: v.type === 'income' ? 'income' : 'expense',
+      category: v.category || (v.type === 'income' ? '收入' : '娱乐'),
       note: canonNote(rawNote),
       amount: round(amount)
     };
     /* 子类：选了就用选的，留空交给关键词匹配 */
-    var subSel = $('fSub');
-    if (subSel && subSel.value) { rec.sub = subSel.value; rec.subExplicit = true; }
+    if (v.sub) { rec.sub = v.sub; rec.subExplicit = true; }
     if (!rec.note) rec.note = rec.category;
-    if (state.editingId) {
-      state.store.edited[state.editingId] = rec;
+    if (v.editingId) {
+      state.store.edited[v.editingId] = rec;
       toast('已更新「' + rec.note + '」', 'info');
     } else {
       state.store.added.push(rec);
       toast('已记下 ' + fmtYuan(rec.amount), 'success');
     }
     saveStore();
-    closeModal();
     renderAll();
+    return '';
+  }
+  function submitEntry(e) {
+    e.preventDefault();
+    var err = $('formError');
+    var msg = commitEntry({
+      editingId: state.editingId,
+      amount: $('fAmount') ? $('fAmount').value : '',
+      date: $('fDate') ? $('fDate').value : '',
+      type: state.entryType,
+      category: $('fCategory') ? $('fCategory').value : '',
+      sub: $('fSub') ? $('fSub').value : '',
+      note: $('fNote') ? $('fNote').value : ''
+    });
+    if (msg) { if (err) { err.textContent = msg; err.hidden = false; } return; }
+    closeModal();
   }
 
   /* ---------------- 弹窗：删除确认 ---------------- */
@@ -2366,7 +2552,6 @@
       if (e.key === 'Escape') {
         if (dp.open) { closeDp(); return; }
         if (cmpOpen) { closeCmp(); return; }
-        if ($('dayPop') && !$('dayPop').hidden) { closeDayPop(); return; }
         if (!$('confirmBackdrop').hidden) { closeConfirm(); return; }
         closeModal();
       }
@@ -2464,29 +2649,20 @@
     if ($('boardReset')) $('boardReset').addEventListener('click', resetBoardFilters);
     if ($('exportBtn')) $('exportBtn').addEventListener('click', exportCsv);
 
-    /* 当日明细浮层的开关 */
-    if ($('dayMask')) $('dayMask').addEventListener('click', closeDayPop);
-    if ($('dayPopClose')) $('dayPopClose').addEventListener('click', closeDayPop);
-    if ($('dayPopAdd')) $('dayPopAdd').addEventListener('click', function () {
-      var k = dayPopKey;
-      closeDayPop();
-      openModal(null, k || todayStr());
-    });
-    if ($('dayPopList')) $('dayPopList').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-day-id]');
-      if (!b) return;
-      var rec = allRecords().filter(function (r) { return r.id === b.dataset.dayId; })[0];
-      if (!rec) return;
-      closeDayPop();
-      openModal(rec);
-    });
-
-
     /* 棋盘：条目 / 空格 / 更多 / 年视图小格 —— 全部走一张委托表 */
     var boardEl = document.querySelector('.cal-board');
     if (boardEl) boardEl.addEventListener('click', function (e) {
+      var qt = e.target.closest('[data-qtype]');
+      if (qt) {
+        quickType = qt.dataset.qtype === 'income' ? 'income' : 'expense';
+        var qbs = document.querySelectorAll('#quickEntryForm [data-qtype]');
+        for (var qi = 0; qi < qbs.length; qi++) qbs[qi].classList.toggle('is-active', qbs[qi].dataset.qtype === quickType);
+        fillQuickCats();
+        return;
+      }
+
       var more = e.target.closest('[data-more]');
-      if (more) { openDayPop(more.dataset.more); return; }
+      if (more) { jumpToDay(more.dataset.more); return; }
 
       var ymHead = e.target.closest('.ym-head[data-month]');
       if (ymHead) { gotoMonth(state.calMonth.year, Number(ymHead.dataset.month)); return; }
@@ -2499,10 +2675,10 @@
 
       var item = e.target.closest('[data-id]');
       if (item) {
-        /* 月/周格子里的条目也算格子的一部分：进当日明细，
-           在明细页里点具体那一笔才编辑。天视图的列表行仍是直达编辑。 */
+        /* 月/周格子里的条目也算格子的一部分：切到天视图看当日明细。
+           天页里点具体那一笔才进编辑，明细分类行同理。 */
         var holder = item.closest('.cal-cell[data-date], .wk-col[data-date]');
-        if (holder) { openDayPop(holder.dataset.date); return; }
+        if (holder) { jumpToDay(holder.dataset.date); return; }
         var rec = allRecords().filter(function (r) { return r.id === item.dataset.id; })[0];
         if (rec) openModal(rec);
         return;
@@ -2514,6 +2690,16 @@
       var wk = e.target.closest('.wk-col[data-date]');
       if (wk) tapDay(wk.dataset.date);
     });
+
+    /* 天页内嵌表单是每次重绘都重建的，事件只能委托在稳定的 .cal-board 上 */
+    if (boardEl) {
+      boardEl.addEventListener('submit', function (e) {
+        if (e.target && e.target.id === 'quickEntryForm') submitQuick(e);
+      });
+      boardEl.addEventListener('change', function (e) {
+        if (e.target && e.target.id === 'qCategory') fillQuickSubs();
+      });
+    }
 
     /* 分析页：年度卡 → 日历 */
     var annualGrid = $('annualGrid');
@@ -2547,60 +2733,10 @@
     }, 160));
   }
 
-  /* ---------------- 当日明细浮层 ----------------
-     格子是扫描用的，不是归档用的。装不下的那截不该被裁掉，
-     所以点格子直接把这天摊开：大字号、全部条目、点一行就能改。 */
-  var dayPopKey = '';
-  /* 格子默认动作 = 打开当日明细（哪怕这天一笔都没有，明细页里也能直接记一笔）。
-     只有格子右下角的 ＋ 才直接弹「记一笔」，两条路彻底分开。 */
+  /* 格子与年历的小日子走同一条路：切到「天」视图看那一整天的明细。
+     天页本身就是当日明细，左侧还带内嵌记账表单。 */
   function tapDay(key) {
-    openDayPop(key);
-  }
-  function openDayPop(key) {
-    var pop = $('dayPop'), mask = $('dayMask');
-    if (!pop || !mask) return;
-    dayPopKey = key;
-    var p = palette();
-    var d = new Date(key + 'T00:00:00');
-    var rows = allRecords().filter(function (r) { return r.date === key; });
-    rows.sort(function (a, b) {
-      if (a.type !== b.type) return a.type === 'income' ? -1 : 1;
-      return b.amount - a.amount;
-    });
-    var de = 0, di = 0;
-    rows.forEach(function (r) { if (r.type === 'income') di += r.amount; else de += r.amount; });
-    de = round(de); di = round(di);
-    var net = round(di - de);
-
-    if ($('dayPopTitle')) $('dayPopTitle').textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日 · ' + WEEKDAYS[(d.getDay() + 6) % 7];
-    if ($('dayPopSub')) $('dayPopSub').textContent = key + ' · 共 ' + rows.length + ' 笔';
-    if ($('dayPopExp')) $('dayPopExp').textContent = fmtBig(de);
-    if ($('dayPopInc')) $('dayPopInc').textContent = fmtBig(di);
-    if ($('dayPopNet')) $('dayPopNet').textContent = (net < 0 ? '−' : '') + fmtBig(Math.abs(net));
-
-    var html = rows.map(function (r) {
-      var c = r.type === 'income' ? p.income : catColor(p, r.category);
-      var ink = catInk(p, c);
-      var label = r.note || r.sub;
-      return '<button type="button" class="day-row2" data-day-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + ink + '">' +
-        '<span class="dr2-dot">' + esc(String(r.sub || r.category).slice(0, 1)) + '</span>' +
-        '<span class="dr2-mid"><b class="dr2-note">' + esc(label) + '</b>' +
-        '<i class="dr2-sub">' + esc(r.category) + ' / ' + esc(r.sub) + '</i></span>' +
-        '<b class="dr2-amt ' + (r.type === 'income' ? 'pos' : 'neg') + '">' + (r.type === 'income' ? '+' : '−') + fmtChip(r.amount) + '</b>' +
-        '</button>';
-    }).join('');
-    if (!html) html = '<div class="day-pop-empty">这一天还没有记录</div>';
-    if ($('dayPopList')) $('dayPopList').innerHTML = html;
-
-    mask.hidden = false;
-    pop.hidden = false;
-    if ($('dayPopList')) $('dayPopList').scrollTop = 0;
-    if ($('dayPopClose')) $('dayPopClose').focus();
-  }
-  function closeDayPop() {
-    if ($('dayPop')) $('dayPop').hidden = true;
-    if ($('dayMask')) $('dayMask').hidden = true;
-    dayPopKey = '';
+    jumpToDay(key);
   }
 
 
