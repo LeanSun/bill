@@ -51,8 +51,8 @@
   --radius-sm: 10px;
   --ease: cubic-bezier(.22, 1, .36, 1);
   --ease-soft: cubic-bezier(.4, 0, .2, 1);
-  --sidebar-w: 238px;
-  --topbar-h: 88px;
+  --sidebar-w: 208px;
+  --main-pt: 18px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -101,7 +101,7 @@ html[data-theme="dark"] {
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
-/* 换肤只做一帧：底色不再自身过渡，色的"动"交给合成层光晕完成 */
+/* 换肤只做一帧：底色不自身过渡，也没有覆盖层动画，token 直接替换 */
 html { -webkit-text-size-adjust: 100%; background: var(--bg); }
 
 body {
@@ -211,33 +211,37 @@ svg { display: block; }
 .link-btn { padding: 0; font-size: 11.5px; font-weight: 600; color: var(--primary); transition: opacity .2s; }
 .link-btn:hover { opacity: .72; text-decoration: underline; text-underline-offset: 3px; }
 
-/* ---------------- 顶栏 ----------------
-   吸顶时必须完全遮住下方内容：整块实色 + 底部署名式渐隐，
-   渐隐用伪元素落在盒子外，绝不把透明留在表头里 */
-.main { min-width: 0; padding: 0 clamp(18px, 3vw, 40px) 56px; }
-.topbar {
-  position: sticky; top: 0; z-index: 25;
-  display: flex; align-items: center; justify-content: space-between; gap: 18px;
-  padding: 22px 0 16px;
-  background: var(--bg);
+/* ---------------- 主区与侧栏工具位 ----------------
+   顶栏整块撤掉：标题、介绍、日期、按钮全部不再占一整行，
+   正文从顶部 18px 起排，日历因此多出约 70px 的净高。 */
+.main { min-width: 0; padding: var(--main-pt) clamp(16px, 2.2vw, 30px) 56px; }
+
+.side-tools {
+  margin-top: 22px; padding: 0 4px;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.topbar::after {
-  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 22px;
-  background: linear-gradient(to bottom, var(--bg), transparent);
-  pointer-events: none;
+.side-add { width: 100%; height: 38px; justify-content: center; }
+.side-tool-row { display: flex; align-items: center; gap: 8px; }
+.side-tool-btn {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 9px;
+  height: 36px; padding: 0 11px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform .25s var(--ease), color .2s, border-color .2s;
 }
-html[data-theme="light"] .topbar { background: #f4f6fa; }
-html[data-theme="dark"] .topbar { background: #0d121c; }
-.topbar-title h1 { margin: 0; font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
-.topbar-title p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
-.topbar-actions { display: flex; align-items: center; gap: 10px; }
-.period-chip { padding: 7px 13px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); font-size: 11.5px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: var(--shadow-sm); }
+.side-tool-btn:hover { transform: translateY(-2px); color: var(--primary); border-color: var(--primary); }
+.side-tool-ico { display: grid; place-items: center; flex: 0 0 17px; width: 17px; height: 17px; }
+.side-tool-ico svg { width: 17px; height: 17px; }
+.side-tool-label { white-space: nowrap; }
 
 .icon-btn { position: relative; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: transform .25s var(--ease), color .2s, border-color .2s; overflow: hidden; }
 .icon-btn:hover { transform: translateY(-2px); color: var(--primary); border-color: var(--primary); }
 .icon-btn svg { width: 17px; height: 17px; }
 .ico-moon { display: none; }
-/* 云同步的窄屏入口：桌面走侧栏脚部，≤940px 侧栏脚部隐藏，改由顶栏图标顶上 */
+/* 云同步的窄屏入口：桌面走侧栏脚部的「云同步」文字链，
+   ≤940px 脚部隐藏，改由侧栏工具位里的云图标顶上 */
 .sync-mobile-btn { display: none; }
 /* 已连接时给个绿点常驻提醒 */
 .sync-mobile-btn.is-on { color: var(--primary); border-color: var(--primary); }
@@ -269,13 +273,12 @@ html[data-theme="dark"] .ico-moon { display: block; }
 @keyframes viewIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
 /* 日历页：整页锁一屏
-   高度 = 视口 - 顶栏，卡内自己分配：工具条定高、棋盘吃剩余、六行均分。
-   所以"月""年"都在一屏内，正文不产生竖向滚动。 */
+   高度 = 视口 - 正文顶部留白，卡内自己分配：工具条定高、棋盘吃剩余、六行均分。
+   顶栏撤掉后这里比原来多出约 70px，月视图格子更高，条目更松。 */
 .main.is-calendar { padding-bottom: 0; }
-.main.is-calendar .topbar { padding-bottom: 8px; }
 #view-calendar.is-active {
   display: flex; flex-direction: column; gap: 8px;
-  height: calc(100dvh - var(--topbar-h) - 6px);
+  height: calc(100dvh - var(--main-pt) - 6px);
   min-height: 420px;
   animation: viewIn .38s var(--ease) backwards;
 }
@@ -495,20 +498,28 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .ct-chips::-webkit-scrollbar { display: none; }
 /* 分类与子类两组按钮流进同一条滚动行，中间的竖线由 .ct-div 承担 */
 .ct-group { display: contents; }
+/* 每颗胶囊按自己的分类色铺一层淡底：--c 由 renderCatBar 写入，
+   --ink 是同色相压暗后的文字色，浅底上仍然读得清。 */
 .ct-chips button {
   display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
   padding: 3px 8px; border-radius: 20px;
-  font-size: 11px; font-weight: 600; color: var(--text-2);
-  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 11px; font-weight: 600; color: var(--ink, var(--text-2));
+  background: color-mix(in srgb, var(--c, var(--primary)) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--c, var(--primary)) 45%, var(--border));
   transition: color .2s, background-color .2s, border-color .2s, box-shadow .2s;
 }
-.ct-chips button:hover { border-color: var(--c, var(--border-strong)); color: var(--ink, var(--text)); }
-/* 选中态用同色相浅填充 + 描边：金 / 奶黄这类浅色板也压得住 */
+.ct-chips button:hover {
+  border-color: var(--c, var(--border-strong));
+  background: color-mix(in srgb, var(--c, var(--primary)) 30%, var(--surface));
+  color: var(--ink, var(--text));
+}
+/* 选中态加深同色填充 + 同色描边，不靠中性灰滑块区分 */
 .ct-chips button.is-active {
   color: var(--ink, var(--text));
-  background: color-mix(in srgb, var(--c) 30%, var(--surface));
-  border-color: var(--c);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c, var(--primary)) 42%, var(--surface));
+  border-color: var(--c, var(--primary));
+  box-shadow: inset 0 0 0 1px var(--c, var(--primary));
+  font-weight: 700;
 }
 /* 分类色点让位给文字：一行要塞下七个分类，图省 80px 比留个 6px 点划算；
    颜色归属交给选中态底色和格子里的条目本身 */
@@ -537,6 +548,27 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .ct-right .seg-sm { min-width: 110px; padding: 2px; flex: 0 0 auto; }
 .ct-right .seg-sm button { padding: 4px 2px; font-size: 11px; }
 .ct-right .seg-sm .seg-ind { top: 2px; left: 2px; width: calc((100% - 4px) / var(--seg-n)); height: calc(100% - 4px); }
+
+/* 全部 / 支 / 收：三颗各自语义色的填充，外壳也带一层淡底。
+   滑块在这里退场 —— 选中态由按钮自己的深一档底色承担。 */
+#typeSeg { background: color-mix(in srgb, var(--primary) 10%, var(--surface-3)); }
+#typeSeg button {
+  --tc: var(--primary);
+  border-radius: 7px;
+  color: color-mix(in srgb, var(--tc) 58%, var(--text));
+  background: color-mix(in srgb, var(--tc) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tc) 34%, transparent);
+  transition: color .2s, background-color .2s, border-color .2s, box-shadow .2s;
+}
+#typeSeg button[data-type="expense"] { --tc: var(--expense); }
+#typeSeg button[data-type="income"] { --tc: var(--income); }
+#typeSeg .seg-ind { display: none; }
+#typeSeg button.is-active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--tc) 40%, var(--surface));
+  border-color: var(--tc);
+  box-shadow: inset 0 0 0 1px var(--tc);
+}
 
 .cal-month-pop { position: absolute; top: calc(100% + 8px); left: 0; z-index: 45; width: 262px; padding: 13px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-pop); animation: dpIn .3s var(--ease) backwards; }
 
@@ -832,51 +864,8 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 .modal-sm .modal-foot .btn { min-width: 100px; }
 
 /* ---------------- 主题切换 ----------------
-   旧的修法用的是 View Transitions：整页截图两次 + clip-path 圆形擦除。
-   clip-path 不是合成动画，每帧都要把整页快照重新裁一遍再栅格化，
-   窗口一大就是几百毫秒的掉帧——这条路修不好，只能换掉。
-   现在：token 一帧内换完（图表同步换色），动的只有一个光斑，
-   它只改 transform / opacity，全程留在合成层，不碰布局也不碰绘制。 */
-/* ---------------- 换肤过渡 ----------------
-   一颗实心光斑 + 一道扩散环，两者都只动 transform / opacity，全程留在合成层。
-   上一版的透明度上限只有 .55、缩放 0.05→1.55，跟同帧换色叠在一起几乎看不见，
-   所以被当成"没有动效"。现在起手是不透明的亮核，并补一道描边环比扩散感。 */
-.theme-orb {
-  position: fixed; left: 0; top: 0; z-index: 300;
-  width: 560px; height: 560px; margin: -280px 0 0 -280px;
-  border-radius: 50%; pointer-events: none;
-  opacity: 0; transform: scale(.04);
-  will-change: transform, opacity; contain: strict;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(var(--neon), .62) 0%,
-    rgba(var(--neon), .40) 22%,
-    rgba(var(--neon), .17) 46%,
-    rgba(var(--neon), .05) 68%,
-    transparent 80%);
-}
-.theme-orb.is-on { animation: orbBurst .78s cubic-bezier(.22, 1, .36, 1) forwards; }
-@keyframes orbBurst {
-  0%   { opacity: .85; transform: scale(.05); }
-  34%  { opacity: .48; }
-  100% { opacity: 0;   transform: scale(2.15); }
-}
-
-.theme-ring {
-  position: fixed; left: 0; top: 0; z-index: 301;
-  width: 200px; height: 200px; margin: -100px 0 0 -100px;
-  border-radius: 50%; pointer-events: none;
-  border: 2px solid rgba(var(--neon), .85);
-  box-shadow: 0 0 20px rgba(var(--neon), .5), inset 0 0 20px rgba(var(--neon), .3);
-  opacity: 0; transform: scale(.2);
-  will-change: transform, opacity; contain: strict;
-}
-.theme-ring.is-on { animation: ringOut .92s cubic-bezier(.16, 1, .3, 1) .03s forwards; }
-@keyframes ringOut {
-  0%   { opacity: .95; transform: scale(.18); }
-  62%  { opacity: .3; }
-  100% { opacity: 0;   transform: scale(6.6); }
-}
-
+   光晕已取消：换肤只做一次 token 与图表配色的同步替换，
+   不再生成任何覆盖层、不再占用合成层、不再有 420ms 的切换锁。 */
 /* ---------------- 自定义日历选择器 ---------------- */
 .date-wrap { position: relative; }
 .date-field { width: 100%; display: flex; align-items: center; gap: 9px; padding: 10px 11px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2); text-align: left; font-size: 12.5px; font-weight: 600; color: var(--text); transition: border-color .25s, box-shadow .25s, background-color .25s; }
@@ -1010,18 +999,22 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .sidebar { position: relative; height: auto; flex-direction: row; align-items: center; gap: 16px; padding: 12px 18px; border-right: 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   .brand { padding: 0; }
   .brand-text span { display: none; }
-  .nav { flex-direction: row; gap: 3px; margin-left: auto; }
+  .nav { flex-direction: row; gap: 3px; margin-left: 0; }
   .nav-item { width: auto; padding: 8px 12px; }
   .nav-ind { display: none; }
   .side-block, .side-foot { display: none; }
+  /* 工具位在窄屏转成横排：记一笔 / 深浅切换 / 云同步都留在工作台里 */
+  .side-tools { flex-direction: row; align-items: center; margin: 0 0 0 auto; padding: 0; gap: 8px; }
+  .side-add { width: auto; height: 36px; padding: 0 12px; }
+  .side-tool-row { gap: 6px; }
+  .side-tool-label { display: none; }
+  .side-tool-btn { flex: 0 0 auto; width: 36px; padding: 0; justify-content: center; }
   .sync-mobile-btn { display: grid; }
-  .main { padding: 0 18px 48px; }
+  .main { padding: 12px 18px 48px; }
   .chart-grid { grid-template-columns: 1fr; }
   .chart-card.span-2 { grid-column: span 1; }
   .chart-calendar { height: 300px; }
   .annual-grid { grid-template-columns: 1fr; }
-  .topbar { position: relative; }
-  .topbar::after { display: none; }
   /* 窄屏不再锁屏高：工具条会换行，交给页面自然滚动 */
   #view-calendar.is-active { height: auto; min-height: 0; }
   .cal-grid { grid-template-rows: repeat(6, minmax(96px, 1fr)); }
@@ -1044,9 +1037,12 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
   .ay-cells { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {
-  .topbar { flex-wrap: wrap; gap: 10px; padding: 16px 0 14px; }
-  .topbar-title h1 { font-size: 20px; }
-  .period-chip { display: none; }
+  .sidebar { gap: 9px; padding: 10px 12px; }
+  .brand-text strong { font-size: 15px; }
+  .nav-item { padding: 7px 9px; font-size: 12.5px; }
+  .nav-item svg { width: 16px; height: 16px; flex-basis: 16px; }
+  .side-add { height: 34px; padding: 0 10px; font-size: 12px; }
+  .side-tool-btn, .sync-mobile-btn { height: 34px; width: 34px; }
   .stat-strip { grid-template-columns: 1fr; }
   .stat-cell { border-right: 0; border-bottom: 1px solid var(--border); padding: 11px 14px; }
   .stat-cell:last-child { border-bottom: 0; }
@@ -1078,18 +1074,10 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* 系统关掉动效时不能"什么都不发生"。大扫过换成一次短促光晕淡出：
-     没有横扫、没有大幅位移，但换肤这件事仍然看得见。 */
-  *:not(.theme-orb):not(.theme-ring), *:not(.theme-orb):not(.theme-ring)::before, *:not(.theme-orb):not(.theme-ring)::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-  .theme-ring { display: none !important; }
-  .theme-orb.is-on { animation: orbFade .46s ease-out forwards !important; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .spark path.line { stroke-dashoffset: 0; }
   /* 今日格：呼吸换成常亮描边，标记不因关动效而消失 */
   .cal-cell.is-today::after, .wk-col.is-today::after, .ym-day.is-today::after { animation: none !important; opacity: .62; }
-}
-@keyframes orbFade {
-  0%   { opacity: .5; transform: scale(.55); }
-  100% { opacity: 0;  transform: scale(1.08); }
 }
 
 /* ---------------- 云同步 ----------------

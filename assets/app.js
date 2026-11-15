@@ -147,7 +147,6 @@
     editingId: null,
     entryType: 'expense',
     pendingDeleteId: null,
-    themeAnimating: false,
     store: { added: [], edited: {}, deleted: [] }
   };
 
@@ -1432,30 +1431,6 @@
     }
   }
 
-  function renderSide() {
-    var recs = allRecords();
-    var count = $('sideCount'), rangeEl = $('sideRange'), local = $('sideLocal'), dims = $('sideDims');
-    if (count) count.textContent = recs.length.toLocaleString('zh-CN') + ' 笔';
-    if (dims) dims.textContent = EXPENSE_CATS.length + ' 类 · ' + countSubCats() + ' 子类';
-    if (rangeEl) {
-      var dates = recs.map(function (r) { return r.date; }).sort();
-      rangeEl.textContent = dates.length ? (dates[0].slice(0, 7).replace('-', '.') + ' — ' + dates[dates.length - 1].slice(0, 7).replace('-', '.')) : '—';
-    }
-    if (local) {
-      var n = state.store.added.length + Object.keys(state.store.edited).length + state.store.deleted.length;
-      local.textContent = n + ' 笔';
-    }
-  }
-
-  function renderPeriod() {
-    var el = $('periodChip');
-    if (!el) return;
-    var recs = scopeRecords();
-    if (!recs.length) { el.textContent = '暂无数据'; return; }
-    var dates = recs.map(function (r) { return r.date; }).sort();
-    el.textContent = dates[0].slice(0, 7).replace('-', '.') + ' — ' + dates[dates.length - 1].slice(0, 7).replace('-', '.');
-  }
-
   /* ---------------- 日历：分类 / 子类筛选（与工具条同一行） ---------------- */
   var cmpYear = 2026, cmpOpen = false;
   function renderCatBar(p) {
@@ -1485,8 +1460,8 @@
       });
       var names = subCatNames(cat);
       sub = '<span class="ct-div" aria-hidden="true"></span>';
-      sub += '<button type="button" class="ct-sub" data-sub="all" style="--c:' + p.primary + ';--ink:' + p.primary + '"' +
-        (state.filters.sub === 'all' ? ' class="ct-sub is-active"' : '') + '>全部<b>' + tot + '</b></button>';
+      sub += '<button type="button" class="ct-sub' + (state.filters.sub === 'all' ? ' is-active' : '') +
+        '" data-sub="all" style="--c:' + p.primary + ';--ink:' + catInk(p, p.primary) + '">全部<b>' + tot + '</b></button>';
       names.forEach(function (s, i) {
         var n = counts[s] || 0;
         var on = state.filters.sub === s;
@@ -1852,8 +1827,6 @@
   }
 
   function renderAll() {
-    renderSide();
-    renderPeriod();
     renderKpis();
     renderBoard();
     renderCharts(state.view);
@@ -1870,8 +1843,6 @@
     /* 日历页要锁一整屏，正文底距归零，否则那 56px 会把日历顶出一截 */
     var main = document.querySelector('.main');
     if (main) main.classList.toggle('is-calendar', view === 'calendar');
-    if ($('pageTitle')) $('pageTitle').textContent = VIEW_META[view][0];
-    if ($('pageSub')) $('pageSub').textContent = VIEW_META[view][1];
     writeRoute(view, false);
     if (view === 'calendar') renderBoard();
     requestAnimationFrame(function () {
@@ -2288,51 +2259,13 @@
     if (!deferCharts) renderCharts(state.view, 'instant');
   }
 
-  /* 换肤：一帧内换完 token + 图表配色，动的只有一个合成层光斑。
-     旧方案走 View Transitions：整页截图两次 + clip-path 圆形擦除。
-     clip-path 不是合成动画，每帧都要把整页快照重新裁剪栅格化，
-     窗口一大就是成片的掉帧，调时长救不回来，所以整条路拆掉。
-     现在这里没有快照、没有布局读写、没有 per-frame 样式写入：
-     换色同步完成，"动"的部分只有 .theme-orb 的 transform / opacity。 */
-  function themeLayer(cls, id) {
-    var el = document.getElementById(id);
-    if (!el) {
-      el = document.createElement('div');
-      el.id = id;
-      el.className = cls;
-      el.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(el);
-    }
-    return el;
-  }
-  function setTheme(t, x, y) {
-    if (t === state.theme || state.themeAnimating) return;
-    var cx = (typeof x === 'number' && x > 0) ? x : window.innerWidth - 46;
-    var cy = (typeof y === 'number' && y > 0) ? y : 40;
-
-    /* 1) token 与图表同帧换完：不经过任何中间态，也就没有残影可闪 */
-    state.themeAnimating = true;
-    try {
-      applyTheme(t, true);
-      renderCharts(state.view, 'instant');
-    } finally {
-      /* 2) 光斑 + 扩散环从点击点散开：两层都只改 transform / opacity，
-            全程留在合成层，主线程一帧都不用等 */
-      var orb = themeLayer('theme-orb', 'themeOrb');
-      var ring = themeLayer('theme-ring', 'themeRing');
-      var layers = [orb, ring];
-      for (var i = 0; i < layers.length; i++) {
-        var el = layers[i];
-        el.style.left = cx + 'px';
-        el.style.top = cy + 'px';
-        el.classList.remove('is-on');
-        void el.offsetWidth;
-      }
-      orb.classList.add('is-on');
-      ring.classList.add('is-on');
-      window.clearTimeout(setTheme._t);
-      setTheme._t = window.setTimeout(function () { state.themeAnimating = false; }, 420);
-    }
+  /* 换肤：光晕已取消。只做一次 token + 图表配色的同步替换，
+     不生成覆盖层、不读写布局、不设切换锁，连点也能立刻响应。
+     底色与卡面本来就没有 background-color 过渡，所以是干净的一帧切换。 */
+  function setTheme(t) {
+    if (t === state.theme) return;
+    applyTheme(t, true);
+    renderCharts(state.view, 'instant');
   }
 
   function bindEvents() {
@@ -2372,9 +2305,8 @@
       renderAnnual(palette());
     });
 
-    if ($('themeBtn')) $('themeBtn').addEventListener('click', function (e) {
-      var r = this.getBoundingClientRect();
-      setTheme(state.theme === 'dark' ? 'light' : 'dark', e.clientX || (r.left + r.width / 2), e.clientY || (r.top + r.height / 2));
+    if ($('themeBtn')) $('themeBtn').addEventListener('click', function () {
+      setTheme(state.theme === 'dark' ? 'light' : 'dark');
     });
 
     if ($('resetBtn')) $('resetBtn').addEventListener('click', function () {
