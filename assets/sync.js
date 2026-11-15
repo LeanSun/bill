@@ -247,7 +247,8 @@
       deleted: s.deleted || [],
       theme: s.theme === 'dark' ? 'dark' : 'light',
       layout: s.layout || null,
-      weights: s.weights || {}
+      weights: s.weights || {},
+      weightCleared: s.weightCleared || []
     };
   }
   function hasContent(s) {
@@ -255,7 +256,8 @@
     return (s.added || []).length > 0 ||
       Object.keys(s.edited || {}).length > 0 ||
       (s.deleted || []).length > 0 || !!s.layout ||
-      Object.keys(s.weights || {}).length > 0;
+      Object.keys(s.weights || {}).length > 0 ||
+      (s.weightCleared || []).length > 0;
   }
 
   function adopt(remote, sha) {

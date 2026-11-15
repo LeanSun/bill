@@ -1643,3 +1643,88 @@ html[data-theme="dark"] .cal-daynum {
   .day-ins-col { overflow: auto; }
   .ins-card { overflow: visible; }
 }
+
+/* ==================== 本轮：天页列宽 / 表单排布 / 剩余额度 / 折线 ==================== */
+/* 关于这一天缩到原来一半，腾出的宽度全部给当日明细 */
+.cal-day { grid-template-columns: minmax(0, 290px) minmax(0, 1.575fr) minmax(0, .575fr); }
+
+/* 记一笔：按图里的纵向顺序排——类型 / 金额 / 分类子类 / 备注 / 保存。
+   支出绿色的选中配色保留，备注与保存各自占满一行。 */
+.dq-top { grid-template-columns: 1fr; }
+.dq-amount input { height: 36px; font-size: 15px; }
+.dq-bottom { grid-template-columns: 1fr; gap: 7px; }
+.dq-note input[type="text"] { height: 42px; font-size: 12px; padding: 0 11px; }
+.dq-bottom .btn { height: 32px; font-size: 12px; }
+
+/* 体重输入行加高 */
+.ds-weight { padding: 10px; gap: 8px; }
+.ds-weight input[type="number"] { height: 34px; font-size: 13px; }
+.dw-label { font-size: 12px; }
+.dw-save { padding: 7px 12px; font-size: 11.5px; }
+.dw-clear { width: 24px; height: 24px; }
+
+/* 近 7 日支出折线 */
+.ins-line { display: block; width: 100%; height: 34px; overflow: visible; }
+.ins-ln-area { fill: color-mix(in srgb, var(--primary) 16%, transparent); }
+.ins-ln-path { fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ins-ln-dot { fill: var(--surface); stroke: var(--primary); stroke-width: 1.8; vector-effect: non-scaling-stroke; cursor: pointer; transition: r .16s var(--ease); }
+.ins-ln-dot:hover, .ins-ln-dot.is-today { fill: var(--primary); r: 3.6; }
+.ins-ln-x { display: flex; justify-content: space-between; margin-top: 1px; padding: 0 2px; font-size: 9px; color: var(--muted); }
+.ins-ln-x .is-today { color: var(--primary); font-weight: 700; }
+
+/* 当前月 / 当前年剩余 */
+.ins-left-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ins-left-row > div { min-width: 0; }
+.ins-left-row span { display: block; font-size: 9px; color: var(--muted); }
+.ins-left-row b { display: block; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ins-left-row b.is-over { color: var(--expense); }
+.ins-left-bar { height: 4px; margin-top: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.ins-left-bar.is-year { margin-top: 2px; }
+.ins-left-bar i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.ins-left-bar.is-year i { background: var(--amber); }
+.ins-left .ins-foot { font-size: 8.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 工具条里的回到今天：紧挨 年/月/周/天 */
+.ct-today {
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+  height: 34px; padding: 0 10px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-2); font-size: 12px; font-weight: 600; white-space: nowrap;
+  transition: color .2s, border-color .2s, background-color .2s, transform .2s var(--ease);
+}
+.ct-today svg { width: 15px; height: 15px; }
+.ct-today:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); transform: translateY(-1px); }
+
+@media (max-width: 1240px) {
+  .ct-today span { display: none; }
+  .ct-today { width: 34px; padding: 0; justify-content: center; }
+}
+@media (max-width: 940px) {
+  .cal-day { grid-template-columns: 1fr; }
+  .dq-note input[type="text"] { height: 40px; }
+}
+
+/* 总览新增的信息卡 */
+.stat-card .ov-stat { padding-top: 4px; }
+.ovs-big { display: flex; align-items: baseline; gap: 8px; }
+.ovs-big b { font-size: 25px; font-weight: 750; letter-spacing: -.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+.ovs-big span { font-size: 11px; color: var(--muted); }
+.ovs-bar { display: flex; height: 9px; margin: 9px 0 8px; border-radius: 7px; overflow: hidden; background: var(--surface-3); }
+.ovs-bar i { display: block; height: 100%; min-width: 2px; cursor: help; }
+.ovs-list { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.ovs-list span { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-2); }
+.ovs-list i { width: 7px; height: 7px; border-radius: 2px; }
+.ovs-list b { font-variant-numeric: tabular-nums; color: var(--text); }
+.ovs-note { margin-top: 8px; font-size: 10px; color: var(--muted); }
+.ovs-note b { color: var(--text-2); }
+.ovs-rec { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--border); }
+.ovs-rec:last-of-type { border-bottom: 0; }
+.ovs-rec span { font-size: 11.5px; font-weight: 650; color: var(--text); }
+.ovs-rec i { font-style: normal; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.ovs-empty { padding: 16px 0; font-size: 11.5px; color: var(--muted); text-align: center; }
+.ovs-kpi { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ovs-kpi span { font-size: 10.5px; color: var(--muted); }
+.ovs-kpi b { font-size: 22px; font-weight: 750; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.ovs-kpi i { font-style: normal; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#statRhythm { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding-top: 10px; }
+@media (max-width: 760px) { #statRhythm { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

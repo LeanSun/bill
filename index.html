@@ -47,10 +47,6 @@
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         记一笔
       </button>
-      <button type="button" class="btn btn-ghost side-add side-today" id="calToday" aria-label="回到今天" title="回到今天">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="side-today-label">回到今天</span>
-      </button>
       <div class="side-tool-row" data-page-node-id="FAzWtPIAUNd1Jpbqgot7kQ">
         <button type="button" class="side-tool-btn" id="themeBtn" aria-label="切换深浅色主题" title="切换主题" data-page-node-id="LX8Thc9DucV8NCd8GRC4Vn">
           <span class="side-tool-ico" aria-hidden="true" data-page-node-id="gAbsZfuEiKdpsBOWKU8pYA">
@@ -213,27 +209,24 @@
         </article>
 
         <div class="chart-grid" data-page-node-id="OzM9fFthxf7lEac9ql6B5Z">
-          <article class="card chart-card span-2" style="--i:1" data-page-node-id="qGS1WZoV8o2xwopMLMDGwN">
-            <div class="card-head" data-page-node-id="fEJHCcsIXjWRTEzU6Egymz">
-              <div data-page-node-id="EDAWAEuZ7zDjAfuOnINyO6"><h3 data-page-node-id="FzCOhm58HgptcVkAgcoyr9">年度对比</h3><p id="compareSub" data-page-node-id="Bh1K08oamXEc1FdBqymOHg">2025 与 2026 逐月对照</p></div>
-              <div class="seg seg-sm" id="compareMetric" role="group" aria-label="对比指标" data-page-node-id="Tb0cQJsx4C7zx8PXhLmxbV">
-                <span class="seg-ind" aria-hidden="true" data-page-node-id="ykNDRoZb9fa5mYjqmuB2m3"></span>
-                <button type="button" data-metric="expense" class="is-active" data-page-node-id="IR0IsqRm9AaPhVNaQ86ouK">支出</button>
-                <button type="button" data-metric="income" data-page-node-id="Y4FC4BHSXRwBpSQhSvbN9n">收入</button>
-                <button type="button" data-metric="balance" data-page-node-id="9zE2RmMbHm4sE09W8TXzcD">结余</button>
-              </div>
-            </div>
-            <div class="chart chart-lg" id="chartCompare" data-page-node-id="0MIUvTc5nok90p2qF3o1Xj"></div>
+          <article class="card chart-card stat-card" style="--i:1" data-oid="focus">
+            <div class="card-head"><div><h3>消费集中度</h3><p>前三类支出占比与餐饮权重</p></div></div>
+            <div class="ov-stat" id="statFocus"></div>
+          </article>
+
+          <article class="card chart-card stat-card" style="--i:2" data-oid="recur">
+            <div class="card-head"><div><h3>固定支出</h3><p>连续多月出现的固定名目</p></div></div>
+            <div class="ov-stat" id="statRecur"></div>
+          </article>
+
+          <article class="card chart-card stat-card span-2" style="--i:3" data-oid="rhythm">
+            <div class="card-head"><div><h3>记账节奏</h3><p>有账天数、连续记录与单日峰值</p></div></div>
+            <div class="ov-stat" id="statRhythm"></div>
           </article>
 
           <article class="card chart-card" style="--i:2" data-page-node-id="HMmKChNlMp71riaz9DqCUh">
             <div class="card-head" data-page-node-id="BNkwIU0V4PzFzuGjI0Chr4"><div data-page-node-id="p8jqurhA6eh2m27oBzPA76"><h3 data-page-node-id="CtpILXqaozD6m9WttnbEzv">分类排行</h3><p data-page-node-id="bDNJfbzASXI2BnnoqPTo9s">累计支出金额</p></div></div>
             <div class="chart chart-md" id="chartRank" data-page-node-id="uokEsLR1IDwRHxYKSrQi6w"></div>
-          </article>
-
-          <article class="card chart-card" style="--i:3" data-page-node-id="lsjMdm2LBeMBvsk7j6ubF0">
-            <div class="card-head" data-page-node-id="EAJoxJGQCGJOMqDezrxi1X"><div data-page-node-id="1TVMfD29N012bYzzGoZJKi"><h3 data-page-node-id="uNUEoVkwWC6yFmzAA9fz3e">星期分布</h3><p data-page-node-id="1Z7KxmXVdtu6QdCAgZ6zj9">按星期汇总的支出</p></div></div>
-            <div class="chart chart-md" id="chartWeekday" data-page-node-id="paPMPLjYjdGQDMdc5nmxFe"></div>
           </article>
 
           <article class="card chart-card span-2" style="--i:4" data-page-node-id="MjGJ8ZeE3oTMDs8EjPTR44">
@@ -298,6 +291,11 @@
             <button type="button" data-scale="week" data-page-node-id="homqXiRhcOV2zk4NBlXCpG">周</button>
             <button type="button" data-scale="day" data-page-node-id="FRQlmdvbFflNta6yaVwARm">天</button>
           </div>
+
+          <button type="button" class="ct-today" id="calToday" aria-label="回到今天" title="回到今天">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>回到今天</span>
+          </button>
 
           <span class="ct-vr" aria-hidden="true" data-page-node-id="DdvNmwj06vcAn62bR0T7et"></span>
 

@@ -73,6 +73,15 @@ function cleanWeights(w) {
   }
   return out;
 }
+function cleanWeightCleared(a) {
+  if (!Array.isArray(a)) return [];
+  const out = [], seen = new Set();
+  for (const k of a.slice(0, 5000)) {
+    const s = String(k);
+    if (RE_WDATE.test(s) && !seen.has(s)) { seen.add(s); out.push(s); }
+  }
+  return out;
+}
 function cleanLayout(L) {
   if (!L || typeof L !== 'object' || L.v !== 1 || !Array.isArray(L.order)) return null;
   const order = L.order.map(x => String(x).slice(0, 32)).slice(0, 40);
@@ -89,7 +98,7 @@ function cleanLayout(L) {
   }
   return { v: 1, order, spans };
 }
-const EMPTY = () => ({ rev: 0, updatedAt: null, added: [], edited: {}, deleted: [], theme: 'light', layout: null, weights: {} });
+const EMPTY = () => ({ rev: 0, updatedAt: null, added: [], edited: {}, deleted: [], theme: 'light', layout: null, weights: {}, weightCleared: [] });
 
 function readState() {
   try {
@@ -103,7 +112,8 @@ function readState() {
       deleted: Array.isArray(o.deleted) ? o.deleted : [],
       theme: o.theme === 'dark' ? 'dark' : 'light',
       layout: cleanLayout(o.layout),
-      weights: cleanWeights(o.weights)
+      weights: cleanWeights(o.weights),
+      weightCleared: cleanWeightCleared(o.weightCleared)
     };
   } catch (e) {
     return EMPTY();
@@ -195,7 +205,8 @@ function validatePayload(body) {
     value: {
       added: outAdded, edited: outEdited, deleted, theme,
       layout: cleanLayout(body.layout),
-      weights: cleanWeights(body.weights)
+      weights: cleanWeights(body.weights),
+      weightCleared: cleanWeightCleared(body.weightCleared)
     }
   };
 }

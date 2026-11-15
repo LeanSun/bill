@@ -9,6 +9,11 @@
 
   /* ---------------- 常量 ---------------- */
   var SEED = (window.BILL_DATA && Array.isArray(window.BILL_DATA.records)) ? window.BILL_DATA.records : [];
+  /* 原始 xlsx 里的体重与拼音表：体重作为种子值，用户记录覆盖；拼音只服务搜索 */
+  var SEED_WEIGHTS = (window.BILL_DATA && window.BILL_DATA.weights && typeof window.BILL_DATA.weights === 'object')
+    ? window.BILL_DATA.weights : {};
+  var PY_MAP = (window.BILL_DATA && window.BILL_DATA.pinyin && typeof window.BILL_DATA.pinyin === 'object')
+    ? window.BILL_DATA.pinyin : {};
   var STORE_KEY = 'qingzhang.ledger.v1';
   var THEME_KEY = 'qingzhang.theme.v1';
   /* 数据里实际出现过的年份，升序。年度分析、对比图、消费日历都从这三个数里取，
@@ -62,6 +67,16 @@
     '发红包': '红包', '妈妈生日': '生日',
     '二建教材': '教材', '魔方书籍': '书籍'
   };
+  /* 反向别名：「早餐」也要能被「早饭 / zaofan」搜到 */
+  var ALIAS_REV = (function () {
+    var m = {};
+    Object.keys(NOTE_ALIAS).forEach(function (a) {
+      var k = NOTE_ALIAS[a];
+      if (!m[k]) m[k] = [];
+      m[k].push(a);
+    });
+    return m;
+  })();
 
   /* 二级分类：一级分类下的语义细分。
      顺序即优先级——先列的子类先抢关键词，所以具体词在上、泛指词在下 */
@@ -140,14 +155,13 @@
     anchorDate: '',
     focusDate: '',
     trendScope: 'both',
-    compareMetric: 'expense',
     calendarYear: Y_LAST,
     annualScope: 'both',
     filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all' },
     editingId: null,
     entryType: 'expense',
     pendingDeleteId: null,
-    store: { added: [], edited: {}, deleted: [], weights: {} },
+    store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     layout: null
   };
 
@@ -305,18 +319,42 @@
     });
     return out;
   }
+  function cleanWeightCleared(a) {
+    if (!Array.isArray(a)) return [];
+    var out = [], seen = {};
+    a.slice(0, 5000).forEach(function (k) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(k)) && !seen[k]) { seen[k] = 1; out.push(String(k)); }
+    });
+    return out;
+  }
+  function emptyStore() { return { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] }; }
+  /* 原始账单里的体重是种子值：本地没有、且没被用户主动删掉的日期才补进来。
+     每次同步落盘后再跑一次，云端的快照也不会把种子值冲掉。 */
+  function mergeSeedWeights() {
+    var s = state.store;
+    if (!s) return;
+    if (!Array.isArray(s.weightCleared)) s.weightCleared = [];
+    var cleared = {};
+    s.weightCleared.forEach(function (k) { cleared[k] = 1; });
+    Object.keys(SEED_WEIGHTS).forEach(function (k) {
+      if (cleared[k] || (s.weights[k] !== undefined && s.weights[k] !== null && s.weights[k] !== '')) return;
+      var v = Number(SEED_WEIGHTS[k]);
+      if (isFinite(v) && v >= 20 && v <= 300) s.weights[k] = Math.round(v * 10) / 10;
+    });
+  }
   function loadStore() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return { added: [], edited: {}, deleted: [], weights: {} };
+      if (!raw) return emptyStore();
       var o = JSON.parse(raw);
       return {
         added: Array.isArray(o.added) ? o.added : [],
         edited: (o.edited && typeof o.edited === 'object' && !Array.isArray(o.edited)) ? o.edited : {},
         deleted: Array.isArray(o.deleted) ? o.deleted : [],
-        weights: cleanWeights(o.weights)
+        weights: cleanWeights(o.weights),
+        weightCleared: cleanWeightCleared(o.weightCleared)
       };
-    } catch (e) { return { added: [], edited: {}, deleted: [], weights: {} }; }
+    } catch (e) { return emptyStore(); }
   }
   function saveStore() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state.store)); } catch (e) { /* 隐私模式下静默 */ }
@@ -329,6 +367,43 @@
     var s = String(n || '').trim();
     if (!s) return s;
     return NOTE_ALIAS[s] || s;
+  }
+  /* 搜索：中文原名 + 别名（早饭→早餐）+ 全拼 + 首字母，一并塞进检索串。
+     翻译只查 data.js 里随数据打包的字符表，离线可用。 */
+  function pyOf(s) {
+    return String(s || '').toLowerCase().replace(/[\u4e00-\u9fff]/g, function (c) {
+      return PY_MAP[c] || '';
+    }).replace(/[^a-z0-9]/g, '');
+  }
+  function initialsOf(s) {
+    var out = '';
+    String(s || '').replace(/[\u4e00-\u9fff]/g, function (c) {
+      var p = PY_MAP[c] || '';
+      if (p) out += p.charAt(0);
+      return ' ';
+    }).split(/[^a-z0-9]+/).forEach(function (w) { if (w) out += w.charAt(0); });
+    return out;
+  }
+  var SEARCH_CACHE = Object.create(null);
+  function searchBlob(r) {
+    var cacheKey = [r.id, r.date, r.note, r.sub, r.category, r.raw].join('\u0001');
+    var hit = SEARCH_CACHE[cacheKey];
+    if (hit !== undefined) return hit;
+    var parts = [];
+    function add(x) { x = String(x || '').trim(); if (x && parts.indexOf(x) === -1) parts.push(x); }
+    add(r.note); add(r.sub); add(r.category); add(r.raw); add(r.date);
+    var canon = canonNote(r.note);
+    add(canon);
+    (ALIAS_REV[canon] || []).forEach(add);
+    var py = [], ini = [];
+    parts.forEach(function (x) {
+      var a = pyOf(x), b = initialsOf(x);
+      if (a) py.push(a);
+      if (b) ini.push(b);
+    });
+    var text = (parts.join(' ') + ' ' + py.join(' ') + ' ' + ini.join(' ')).toLowerCase();
+    SEARCH_CACHE[cacheKey] = text;
+    return text;
   }
   /* 关键词归属：命中第一个子类的关键词即归入该子类，全不中则落「其它」 */
   function guessSub(cat, note) {
@@ -544,7 +619,7 @@
   }
   function matchFilters(r) {
     var f = state.filters;
-    var q = f.q.trim().toLowerCase();
+    var q = f.q.trim().toLowerCase().replace(/[\s'’"-]/g, '');
     var wd = f.weekday;
     if (f.type !== 'all' && r.type !== f.type) return false;
     if (f.category !== 'all' && r.category !== f.category) return false;
@@ -564,7 +639,7 @@
       if (f.amount === 'mid' && (a <= 20 || a >= 100)) return false;
       if (f.amount === 'large' && a < 100) return false;
     }
-    if (q && (r.note + ' ' + r.sub + ' ' + r.category + ' ' + r.date).toLowerCase().indexOf(q) === -1) return false;
+    if (q && searchBlob(r).replace(/[\s'’"-]/g, '').indexOf(q) === -1) return false;
     return true;
   }
   function boardRecords() {
@@ -1113,29 +1188,6 @@
   }
 
   /* ---------------- 图表：分析 ---------------- */
-  function renderCompare(p) {
-    var d = compareData(state.compareMetric);
-    var labels = d.map(function (x) { return x.month + '月'; });
-    var o = baseOption(p);
-    o.color = [p.primary, p.amber];
-    o.grid = { left: 6, right: 12, top: 40, bottom: 6, containLabel: true };
-    o.legend = { top: 2, right: 2, itemWidth: 10, itemHeight: 10, itemGap: 16, icon: 'roundRect', textStyle: { color: p.text2, fontSize: 11.5, fontFamily: p.font } };
-    o.tooltip = tooltipCommon(p, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: withAlpha(p.muted, .09) } }, valueFormatter: function (v) { return fmtYuan(v); } });
-    o.xAxis = catAxis(p, labels);
-    o.yAxis = valAxis(p);
-    o.series = [
-      { name: String(Y_PREV), type: 'bar', barMaxWidth: 15, data: d.map(function (x) { return x.a; }), itemStyle: { borderRadius: [4, 4, 0, 0], color: gradV(withAlpha(p.primary, .9), withAlpha(p.primary, .22)) }, emphasis: { itemStyle: { color: p.primary } } },
-      { name: String(Y_LAST), type: 'bar', barMaxWidth: 15, data: d.map(function (x) { return x.b; }), itemStyle: { borderRadius: [4, 4, 0, 0], color: gradV(withAlpha(p.amber, .9), withAlpha(p.amber, .22)) }, emphasis: { itemStyle: { color: p.amber } } }
-    ];
-    setOpt('chartCompare', o);
-    bindAxisClick('chartCompare', function (idx) {
-      var y = state.year === 'all' ? Y_LAST : Number(state.year);
-      jumpToDetail({ reset: true, year: y, month: idx + 1 });
-    });
-    var sub = $('compareSub');
-    if (sub) sub.textContent = Y_PREV + ' 与 ' + Y_LAST + ' 逐月对照 · ' + ({ expense: '支出', income: '收入', balance: '结余' })[state.compareMetric];
-  }
-
   /* 消费日历 = 日历热力图（calendar 坐标系 + heatmap 系列）。
      优化点：按分位数定色阶（大额不冲淡整图）、空白日给淡底让格网成形、
      四档渐变、提示气泡带笔数、点击直达当日。 */
@@ -1239,28 +1291,6 @@
     });
   }
 
-  function renderWeekday(p) {
-    var data = weekdayTotals(scopeRecords());
-    var colors = [p.primary, p.income, p.amber, p.violet, p.sky, p.expense, mixColor(p.primary, p.income, .5)];
-    var o = baseOption(p);
-    o.color = colors;
-    o.tooltip = tooltipCommon(p, { trigger: 'item', formatter: function (d) { return d.marker + d.name + '<br/><b>' + fmtYuan(d.value) + '</b> · ' + d.percent + '%'; } });
-    o.series = [{
-      type: 'pie', roseType: 'radius', radius: ['20%', '72%'], center: ['50%', '50%'],
-      minAngle: 8,
-      itemStyle: { borderColor: p.surface, borderWidth: 2, borderRadius: 6 },
-      label: { show: true, formatter: '{b}', color: p.text2, fontSize: 10.5, fontFamily: p.font },
-      labelLine: { length: 5, length2: 6, lineStyle: { color: p.border } },
-      emphasis: { scale: true, scaleSize: 6, itemStyle: { shadowBlur: 16, shadowColor: withAlpha(p.primary, .28) } },
-      data: data.map(function (d, i) { return { name: d.name, value: d.value, itemStyle: { color: colors[i] } }; })
-    }];
-    setOpt('chartWeekday', o);
-    bindClick('chartWeekday', function (params) {
-      var i = params.dataIndex;
-      jumpToDetail({ reset: true, weekday: i, label: '已筛选：' + WEEKDAYS[i] });
-    });
-  }
-
   function renderTop(p) {
     var data = topItems(scopeRecords(), 10).reverse();
     var o = baseOption(p);
@@ -1341,7 +1371,7 @@
     if (view === 'overview') {
       /* 合并页：总览三图 + 原分析页七图，一次全画 */
       renderTrend(p); renderDonut(p); renderBalance(p); renderWeight(p);
-      renderAnnual(p); renderCompare(p); renderRank(p); renderWeekday(p); renderCalendar(p); renderStack(p); renderTop(p);
+      renderAnnual(p); renderRank(p); renderCalendar(p); renderStack(p); renderTop(p);
     }
     RENDER_MODE = prevMode;
   }
@@ -1951,16 +1981,32 @@
         '<div class="ins-body">' + body + '</div></div>';
     }
 
-    /* 1) 近 7 日支出 */
+    /* 1) 近 7 日支出：折线 + 淡填充，点/线都能悬浮看数、点击跳日 */
     var WD = ['日', '一', '二', '三', '四', '五', '六'];
-    var week = [], max7 = 1;
-    for (var w = 6; w >= 0; w--) { var y = at(w); week.push(y); if (y.v > max7) max7 = y.v; }
-    var bars = week.map(function (h, i) {
-      var bh = Math.max(3, Math.round(h.v / max7 * 40));
+    var week = [], max7 = 1, min7 = 0;
+    for (var w = 6; w >= 0; w--) {
+      var y = at(w); week.push(y);
+      if (y.v > max7) max7 = y.v;
+      if (y.v < min7) min7 = y.v;
+    }
+    var span7 = Math.max(1, max7 - min7);
+    function lx(i) { return 7 + i * (206 / 6); }
+    function ly(v) { return 37 - ((v - min7) / span7) * 30; }
+    var pts7 = week.map(function (h, i) { return lx(i).toFixed(1) + ',' + ly(h.v).toFixed(1); }).join(' ');
+    var area7 = 'M' + lx(0).toFixed(1) + ',40 L' + pts7.split(' ').join(' L') + ' L' + lx(6).toFixed(1) + ',40 Z';
+    var dots7 = week.map(function (h, i) {
       var t = h.k + '\n支出 ' + fmtYuan(h.v) + (i === 6 ? '\n今天' : '');
-      return '<div class="ins-bar' + (i === 6 ? ' is-today' : '') + '" data-tip="' + esc(t) + '" data-jump-day="' + h.k + '">' +
-        '<b style="height:' + bh + 'px"></b><span>' + WD[h.d.getDay()] + '</span></div>';
+      return '<circle class="ins-ln-dot' + (i === 6 ? ' is-today' : '') + '" cx="' + lx(i).toFixed(1) +
+        '" cy="' + ly(h.v).toFixed(1) + '" r="' + (i === 6 ? 3.4 : 2.4) +
+        '" data-tip="' + esc(t) + '" data-jump-day="' + h.k + '"/>';
     }).join('');
+    var line7 =
+      '<svg class="ins-line" viewBox="0 0 220 44" preserveAspectRatio="none" aria-hidden="true">' +
+      '<path class="ins-ln-area" d="' + area7 + '"/>' +
+      '<polyline class="ins-ln-path" points="' + pts7 + '"/>' + dots7 + '</svg>' +
+      '<div class="ins-ln-x">' + week.map(function (h, i) {
+        return '<span' + (i === 6 ? ' class="is-today"' : '') + '>' + WD[h.d.getDay()] + '</span>';
+      }).join('') + '</div>';
 
     /* 2) 最大一笔 */
     var biggest = items.filter(function (r) { return r.type !== 'income'; })
@@ -1972,17 +2018,37 @@
         '<span>' + fmtYuan(biggest.amount) + ' · 占当日支出 ' + share.toFixed(0) + '%</span></div>'
       : '<div class="ins-none">今天还没有支出记录</div>';
 
-    /* 3) 本月累计与月末预计 */
+    /* 3) 当前月 / 当前年剩余：以近 6 个完整月的月均、往年全年均值作参考线 */
     var dim = new Date(d0.getFullYear(), d0.getMonth() + 1, 0).getDate();
-    var elapsed = d0.getDate(), mtd = 0, mDays = 0;
+    var elapsed = d0.getDate(), mtd = 0, ytd = 0, mDays = 0;
     for (var md = 0; md < elapsed; md++) {
       var dd = new Date(d0.getFullYear(), d0.getMonth(), 1 + md);
       var vv = round(byDate[dateKey(dd)] || 0);
       mtd += vv;
       if (vv > 0) mDays++;
     }
-    var projected = elapsed > 0 ? mtd / elapsed * dim : 0;
-    var prog = Math.min(100, elapsed / dim * 100);
+    for (var t = new Date(d0.getFullYear(), 0, 1); t <= d0; t.setDate(t.getDate() + 1)) {
+      ytd += round(byDate[dateKey(t)] || 0);
+    }
+    var monthBudget = 0, monthN = 0;
+    for (var back = 1; back <= 6; back++) {
+      var bm = new Date(d0.getFullYear(), d0.getMonth() - back, 1);
+      var bdim = new Date(bm.getFullYear(), bm.getMonth() + 1, 0).getDate(), bsum = 0;
+      for (var bd = 1; bd <= bdim; bd++) bsum += round(byDate[dateKey(new Date(bm.getFullYear(), bm.getMonth(), bd))] || 0);
+      if (bsum > 0) { monthBudget += bsum; monthN++; }
+    }
+    monthBudget = monthN ? monthBudget / monthN : (mtd > 0 ? mtd / Math.max(1, elapsed) * dim : 0);
+    var yearBudget = 0, yearN = 0;
+    YEARS.forEach(function (yy) {
+      if (yy >= d0.getFullYear()) return;
+      var s = 0;
+      Object.keys(byDate).forEach(function (k) { if (Number(k.slice(0, 4)) === yy) s += byDate[k]; });
+      if (s > 0) { yearBudget += s; yearN++; }
+    });
+    yearBudget = yearN ? yearBudget / yearN : monthBudget * 12;
+    var mLeft = monthBudget - mtd, yLeft = yearBudget - ytd;
+    var mLeftPct = monthBudget > 0 ? Math.max(0, Math.min(100, mtd / monthBudget * 100)) : 0;
+    var yLeftPct = yearBudget > 0 ? Math.max(0, Math.min(100, ytd / yearBudget * 100)) : 0;
 
     /* 4) 当日分类构成：一条堆叠横条 + 前三名图例 */
     var catSum = {}, catTotal = 0;
@@ -2051,11 +2117,18 @@
         wSpark + '</div>'
       : '<div class="ins-none" data-focus-weight="1">还没有体重记录 · 点这里去记一条</div>';
 
-    return card('近 7 日支出', '<div class="ins-bars">' + bars + '</div>', 0) +
+    var leftCard =
+      '<div class="ins-left">' +
+      '<div class="ins-left-row"><div><span>当前月剩余</span><b class="' + (mLeft < 0 ? 'is-over' : '') + '">' + fmtYuan(mLeft) + '</b></div>' +
+      '<div><span>当前年剩余</span><b class="' + (yLeft < 0 ? 'is-over' : '') + '">' + fmtYuan(yLeft) + '</b></div></div>' +
+      '<div class="ins-left-bar"><i style="width:' + mLeftPct.toFixed(1) + '%"></i></div>' +
+      '<div class="ins-left-bar is-year"><i style="width:' + yLeftPct.toFixed(1) + '%"></i></div>' +
+      '<div class="ins-foot"><span>参考月均 ' + fmtBig(monthBudget) + ' · 年均 ' + fmtBig(yearBudget) + ' · 本月已记 ' + mDays + ' 天</span></div>' +
+      '</div>';
+
+    return card('近 7 日支出', line7, 0) +
       card('最大一笔', '<div class="ins-ring-wrap">' + ring + '</div>', 1) +
-      card('本月累计与预计', '<div class="ins-mtd"><b>' + fmtYuan(mtd) + '</b><span>已过 ' + elapsed + ' / ' + dim + ' 天 · 有记录 ' + mDays + ' 天</span></div>' +
-        '<div class="ins-prog"><i style="width:' + prog.toFixed(1) + '%"></i></div>' +
-        '<div class="ins-foot"><span>按当前节奏，月末约 <b>' + fmtYuan(projected) + '</b></span></div>', 2) +
+      card('当前月 / 当前年剩余', leftCard, 2) +
       card('当日分类构成', catCard, 3) +
       card('单笔金额分布', '<div class="ins-abs">' + amtBars + '</div>', 4) +
       card('体重记录', weightCard, 5);
@@ -2305,8 +2378,99 @@
     return { main: d.getFullYear() + '年 ' + (d.getMonth() + 1) + '月 ' + d.getDate() + '日', sub: WEEK_CN[d.getDay()] };
   }
 
+  /* 总览里的三张信息卡：不依赖 ECharts，用最少的视觉体积给出可行动的结论 */
+  function renderOverviewStats() {
+    var f = $('statFocus'), r = $('statRecur'), h = $('statRhythm');
+    if (!f && !r && !h) return;
+    var p = palette();
+    var rows = scopeRecords().filter(function (x) { return x.type !== 'income'; });
+
+    if (f) {
+      var byCat = {};
+      var total = 0;
+      rows.forEach(function (x) {
+        var c = x.category || '其它';
+        byCat[c] = (byCat[c] || 0) + x.amount;
+        total += x.amount;
+      });
+      var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+      var top3 = cats.slice(0, 3);
+      var top3sum = top3.reduce(function (s, c) { return s + byCat[c]; }, 0);
+      var topPct = total > 0 ? top3sum / total * 100 : 0;
+      var eat = total > 0 ? (byCat['餐饮'] || 0) / total * 100 : 0;
+      var other = Math.max(0, 100 - topPct);
+      var segs = top3.map(function (c) {
+        var pct = total > 0 ? byCat[c] / total * 100 : 0;
+        var col = catColor(p, c);
+        return '<i data-tip="' + esc(c + ' ' + fmtYuan(byCat[c]) + ' · ' + pct.toFixed(1) + '%') +
+          '" style="width:' + pct.toFixed(2) + '%;background:' + col + '"></i>';
+      }).join('') + (other > 0 ? '<i data-tip="其它 ' + other.toFixed(1) + '%" style="width:' + other.toFixed(2) + '%;background:var(--surface-3)"></i>' : '');
+      f.innerHTML =
+        '<div class="ovs-big"><b>' + topPct.toFixed(1) + '%</b><span>前三类支出占比</span></div>' +
+        '<div class="ovs-bar">' + segs + '</div>' +
+        '<div class="ovs-list">' + (top3.length
+          ? top3.map(function (c) {
+            return '<span><i style="background:' + catColor(p, c) + '"></i>' + esc(c) +
+              '<b>' + (total > 0 ? (byCat[c] / total * 100).toFixed(1) : '0.0') + '%</b></span>';
+          }).join('')
+          : '<span class="ovs-empty">暂无支出记录</span>') + '</div>' +
+        '<div class="ovs-note">餐饮权重 <b>' + eat.toFixed(1) + '%</b> · 越低说明花得越分散</div>';
+    }
+
+    if (r) {
+      var byNote = {};
+      rows.forEach(function (x) {
+        var n = canonNote(x.note) || x.sub || '未命名';
+        if (!byNote[n]) byNote[n] = { total: 0, months: {}, count: 0 };
+        byNote[n].total += x.amount;
+        byNote[n].months[x.month + (x.year * 12)] = 1;
+        byNote[n].count++;
+      });
+      var rec = Object.keys(byNote).filter(function (n) {
+        return byNote[n].count >= 3 && Object.keys(byNote[n].months).length >= 3;
+      }).sort(function (a, b) {
+        var A = byNote[a], B = byNote[b];
+        return (B.total / Object.keys(B.months).length) - (A.total / Object.keys(A.months).length);
+      }).slice(0, 5);
+      r.innerHTML = rec.length
+        ? rec.map(function (n) {
+          var o = byNote[n], m = Object.keys(o.months).length;
+          return '<div class="ovs-rec"><span>' + esc(n) + '</span><i>' + m + ' 个月 · 月均 ' + fmtBig(o.total / m) + '</i></div>';
+        }).join('') + '<div class="ovs-note">连续 3 个月以上出现的项目，按近月均值排序</div>'
+        : '<div class="ovs-empty">还没有连续 3 个月出现的固定支出</div>';
+    }
+
+    if (h) {
+      var byDate = {}, dayTotal = {}, months = {};
+      scopeRecords().forEach(function (x) {
+        byDate[x.date] = (byDate[x.date] || 0) + 1;
+        if (x.type !== 'income') dayTotal[x.date] = (dayTotal[x.date] || 0) + x.amount;
+        months[x.year + '-' + x.month] = 1;
+      });
+      var keys = Object.keys(byDate).sort();
+      var spanDays = keys.length ? Math.max(1, Math.round((new Date(keys[keys.length - 1] + 'T00:00:00') -
+        new Date(keys[0] + 'T00:00:00')) / 86400000) + 1) : 0;
+      var streak = 0, best = 0, prev = null;
+      keys.forEach(function (k) {
+        streak = (prev && Math.round((new Date(k + 'T00:00:00') - new Date(prev + 'T00:00:00')) / 86400000) === 1)
+          ? streak + 1 : 1;
+        if (streak > best) best = streak;
+        prev = k;
+      });
+      var peakDate = Object.keys(dayTotal).sort(function (a, b) { return dayTotal[b] - dayTotal[a]; })[0] || '—';
+      var nMonth = Math.max(1, Object.keys(months).length);
+      h.innerHTML =
+        '<div class="ovs-kpi"><span>有账天数</span><b>' + keys.length + '</b><i>/ ' + spanDays + ' 天 · 覆盖 ' +
+        (spanDays ? (keys.length / spanDays * 100).toFixed(0) : 0) + '%</i></div>' +
+        '<div class="ovs-kpi"><span>最长连续</span><b>' + best + '</b><i>天不断记</i></div>' +
+        '<div class="ovs-kpi"><span>月均有账</span><b>' + Math.round(keys.length / nMonth) + '</b><i>天 / ' + nMonth + ' 个月</i></div>' +
+        '<div class="ovs-kpi"><span>单日峰值</span><b>' + fmtBig(dayTotal[peakDate] || 0) + '</b><i>' + peakDate + '</i></div>';
+    }
+  }
+
   function renderAll() {
     renderKpis();
+    renderOverviewStats();
     renderBoard();
     renderCharts(state.view);
   }
@@ -2601,6 +2765,8 @@
     var key = $('weightDate') ? $('weightDate').value : dateKey(anchorDate());
     state.store.weights = state.store.weights || {};
     state.store.weights[key] = Math.round(v * 10) / 10;
+    if (!Array.isArray(state.store.weightCleared)) state.store.weightCleared = [];
+    state.store.weightCleared = state.store.weightCleared.filter(function (k) { return k !== key; });
     saveStore();
     renderAll();
     toast('已记录 ' + state.store.weights[key].toFixed(1) + ' kg', 'success');
@@ -2608,6 +2774,8 @@
   function clearWeight() {
     var key = $('weightDate') ? $('weightDate').value : dateKey(anchorDate());
     if (state.store.weights) delete state.store.weights[key];
+    if (!Array.isArray(state.store.weightCleared)) state.store.weightCleared = [];
+    if (state.store.weightCleared.indexOf(key) === -1) state.store.weightCleared.push(key);
     saveStore();
     renderAll();
     toast('已删除这天的体重', 'info');
@@ -2869,10 +3037,6 @@
       var sub = $('trendSub');
       if (sub) sub.textContent = ({ both: '按自然月汇总', expense: '仅显示支出', income: '仅显示收入' })[v];
       renderTrend(palette());
-    });
-    bindSeg($('compareMetric'), 'data-metric', function (v) {
-      state.compareMetric = v;
-      renderCompare(palette());
     });
     bindSeg($('calendarYear'), 'data-cy', function (v) {
       state.calendarYear = Number(v);
@@ -3200,20 +3364,21 @@
   var DEFAULT_LAYOUT = {
     v: 1,
     order: ['kpi', 'mini', 'trend', 'donut', 'balance', 'weight', 'divider', 'annual',
-      'compare', 'rank', 'weekday', 'calheat', 'stack', 'top'],
+      'focus', 'recur', 'rhythm', 'rank', 'calheat', 'stack', 'top'],
     spans: {
       kpi: [12, 3], mini: [12, 2], trend: [12, 7], donut: [6, 7], balance: [6, 7], weight: [12, 6],
-      divider: [12, 1], annual: [12, 7], compare: [12, 7], rank: [6, 6], weekday: [6, 6],
+      divider: [12, 1], annual: [12, 7], focus: [6, 6], recur: [6, 6], rhythm: [12, 5], rank: [6, 6],
       calheat: [12, 8], stack: [12, 7], top: [12, 7]
     }
   };
   var ovGrid = null, ovEditing = false;
   var OV_CHART_IDS = {
     chartTrend: 'trend', chartDonut: 'donut', chartBalance: 'balance',
-    chartCompare: 'compare', chartRank: 'rank', chartWeekday: 'weekday',
-    chartCalendar: 'calheat', chartStack: 'stack', chartTop: 'top', chartWeight: 'weight'
+    chartRank: 'rank', chartCalendar: 'calheat', chartStack: 'stack',
+    chartTop: 'top', chartWeight: 'weight'
   };
   function ovIdOf(el) {
+    if (el.getAttribute && el.getAttribute('data-oid')) return el.getAttribute('data-oid');
     var c = el.querySelector('.chart[id]');
     if (c) return OV_CHART_IDS[c.id] || c.id;
     if (el.classList.contains('stat-strip')) return 'kpi';
@@ -3467,41 +3632,82 @@
     ovGrid.addEventListener('pointerdown', onDown);
   }
 
-  /* 所有筛选滑块都能按住拖：指针在轨道上移动时按所在段触发对应按钮，
-     滑块节点不换、只改 --seg-i，过渡关掉后跟手；松手时吞掉那次原生 click，
-     避免"拖到 B 结果又弹回 A"。 */
+  /* 所有筛选滑块：按住时滑块用弹簧物理跟着指针走（有轻微滞后与过冲），
+     跨段时照常触发对应按钮；松手后回弹到最近一档。原生 click 在拖动后吞掉。 */
   function enableSegDrag(el) {
     if (!el || el.dataset.segDrag === '1') return;
     el.dataset.segDrag = '1';
-    var act = null, suppress = false;
+    var act = null, suppress = false, raf = 0;
+    var cur = 0, target = 0, vel = 0, unit = 1, pad = 4, trackW = 0;
     function btns() { return Array.prototype.slice.call(el.querySelectorAll('button')); }
-    function idxAt(x) {
+    function metrics() {
       var r = el.getBoundingClientRect(), bs = btns();
-      if (!bs.length) return -1;
-      var pad = parseFloat(getComputedStyle(el).paddingLeft) || 4;
-      var unit = (r.width - pad * 2) / bs.length;
-      return Math.max(0, Math.min(bs.length - 1, Math.floor((x - r.left - pad) / Math.max(1, unit))));
+      pad = parseFloat(getComputedStyle(el).paddingLeft) || 4;
+      unit = Math.max(1, (r.width - pad * 2) / Math.max(1, bs.length));
+      trackW = unit * Math.max(0, bs.length - 1);
+      return r;
     }
+    function idxAt(x) {
+      return Math.max(0, Math.min(btns().length - 1, Math.round((x - act.rLeft - pad - unit / 2) / unit)));
+    }
+    function paint() {
+      var ind = el.querySelector('.seg-ind');
+      if (!ind) return;
+      ind.style.transition = 'none';
+      ind.style.transform = 'translateX(' + cur.toFixed(2) + 'px)';
+    }
+    function releaseTransform() {
+      var ind = el.querySelector('.seg-ind');
+      if (!ind) return;
+      ind.style.transition = '';
+      ind.style.transform = '';
+    }
+    function tick() {
+      var d = target - cur;
+      vel = vel * .58 + d * .30;
+      cur += vel;
+      if (cur < -unit * .12) { cur = -unit * .12; vel *= -.35; }
+      if (cur > trackW + unit * .12) { cur = trackW + unit * .12; vel *= -.35; }
+      paint();
+      if (!act && Math.abs(d) < .35 && Math.abs(vel) < .35) {
+        cur = target; paint(); releaseTransform(); raf = 0; return;
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    function start() { if (!raf) raf = requestAnimationFrame(tick); }
     el.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || btns().length < 2) return;
-      act = { x: e.clientX, y: e.clientY, last: -1, moved: false };
+      var r = metrics(), bs = btns(), idx = 0;
+      bs.forEach(function (b, i) { if (b.classList.contains('is-active')) idx = i; });
+      cur = target = idx * unit;
+      vel = 0;
+      act = { x: e.clientX, y: e.clientY, rLeft: r.left, last: idx, moved: false };
     });
     document.addEventListener('pointermove', function (e) {
       if (!act) return;
       if (!act.moved && Math.abs(e.clientX - act.x) < 5 && Math.abs(e.clientY - act.y) < 5) return;
       if (!act.moved) { act.moved = true; el.classList.add('is-dragging'); }
+      target = Math.max(-unit * .1, Math.min(trackW + unit * .1, e.clientX - act.rLeft - pad - unit / 2));
       var i = idxAt(e.clientX);
       if (i >= 0 && i !== act.last) {
         act.last = i;
         var b = btns()[i];
         if (b && !b.classList.contains('is-active')) b.click();
       }
+      start();
     });
-    document.addEventListener('pointerup', function () {
+    function up() {
       if (!act) return;
-      if (act.moved) { suppress = true; el.classList.remove('is-dragging'); }
+      if (act.moved) {
+        suppress = true;
+        el.classList.remove('is-dragging');
+        target = act.last * unit;
+        start();
+      }
       act = null;
-    });
+    }
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
     el.addEventListener('click', function (e) {
       if (!suppress) return;
       suppress = false;
@@ -3515,6 +3721,7 @@
 
   function init() {
     state.store = loadStore();
+    mergeSeedWeights();
     var saved = null;
     try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* noop */ }
     state.theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
@@ -3557,6 +3764,7 @@
         edited: state.store.edited,
         deleted: state.store.deleted,
         weights: state.store.weights || {},
+        weightCleared: state.store.weightCleared || [],
         theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
         layout: state.layout || null
       };
@@ -3568,10 +3776,12 @@
         added: Array.isArray(s.added) ? s.added : [],
         edited: (s.edited && typeof s.edited === 'object' && !Array.isArray(s.edited)) ? s.edited : {},
         deleted: Array.isArray(s.deleted) ? s.deleted : [],
-        weights: cleanWeights(s.weights)
+        weights: cleanWeights(s.weights),
+        weightCleared: cleanWeightCleared(s.weightCleared)
       };
-      var changed = JSON.stringify(next) !== before;
       state.store = next;
+      mergeSeedWeights();
+      var changed = JSON.stringify(next) !== before;
       if (validLayout(s.layout)) {
         state.layout = s.layout;
         writeLayout(s.layout);
