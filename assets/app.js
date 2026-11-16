@@ -1535,6 +1535,23 @@
     chart.setOption(option, true);
     return chart;
   }
+  /* 从总览跳进魔方页并带上筛选：iframe 第一次进这一页才挂载，
+     消息可能比子页脚本早到，所以用重试把条件送到位。 */
+  function jumpCube(filter) {
+    setView('cube');
+    if (!filter) return;
+    var tries = 0;
+    (function send() {
+      var f = $('cubeFrame'), ready = false;
+      try { ready = !!(f && f.contentWindow && f.getAttribute('src')); } catch (e) { ready = false; }
+      if (ready) {
+        try { f.contentWindow.postMessage({ __ledgerCubeFilter: filter }, '*'); } catch (e) { /* noop */ }
+        return;
+      }
+      if (tries++ < 60) setTimeout(send, 120);
+    })();
+  }
+
   function renderCubeOverview() {
     var d = cubeData();
     var cubes = d ? d.cubes : [], comps = d ? d.competitions : [];
@@ -1546,6 +1563,22 @@
     set('cubeSpend', cubeMoney(spend));
     set('cubeComp', String(comps.length));
     set('cubeFee', cubeMoney(compSpend));
+
+    /* 四格并在一条里：每一格都是一扇门，点进去就是筛好的魔方页 */
+    var cells = document.querySelectorAll('[data-cube-filter]');
+    for (var ci = 0; ci < cells.length; ci++) {
+      (function (cell) {
+        var kind = cell.dataset.cubeFilter;
+        var go = function () {
+          if (kind === 'comp' || kind === 'fee') jumpCube({ tab: 'competitions' });
+          else jumpCube({ tab: 'cubes' });
+        };
+        cell.onclick = go;
+        cell.onkeydown = function (ev) {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
+        };
+      })(cells[ci]);
+    }
 
     if (!hasEcharts) return;
     var p = palette();
@@ -1585,7 +1618,7 @@
     });
     if (yearChart) {
       yearChart.off('click');
-      yearChart.on('click', function () { setView('cube'); });
+      yearChart.on('click', function (a) { jumpCube({ tab: 'cubes', year: String(a.name) }); });
     }
 
     /* 类型支出排行：跟「高频项目 TOP 10」同款横向柱 */
@@ -1630,7 +1663,7 @@
     });
     if (typeChart) {
       typeChart.off('click');
-      typeChart.on('click', function () { setView('cube'); });
+      typeChart.on('click', function (a) { jumpCube({ tab: 'cubes', type: String(a.name) }); });
     }
   }
 
@@ -4517,13 +4550,13 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 6,
+    v: 7,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
-      'cubecnt', 'cubespend', 'cubecomp', 'cubefee', 'cubeyear', 'cubetype', 'salary', 'reimb'],
+      'cubestats', 'cubeyear', 'cubetype', 'salary', 'reimb'],
     spans: {
       kpi: [12, 3], calheat: [12, 7], trend: [5, 6], donut: [3, 6], balance: [4, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
-      cubecnt: [3, 3], cubespend: [3, 3], cubecomp: [3, 3], cubefee: [3, 3],
+      cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
       salary: [6, 11], reimb: [6, 8]
     }
@@ -4548,7 +4581,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 6 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && (L.v === 6 || L.v === 7) && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -4564,7 +4597,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 6, order: [], spans: {} };
+    var L = { v: 7, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;

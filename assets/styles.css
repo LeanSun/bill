@@ -2194,6 +2194,51 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
   .cube-stat-card .cs-num { font-size: 19px; }
 }
 
+/* 四格并成一条：一条横带分成四扇门，点哪格进哪格 */
+.cube-stat-strip {
+  display: flex; align-items: stretch;
+  padding: 0; overflow: hidden; min-height: 84px;
+}
+.cube-stat-strip .css-cell {
+  flex: 1 1 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  padding: 14px 16px; min-width: 0; cursor: pointer;
+  transition: background .2s var(--ease);
+}
+.cube-stat-strip .css-cell + .css-cell { border-left: 1px solid var(--border); }
+.cube-stat-strip .css-cell:hover { background: var(--surface-2); }
+.cube-stat-strip .css-cell:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: -2px;
+}
+.cube-stat-strip .cs-lab {
+  font-size: 11px; color: var(--muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 5px;
+}
+.cube-stat-strip .cs-lab::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%; flex: 0 0 5px;
+  background: var(--primary); opacity: .55;
+}
+.cube-stat-strip .cs-num {
+  font-size: 21px; font-weight: 780; letter-spacing: -.035em; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cube-stat-strip .cs-hint {
+  font-size: 10px; color: var(--muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+@media (max-width: 900px) {
+  .cube-stat-strip { flex-wrap: wrap; }
+  .cube-stat-strip .css-cell { flex: 1 1 45%; }
+  .cube-stat-strip .css-cell:nth-child(3) {
+    border-left: 0; border-top: 1px solid var(--border);
+  }
+  .cube-stat-strip .css-cell:nth-child(4) { border-top: 1px solid var(--border); }
+  .cube-stat-strip .cs-num { font-size: 19px; }
+}
+
 /* 子类筛选行：按钮收窄，右侧让位给当前区间的金额统计 */
 .fx-sub-slot .sub-seg { flex: 1 1 auto; min-width: 0; }
 .fx-sub-slot .sub-seg .ct-sub { padding-left: 1px; padding-right: 1px; }
