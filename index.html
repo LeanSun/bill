@@ -227,7 +227,14 @@
               <div class="reimb-total"><span>合计</span><b id="payReimbTotal">¥0.00</b></div>
             </div>
             <form class="pay-reimb-add" id="payReimbForm" novalidate>
-              <label class="ri-date"><span>日期</span><input type="date" id="payReimbDate" autocomplete="off"></label>
+              <div class="ri-date ri-date-wrap">
+                <span>日期</span>
+                <button type="button" class="ri-date-btn" id="payReimbDateBtn" aria-haspopup="dialog" aria-label="选择报销日期">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  <b id="payReimbDateText">今天</b>
+                </button>
+                <input type="hidden" id="payReimbDate" autocomplete="off">
+              </div>
               <label class="ri-note"><span>内容</span><input type="text" id="payReimbNote" placeholder="例如：打车、差旅、打印" maxlength="24" autocomplete="off"></label>
               <label class="ri-amt"><span>金额</span><input type="number" id="payReimbAmount" step="0.01" min="0.01" placeholder="0.00" autocomplete="off"></label>
               <button type="submit" class="btn btn-primary">添加</button>

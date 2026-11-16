@@ -451,7 +451,43 @@
     });
     return out;
   }
-  function emptyStore() { return { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] }; }
+  /* 社保 / 报销那块的数据单独一份，跟着 store 一起上云。
+     清理规则和表单一致：数字要有限、比例 0–100、报销金额 > 0、日期合法。
+     rows 允许为空数组（表示还没配过），由界面回落到出厂五行。 */
+  function cleanPay(o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    var num = function (v, def) { var n = Number(v); return isFinite(n) ? n : def; };
+    var out = {
+      base: num(o.base, 8477), wage: num(o.wage, 6400),
+      perf: num(o.perf, 2425), subsidy: num(o.subsidy, 550), gap: num(o.gap, 32.075),
+      rows: [], reimb: []
+    };
+    if (Array.isArray(o.rows)) {
+      o.rows.slice(0, 24).forEach(function (r) {
+        if (!r || !r.name) return;
+        out.rows.push({
+          name: String(r.name).slice(0, 24),
+          p: Math.max(0, Math.min(100, num(r.p, 0))),
+          c: Math.max(0, Math.min(100, num(r.c, 0)))
+        });
+      });
+    }
+    if (Array.isArray(o.reimb)) {
+      o.reimb.slice(0, 500).forEach(function (r) {
+        if (!r) return;
+        var amt = Number(r.amount);
+        if (!isFinite(amt) || amt <= 0) return;
+        out.reimb.push({
+          id: String(r.id || ('r' + Math.random().toString(36).slice(2, 9))).slice(0, 40),
+          note: String(r.note || '报销').slice(0, 40),
+          amount: Math.round(amt * 100) / 100,
+          date: /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) ? String(r.date) : ''
+        });
+      });
+    }
+    return out;
+  }
+  function emptyStore() { return { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [], pay: null }; }
   /* 原始账单里的体重是种子值：本地没有、且没被用户主动删掉的日期才补进来。
      每次同步落盘后再跑一次，云端的快照也不会把种子值冲掉。 */
   function mergeSeedWeights() {
@@ -476,7 +512,8 @@
         edited: (o.edited && typeof o.edited === 'object' && !Array.isArray(o.edited)) ? o.edited : {},
         deleted: Array.isArray(o.deleted) ? o.deleted : [],
         weights: cleanWeights(o.weights),
-        weightCleared: cleanWeightCleared(o.weightCleared)
+        weightCleared: cleanWeightCleared(o.weightCleared),
+        pay: cleanPay(o.pay)
       };
     } catch (e) { return emptyStore(); }
   }
@@ -540,7 +577,9 @@
     return t;
   }
   /* 关键词归属：命中第一个子类的关键词即归入该子类，全不中则落「其它」 */
-  function guessSub(cat, note) {
+  /* 关键词命中：命中就返回那一档的子类名，没命中返回空串。
+     刻意不编一个"最像"的答案 —— 留空时的兜底交给 guessSub 明确说清。 */
+  function guessSubHit(cat, note) {
     var list = SUBCATS[cat] || [];
     var s = expandText(note);
     for (var i = 0; i < list.length; i++) {
@@ -550,7 +589,18 @@
         if (s.indexOf(item.keys[k]) !== -1) return item.name;
       }
     }
-    return list.length ? list[list.length - 1].name : '其它';
+    return '';
+  }
+  /* 落库兜底：认不出就归「其它」；没有「其它」这档的分类落到第一档
+     （餐饮 → 三餐、日常 → 房租），不再拿列表最后一项去硬凑一个结论。 */
+  function guessSub(cat, note) {
+    var hit = guessSubHit(cat, note);
+    if (hit) return hit;
+    var list = SUBCATS[cat] || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].name === '其它' || list[i].name === '其他') return list[i].name;
+    }
+    return list.length ? list[0].name : '其它';
   }
   function subcatOf(r) { return r.sub || guessSub(r.category, r.note); }
 
@@ -1352,10 +1402,13 @@
       /* dimension: 1 = 取 [日期, 排名] 里的排名维度。
          不写的话 ECharts 默认取末维（笔数），整张图会被笔数染色 */
       dimension: 1,
-      min: 0, max: 100, calculable: false, orient: 'horizontal',
-      left: 'center', bottom: 0, itemWidth: 12, itemHeight: 390,
-      text: ['贵', '省'], textGap: 10,
-      textStyle: { color: p.muted, fontSize: 10, fontFamily: p.font },
+      min: 0, max: 100, calculable: true, orient: 'horizontal',
+      /* 滑杆：厚 26（原来 12，翻一倍多，点得中、也拖得动），
+         长度 420，文字 13px —— 「贵 / 省」原来 10px，凑近才看得清 */
+      left: 'center', bottom: 2, itemWidth: 26, itemHeight: 420,
+      text: ['贵', '省'], textGap: 14,
+      textStyle: { color: p.muted, fontSize: 13, fontFamily: p.font },
+      handleStyle: { shadowBlur: 10, shadowColor: 'rgba(24,39,75,.2)' },
       inRange: {
         color: [
           mixColor(p.surface3, p.surface, .3),
@@ -1366,7 +1419,9 @@
       }
     };
     o.calendar = {
-      top: 38, left: 46, right: 24, bottom: 34, cellSize: ['auto', 13], range: String(y),
+      /* 底部让出 54px 给那条加粗的滑杆（26px 条 + 13px 文字 + 间隙），
+         否则日历格会压到滑杆上 */
+      top: 38, left: 46, right: 24, bottom: 54, cellSize: ['auto', 13], range: String(y),
       itemStyle: { color: mixColor(p.surface, p.border, .55), borderColor: p.surface, borderWidth: 1.5, borderRadius: 3 },
       yearLabel: { show: false },
       monthLabel: { color: p.text2, fontSize: 10.5, fontWeight: 600, fontFamily: p.font, nameMap: 'cn', margin: 8 },
@@ -2185,13 +2240,17 @@
     inner.style.transform = 'none';
     inner.style.width = '100%';
     var have = side.clientHeight, need = inner.scrollHeight;
-    if (need <= have + 1) return;
+    if (need <= have + 1) { side.classList.remove('is-scroll'); return; }
     var k = Math.max(.72, have / need);
     inner.style.width = (100 / k).toFixed(3) + '%';
     var need2 = inner.scrollHeight || need;
     var k2 = Math.max(.72, Math.min(1, have / need2));
     inner.style.width = (100 / k2).toFixed(3) + '%';
     inner.style.transform = 'scale(' + k2.toFixed(4) + ')';
+    /* 缩到 0.72 还装不下（1366×768 这种矮屏）：允许左栏自己滚，
+       不然表单下半截被 overflow:hidden 直接切掉，金额和保存都摸不到 */
+    var fits = inner.getBoundingClientRect().height <= have + 1;
+    side.classList.toggle('is-scroll', !fits);
   }
   function renderDayBoard(p, board) {
     var box = $('calDayBoard');
@@ -2697,6 +2756,145 @@
     });
   }
 
+  /* ---------------- 通用日期浮层（报销卡） ----------------
+     记账弹窗那颗 #datePop 是绑死在 #dateField 上的，报销卡里有 N 个日期框
+     （添加行一个、列表每行一个），所以另起一颗可移动的浮层：
+     样式整套沿用 .date-pop / .dp-*，只是挂到 body 上按锚点定位。
+     点日期 = 选中并关闭；点「完成」只关不选；Esc / 点外面都关。 */
+  var gp = { el: null, open: false, view: 'days', year: 0, month: 0, value: '', anchor: null, onPick: null };
+
+  function gpBuild() {
+    if (gp.el) return gp.el;
+    var el = document.createElement('div');
+    el.className = 'date-pop gp-pop';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', '选择日期');
+    el.hidden = true;
+    el.innerHTML =
+      '<div class="dp-head">' +
+      '<button type="button" class="dp-nav" data-gp="prev" aria-label="上一页">' +
+      '<svg viewBox="0 0 24 24" fill="none"><path d="m15 6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+      '<button type="button" class="dp-title" data-gp="title" aria-label="切换月份选择">—</button>' +
+      '<button type="button" class="dp-nav" data-gp="next" aria-label="下一页">' +
+      '<svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+      '</div>' +
+      '<div class="dp-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>' +
+      '<div class="dp-view" data-gp="days"><div class="dp-grid" data-gp="grid"></div></div>' +
+      '<div class="dp-view dp-months" data-gp="months" hidden></div>' +
+      '<div class="dp-foot"><button type="button" class="link-btn" data-gp="today">回到今天</button>' +
+      '<button type="button" class="dp-close" data-gp="close">完成</button></div>';
+    document.body.appendChild(el);
+    gp.el = el;
+    el.addEventListener('click', gpOnClick);
+    document.addEventListener('click', function (e) {
+      if (!gp.open) return;
+      if (el.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('.ri-date-btn, .pr-date')) return;
+      gpClose();
+    });
+    document.addEventListener('keydown', function (e) { if (gp.open && e.key === 'Escape') gpClose(); });
+    window.addEventListener('resize', function () { if (gp.open) gpPlace(); });
+    return el;
+  }
+  function gpRender() {
+    var el = gp.el;
+    if (!el) return;
+    var title = el.querySelector('[data-gp="title"]');
+    var daysBox = el.querySelector('[data-gp="days"]');
+    var monthsBox = el.querySelector('[data-gp="months"]');
+    var grid = el.querySelector('[data-gp="grid"]');
+    title.textContent = gp.view === 'days' ? (gp.year + '年 ' + gp.month + '月') : (gp.year + '年 · 选择月份');
+    daysBox.hidden = gp.view !== 'days';
+    monthsBox.hidden = gp.view !== 'months';
+    if (gp.view === 'months') {
+      monthsBox.innerHTML = MONTH_CN.map(function (n, i) {
+        return '<button type="button" class="dp-month' + (i + 1 === gp.month ? ' is-active' : '') +
+          '" data-gp-month="' + (i + 1) + '">' + n + '</button>';
+      }).join('');
+      return;
+    }
+    var first = new Date(gp.year, gp.month - 1, 1);
+    var offset = first.getDay();
+    var daysInMonth = new Date(gp.year, gp.month, 0).getDate();
+    var count = Math.ceil((offset + daysInMonth) / 7) * 7;
+    var today = todayStr();
+    var html = '';
+    for (var i = 0; i < count; i++) {
+      var d = new Date(gp.year, gp.month - 1, 1 - offset + i);
+      var key = dateKey(d);
+      var cls = 'dp-day';
+      if (d.getMonth() !== gp.month - 1) cls += ' is-other';
+      if (key === today) cls += ' is-today';
+      if (key === gp.value) cls += ' is-selected';
+      html += '<button type="button" class="' + cls + '" data-gp-day="' + key + '" aria-label="' + key + '">' + d.getDate() + '</button>';
+    }
+    grid.innerHTML = html;
+  }
+  function gpPlace() {
+    var el = gp.el, a = gp.anchor;
+    if (!el || !a) return;
+    var r = a.getBoundingClientRect();
+    var w = el.offsetWidth || 302, h = el.offsetHeight || 360;
+    var left = Math.min(Math.max(10, r.left), Math.max(10, window.innerWidth - w - 10));
+    var top = r.bottom + 8;
+    if (top + h > window.innerHeight - 10) top = Math.max(10, r.top - h - 8);
+    el.style.left = Math.round(left) + 'px';
+    el.style.top = Math.round(top) + 'px';
+  }
+  function gpShift(delta) {
+    if (gp.view === 'months') gp.year += delta;
+    else {
+      gp.month += delta;
+      if (gp.month < 1) { gp.month = 12; gp.year -= 1; }
+      else if (gp.month > 12) { gp.month = 1; gp.year += 1; }
+    }
+    gpRender();
+  }
+  function gpOnClick(e) {
+    var t = e.target.closest ? e.target : null;
+    if (!t) return;
+    if (t.closest('[data-gp="prev"]')) { gpShift(-1); return; }
+    if (t.closest('[data-gp="next"]')) { gpShift(1); return; }
+    if (t.closest('[data-gp="title"]')) { gp.view = gp.view === 'days' ? 'months' : 'days'; gpRender(); return; }
+    var mBtn = t.closest('[data-gp-month]');
+    if (mBtn) { gp.month = Number(mBtn.getAttribute('data-gp-month')); gp.view = 'days'; gpRender(); return; }
+    if (t.closest('[data-gp="today"]')) { gpPick(todayStr()); return; }
+    if (t.closest('[data-gp="close"]')) { gpClose(); return; }
+    var day = t.closest('[data-gp-day]');
+    if (day) gpPick(day.getAttribute('data-gp-day'));
+  }
+  function gpPick(key) {
+    var cb = gp.onPick;
+    gpClose();
+    if (cb) cb(key);
+  }
+  function gpOpen(anchor, value, onPick) {
+    gpBuild();
+    gp.anchor = anchor;
+    gp.onPick = onPick || null;
+    gp.value = /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+    var m = /^(\d{4})-(\d{2})/.exec(gp.value);
+    var d = new Date();
+    gp.year = m ? Number(m[1]) : d.getFullYear();
+    gp.month = m ? Number(m[2]) : (d.getMonth() + 1);
+    gp.view = 'days';
+    gp.open = true;
+    gp.el.hidden = false;
+    gp.el.classList.add('is-open');
+    gpRender();
+    gpPlace();
+    if (anchor && anchor.classList) anchor.classList.add('is-open');
+  }
+  function gpClose() {
+    if (!gp.el || !gp.open) return;
+    gp.open = false;
+    gp.el.hidden = true;
+    gp.el.classList.remove('is-open');
+    if (gp.anchor && gp.anchor.classList) gp.anchor.classList.remove('is-open');
+    gp.anchor = null;
+  }
+
+
   /* ---------------- 弹窗：记账 ---------------- */
   /* 天页内嵌记账表单：与弹窗共用一套落库逻辑，只是字段前缀不同。
      用独立前缀避免和弹窗的 id 撞车，两个入口可以同时存在于 DOM 里。 */
@@ -2811,7 +3009,8 @@
     paintSelect(sel);
     updateSubHint();
   }
-  /* 子类留空时，实时回显"会被归到哪"——不选也能看见结果 */
+  /* 子类留空时，实时回显"会被归到哪"——不选也能看见结果。
+     没命中就说清兜底规则，不再假报一个「其它」。 */
   function updateSubHint() {
     var sel = $('fSub'), note = $('fSubNote');
     if (!sel || !note) return;
@@ -2821,8 +3020,11 @@
       return;
     }
     var cat = ($('fCategory') && $('fCategory').value) || '餐饮';
-    var guess = guessSub(cat, ($('fNote') && $('fNote').value) || '');
-    note.textContent = '将自动归入「' + guess + '」';
+    var txt = (($('fNote') && $('fNote').value) || '').trim();
+    var hit = txt ? guessSubHit(cat, txt) : '';
+    note.textContent = hit
+      ? ('将自动归入「' + hit + '」')
+      : ('留空按内容归类，认不出记「' + guessSub(cat, '') + '」');
     note.classList.add('is-auto');
   }
   function setEntryType(t) {
@@ -3068,32 +3270,52 @@
       reimb: []
     };
   }
-  function loadPay() {
+  /* 把一份（可能缺字段的）pay 洗成能直接渲染的形状：缺的用出厂值补，
+     rows 空着就回落到五行，金额 / 日期不合规的条目丢掉。 */
+  function payOrDefaults(o) {
     var d = payDefaults();
-    try {
-      var o = JSON.parse(localStorage.getItem(PAY_KEY));
-      if (o && typeof o === 'object') {
-        ['base', 'wage', 'perf', 'subsidy', 'gap'].forEach(function (k) {
-          var v = Number(o[k]);
-          if (isFinite(v)) d[k] = v;
-        });
-        if (Array.isArray(o.rows) && o.rows.length) {
-          var rows = o.rows.filter(function (r) { return r && r.name; }).map(function (r) {
-            return { name: String(r.name), p: Number(r.p) || 0, c: Number(r.c) || 0 };
-          });
-          if (rows.length) d.rows = rows;
-        }
-        if (Array.isArray(o.reimb)) {
-          d.reimb = o.reimb.filter(function (r) { return r && isFinite(Number(r.amount)); }).map(function (r) {
-            return { id: String(r.id || ''), note: String(r.note || ''), amount: round(r.amount), date: String(r.date || '') };
-          });
-        }
-      }
-    } catch (e) { /* 坏数据就退回默认 */ }
-    pay = d;
+    if (!o || typeof o !== 'object') return d;
+    ['base', 'wage', 'perf', 'subsidy', 'gap'].forEach(function (k) {
+      var v = Number(o[k]);
+      if (isFinite(v)) d[k] = v;
+    });
+    if (Array.isArray(o.rows) && o.rows.length) {
+      var rows = o.rows.filter(function (r) { return r && r.name; }).map(function (r) {
+        return { name: String(r.name), p: Number(r.p) || 0, c: Number(r.c) || 0 };
+      });
+      if (rows.length) d.rows = rows;
+    }
+    if (Array.isArray(o.reimb)) {
+      d.reimb = o.reimb.filter(function (r) { return r && isFinite(Number(r.amount)) && Number(r.amount) > 0; }).map(function (r) {
+        return { id: String(r.id || ''), note: String(r.note || ''), amount: round(r.amount), date: String(r.date || '') };
+      });
+      d.reimb.sort(function (a, b) { return a.date === b.date ? 0 : (a.date < b.date ? 1 : -1); });
+    }
+    return d;
   }
+  /* 数据从哪来：① store（云端 / 上次落盘）优先；② 老版本只存 localStorage，
+     读出来当场接管，之后跟着云同步一起走 —— 一次性的搬家。 */
+  function loadPay() {
+    var src = (state.store && state.store.pay) ? cleanPay(state.store.pay) : null;
+    var fromLocal = false;
+    if (!src) {
+      try {
+        var raw = JSON.parse(localStorage.getItem(PAY_KEY));
+        if (raw && typeof raw === 'object') { src = raw; fromLocal = true; }
+      } catch (e) { /* 坏数据就退回默认 */ }
+    }
+    pay = payOrDefaults(src);
+    if (fromLocal) savePay();          /* 搬家：写进 store，下一次同步就带上云 */
+  }
+  /* 双写：localStorage 留一份镜像（离线 / 换主题立刻可读），store 那份才是随云同步走的 */
   function savePay() {
     try { localStorage.setItem(PAY_KEY, JSON.stringify(pay)); } catch (e) { /* noop */ }
+    if (!state.store) return;
+    state.store.pay = cleanPay({
+      base: pay.base, wage: pay.wage, perf: pay.perf, subsidy: pay.subsidy, gap: pay.gap,
+      rows: pay.rows, reimb: pay.reimb
+    });
+    saveStore();
   }
   function payVal(id, fallback) {
     var el = $(id);
@@ -3160,6 +3382,18 @@
         ' · 实发 ' + fmtYuan(net);
     }
   }
+  function sortReimb() {
+    /* 日期倒序，同一天保持先来后到 */
+    pay.reimb.sort(function (a, b) { return a.date === b.date ? 0 : (a.date < b.date ? 1 : -1); });
+  }
+  /* 添加行那颗日期按钮：显示完整日期，点开是同一套日历浮层 */
+  function paintReimbDate() {
+    var hid = $('payReimbDate'), txt = $('payReimbDateText'), btn = $('payReimbDateBtn');
+    var v = (hid && hid.value) || '';
+    var ok = /^\d{4}-\d{2}-\d{2}$/.test(v);
+    if (txt) txt.textContent = ok ? v : '选择日期';
+    if (btn) btn.title = ok ? (v + ' · ' + weekLabel(v)) : '选择日期';
+  }
   function renderReimb() {
     var list = $('payReimbList'), hint = $('payReimbHint'), total = $('payReimbTotal');
     if (!list) return;
@@ -3169,9 +3403,12 @@
       return '<li data-rid="' + esc(r.id) + '">' +
         '<span class="pr-note">' + esc(r.note || '报销') + '</span>' +
         '<em class="pr-amt">' + fmtYuan(r.amount) + '</em>' +
-        /* 每行自带日期：直接改，改完就落盘 */
-        '<input type="date" class="pr-date" data-reimb-date="' + esc(r.id) + '" value="' + esc(r.date || '') +
-        '" aria-label="' + esc(r.note || '报销') + '的日期">' +
+        /* 每行自带日期：点开日历改，改完立刻重排 */
+        '<button type="button" class="pr-date" data-reimb-date="' + esc(r.id) + '"' +
+        ' title="改日期 · ' + esc(r.date || '') + '" aria-label="' + esc(r.note || '报销') + '的日期">' +
+        '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/>' +
+        '<path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+        '<b>' + esc(r.date || '选日期') + '</b></button>' +
         '<button type="button" class="pr-del" data-reimb-del="' + esc(r.id) + '" title="删除这条" aria-label="删除 ' + esc(r.note || '报销') + '">×</button>' +
         '</li>';
     }).join('');
@@ -3181,7 +3418,7 @@
     var sub = $('payReimbSub');
     if (sub) {
       sub.textContent = pay.reimb.length
-        ? pay.reimb.length + ' 条 · 合计 ' + fmtYuan(sum) + ' · 日期可改'
+        ? pay.reimb.length + ' 条 · 合计 ' + fmtYuan(sum) + ' · 日期可点开改'
         : '垫出去的钱、回来的钱，一条一条记';
     }
   }
@@ -3206,7 +3443,7 @@
       date: day
     });
     /* 新的排在最上面：按日期倒序，同一天按记的顺序 */
-    pay.reimb.sort(function (a, b) { return a.date === b.date ? 0 : (a.date < b.date ? 1 : -1); });
+    sortReimb();
     savePay();
     if ($('payReimbNote')) $('payReimbNote').value = '';
     if ($('payReimbAmount')) $('payReimbAmount').value = '';
@@ -3217,6 +3454,7 @@
     loadPay();
     renderPay();
     if ($('payReimbDate') && !$('payReimbDate').value) $('payReimbDate').value = todayStr();
+    paintReimbDate();
     var wrap = document.querySelector('.pay-card');
     /* 社保卡：所有输入都委托在一个口子上，改比例立刻重算，改基数/工资也一样 */
     if (wrap) wrap.addEventListener('input', function (e) {
@@ -3242,25 +3480,36 @@
         toast('已恢复默认数字', 'info');
       }
     });
-    /* 报销卡：删除、改日期都是自己的口子，和社保互不干扰 */
+    /* 报销卡：删除、改日期都是自己的口子，和社保互不干扰。
+       日期一律走 gpOpen 那颗通用日历浮层 —— 添加行和列表每行共用一套。 */
     var rbox = document.querySelector('.reimb-card');
+    if ($('payReimbDateBtn')) $('payReimbDateBtn').addEventListener('click', function () {
+      var btn = this;
+      gpOpen(btn, ($('payReimbDate') && $('payReimbDate').value) || todayStr(), function (v) {
+        if ($('payReimbDate')) $('payReimbDate').value = v;
+        paintReimbDate();
+      });
+    });
     if (rbox) rbox.addEventListener('click', function (e) {
       var del = e.target.closest && e.target.closest('[data-reimb-del]');
-      if (!del) return;
-      var id = del.getAttribute('data-reimb-del');
-      pay.reimb = pay.reimb.filter(function (r) { return r.id !== id; });
-      savePay();
-      renderReimb();
-    });
-    if (rbox) rbox.addEventListener('change', function (e) {
-      var inp = e.target;
-      if (!inp || !inp.dataset || !inp.dataset.reimbDate) return;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(inp.value)) return;
-      pay.reimb.forEach(function (r) { if (r.id === inp.dataset.reimbDate) r.date = inp.value; });
-      pay.reimb.sort(function (a, b) { return a.date === b.date ? 0 : (a.date < b.date ? 1 : -1); });
-      savePay();
-      renderReimb();
-      toast('日期已改到 ' + inp.value, 'info');
+      if (del) {
+        var did = del.getAttribute('data-reimb-del');
+        pay.reimb = pay.reimb.filter(function (r) { return r.id !== did; });
+        savePay();
+        renderReimb();
+        return;
+      }
+      var dt = e.target.closest && e.target.closest('[data-reimb-date]');
+      if (!dt) return;
+      var rid = dt.getAttribute('data-reimb-date');
+      var rec = pay.reimb.filter(function (r) { return r.id === rid; })[0];
+      gpOpen(dt, (rec && rec.date) || todayStr(), function (v) {
+        pay.reimb.forEach(function (r) { if (r.id === rid) r.date = v; });
+        sortReimb();
+        savePay();
+        renderReimb();
+        toast('日期已改到 ' + v, 'info');
+      });
     });
     var form = $('payReimbForm');
     if (form) form.addEventListener('submit', addReimb);
@@ -3313,6 +3562,9 @@
       var b = e.target.closest('button[data-type]');
       if (b) setEntryType(b.dataset.type);
     });
+    /* 支出 / 收入滑块：和日历那几组同款，按住鼠标能一路拖过去。
+       拖动时它自己点中间的按钮，走的还是上面那条 setEntryType 链路。 */
+    enableSegDrag($('typeToggle'));
     if ($('fCategory')) $('fCategory').addEventListener('change', function () {
       modalCatManual = true;
       paintSelect($('fCategory'));
@@ -3352,7 +3604,8 @@
         closeModal();
         return;
       }
-      /* ← → 翻页：年 / 月 / 周 / 天 四种粒度都走 shiftCalStep，和两颗箭头同一套逻辑 */
+      /* ← → 翻页：年 / 月 / 周 / 天 四种粒度都走 softStep，
+         和两颗箭头、滚轮同一套出入动效 */
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         if (state.view !== 'calendar') return;
         if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
@@ -3360,16 +3613,15 @@
         var t = e.target;
         if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''))) return;
         e.preventDefault();
-        closeCmp();
-        shiftCalStep(e.key === 'ArrowLeft' ? -1 : 1);
+        softStep(e.key === 'ArrowLeft' ? -1 : 1);
       }
     });
 
     /* 日历：粒度 / 步进 / 筛选 / 交互 */
     bindSeg($('scaleSeg'), 'data-scale', function (v) { setScale(v); });
     bindWheelPaging();
-    if ($('calPrev')) $('calPrev').addEventListener('click', function () { closeCmp(); shiftCalStep(-1); });
-    if ($('calNext')) $('calNext').addEventListener('click', function () { closeCmp(); shiftCalStep(1); });
+    if ($('calPrev')) $('calPrev').addEventListener('click', function () { softStep(-1); });
+    if ($('calNext')) $('calNext').addEventListener('click', function () { softStep(1); });
     if ($('calToday')) $('calToday').addEventListener('click', function () {
       var d = new Date();
       setAnchor(d);
@@ -3637,35 +3889,55 @@
     openByTap = { key: '', t: 0 };
   }
 
-  /* ---------------- 滚轮翻页 ----------------
-     月历竖向翻（一次一整月）、周历横向翻（一次一整周）、当日明细淡入淡出。
-     翻完给新内容一段方向明确的入场动画 —— 眼睛得知道换了哪一屏。 */
-  var wheelAcc = 0, wheelLock = 0;
-  function pageByWheel(dir) {
-    wheelLock = Date.now() + 430;
-    var scale = state.scale;
+  /* ---------------- 翻页：丝滑出入 ----------------
+     旧版用 @keyframes 从位移 20px「弹」进来，位移是死的、缓动也是死的，
+     连滚两下就是两次生硬的替换。现在改成两段真 transition：
+     先 150ms 淡出（同时带一点点位移），内容在最低点换掉，再用
+     0.4s 的 ease-out-quint 淡回来 —— 眼睛读到的是"内容滑走了再滑回来"
+     而不是"画面闪了一下"。四档各给一个方向：
+     月历竖向、周历横向、天页纯淡入、年历竖向 + 轻微缩放。 */
+  var wheelAcc = 0, wheelLock = 0, softTimer = 0;
+  var SOFT_OUT = 150, SOFT_IN = 400;
+  function softTarget() {
+    var s = state.scale;
+    return s === 'year' ? $('calYearBoard')
+      : s === 'month' ? $('calGrid')
+      : s === 'week' ? $('calWeekGrid') : $('calDayBoard');
+  }
+  function softStep(dir) {
+    var scale = state.scale, el = softTarget();
     closeCmp();
-    shiftCalStep(dir);
-    var el = scale === 'month' ? $('calGrid')
-      : scale === 'week' ? $('calWeekGrid') : $('calDayBoard');
-    if (!el) return;
-    var cls = scale === 'month' ? (dir > 0 ? 'fx-up' : 'fx-down')
-      : scale === 'week' ? (dir > 0 ? 'fx-left' : 'fx-right') : 'fx-fade';
-    el.classList.remove('fx-up', 'fx-down', 'fx-left', 'fx-right', 'fx-fade');
-    void el.offsetWidth;                 /* 强制重排，同方向连滚也能重放入场 */
-    el.classList.add(cls);
+    if (!el) { shiftCalStep(dir); return; }
+    if (softTimer) { clearTimeout(softTimer); softTimer = 0; }
+    var dx = scale === 'week' ? (dir > 0 ? 16 : -16) : 0;
+    var dy = scale === 'day' ? 4 : scale === 'week' ? 0 : (dir > 0 ? 11 : -11);
+    var sc = scale === 'year' ? .994 : 1;
+    el.style.transition = 'opacity ' + SOFT_OUT + 'ms cubic-bezier(.4,0,.85,1),' +
+      ' transform ' + SOFT_OUT + 'ms cubic-bezier(.4,0,.85,1)';
+    el.style.opacity = '0';
+    el.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0)' + (sc === 1 ? '' : ' scale(' + sc + ')');
+    softTimer = setTimeout(function () {
+      softTimer = 0;
+      shiftCalStep(dir);
+      el.style.transition = 'opacity ' + SOFT_IN + 'ms cubic-bezier(.16,.84,.3,1),' +
+        ' transform ' + (SOFT_IN + 40) + 'ms cubic-bezier(.16,.84,.3,1)';
+      void el.offsetWidth;              /* 让上面的 transition 先落地，不然会瞬移 */
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+    }, SOFT_OUT);
   }
   function bindWheelPaging() {
     [
       { el: $('calGrid'), skip: '' },
       { el: $('calWeekGrid'), skip: '' },
-      { el: $('calDayBoard'), skip: '.day-side' }   /* 左栏表单自己要能滚，不抢它的滚轮 */
+      { el: $('calDayBoard'), skip: '.day-side' },  /* 左栏表单自己要能滚，不抢它的滚轮 */
+      { el: $('calYearBoard'), skip: '' }           /* 年历：滚轮直接换年份 */
     ].forEach(function (z) {
       if (!z.el) return;
       z.el.addEventListener('wheel', function (e) {
         if (state.view !== 'calendar') return;
         if (!$('modalBackdrop').hidden || !$('confirmBackdrop').hidden) return;
-        if (dp.open || cmpOpen) return;
+        if (dp.open || cmpOpen || (window.QZ && window.QZ.pickOpen && window.QZ.pickOpen())) return;
         if (z.skip && e.target.closest && e.target.closest(z.skip)) return;
         /* 横着滚认横、竖着滚认竖：鼠标滚轮和触控板两个方向都吃得下 */
         var d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -3677,7 +3949,8 @@
         if (Math.abs(wheelAcc) < 34) return;
         var dir = wheelAcc > 0 ? 1 : -1;
         wheelAcc = 0;
-        pageByWheel(dir);
+        wheelLock = Date.now() + SOFT_OUT + SOFT_IN - 60;
+        softStep(dir);
       }, { passive: false });
     });
   }
@@ -4202,6 +4475,7 @@
         deleted: state.store.deleted,
         weights: state.store.weights || {},
         weightCleared: state.store.weightCleared || [],
+        pay: state.store.pay || null,
         theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
         layout: state.layout || null
       };
@@ -4214,11 +4488,20 @@
         edited: (s.edited && typeof s.edited === 'object' && !Array.isArray(s.edited)) ? s.edited : {},
         deleted: Array.isArray(s.deleted) ? s.deleted : [],
         weights: cleanWeights(s.weights),
-        weightCleared: cleanWeightCleared(s.weightCleared)
+        weightCleared: cleanWeightCleared(s.weightCleared),
+        pay: cleanPay(s.pay)
       };
       state.store = next;
       mergeSeedWeights();
       var changed = JSON.stringify(next) !== before;
+      /* 社保 / 报销也跟着 store 走了：远端那份和本地不一样就重画两张卡。
+         值相同就不动 DOM —— 每分钟轮询不会把正在编辑的输入框重建掉。 */
+      var inPay = next.pay ? JSON.stringify(payOrDefaults(next.pay)) : '';
+      if (inPay && pay && inPay !== JSON.stringify(pay)) {
+        pay = payOrDefaults(next.pay);
+        renderPay();
+        paintReimbDate();
+      }
       if (validLayout(s.layout)) {
         state.layout = s.layout;
         writeLayout(s.layout);
@@ -4232,6 +4515,7 @@
     },
     setTheme: function (t) { if (t === 'dark' || t === 'light') setTheme(t); },
     onStoreChange: function (fn) { if (typeof fn === 'function') STORE_HOOKS.push(fn); },
+    pickOpen: function () { return !!gp.open; },
     toast: toast
   };
 

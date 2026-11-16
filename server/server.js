@@ -82,8 +82,45 @@ function cleanWeightCleared(a) {
   }
   return out;
 }
+/* 社保 / 报销那份数据：数字要有界、比例 0–100、报销金额 > 0。
+   客户端升到 v2 布局后这里也要认 v2，否则新排布永远存不进服务器。 */
+function cleanPay(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const num = (v, def) => { const n = Number(v); return Number.isFinite(n) ? n : def; };
+  const out = {
+    base: num(o.base, 8477), wage: num(o.wage, 6400),
+    perf: num(o.perf, 2425), subsidy: num(o.subsidy, 550), gap: num(o.gap, 32.075),
+    rows: [], reimb: []
+  };
+  if (Array.isArray(o.rows)) {
+    for (const r of o.rows.slice(0, 24)) {
+      if (!r || !r.name) continue;
+      out.rows.push({
+        name: String(r.name).slice(0, 24),
+        p: Math.max(0, Math.min(100, num(r.p, 0))),
+        c: Math.max(0, Math.min(100, num(r.c, 0)))
+      });
+    }
+  }
+  if (Array.isArray(o.reimb)) {
+    for (const r of o.reimb.slice(0, 500)) {
+      if (!r) continue;
+      const amt = Number(r.amount);
+      if (!Number.isFinite(amt) || amt <= 0) continue;
+      out.reimb.push({
+        id: String(r.id || '').slice(0, 40),
+        note: String(r.note || '报销').slice(0, 40),
+        amount: Math.round(amt * 100) / 100,
+        date: RE_WDATE.test(String(r.date || '')) ? String(r.date) : ''
+      });
+    }
+  }
+  return out;
+}
 function cleanLayout(L) {
-  if (!L || typeof L !== 'object' || L.v !== 1 || !Array.isArray(L.order)) return null;
+  if (!L || typeof L !== 'object' || !Array.isArray(L.order)) return null;
+  const v = Number(L.v);
+  if (v !== 1 && v !== 2) return null;
   const order = L.order.map(x => String(x).slice(0, 32)).slice(0, 40);
   const spans = {};
   if (L.spans && typeof L.spans === 'object') {
@@ -96,9 +133,9 @@ function cleanLayout(L) {
       ];
     }
   }
-  return { v: 1, order, spans };
+  return { v, order, spans };
 }
-const EMPTY = () => ({ rev: 0, updatedAt: null, added: [], edited: {}, deleted: [], theme: 'light', layout: null, weights: {}, weightCleared: [] });
+const EMPTY = () => ({ rev: 0, updatedAt: null, added: [], edited: {}, deleted: [], theme: 'light', layout: null, weights: {}, weightCleared: [], pay: null });
 
 function readState() {
   try {
@@ -113,7 +150,8 @@ function readState() {
       theme: o.theme === 'dark' ? 'dark' : 'light',
       layout: cleanLayout(o.layout),
       weights: cleanWeights(o.weights),
-      weightCleared: cleanWeightCleared(o.weightCleared)
+      weightCleared: cleanWeightCleared(o.weightCleared),
+      pay: cleanPay(o.pay)
     };
   } catch (e) {
     return EMPTY();
@@ -206,7 +244,8 @@ function validatePayload(body) {
       added: outAdded, edited: outEdited, deleted, theme,
       layout: cleanLayout(body.layout),
       weights: cleanWeights(body.weights),
-      weightCleared: cleanWeightCleared(body.weightCleared)
+      weightCleared: cleanWeightCleared(body.weightCleared),
+      pay: cleanPay(body.pay)
     }
   };
 }

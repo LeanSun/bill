@@ -1829,11 +1829,12 @@ html[data-theme="dark"] .day-side.is-weekend .ds-dow { color: color-mix(in srgb,
 /* 天页表单：类型 → 内容 → 分类子类 → 金额 + 保存 */
 .dq-seg { width: 100%; height: 40px; }
 /* 金额框和「保存这笔」并排占满一行，两者同高，和上面的内容框一样高 */
-.dq-bottom { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; align-items: stretch; }
+/* 金额与保存各占一整行、上下排列，宽度与「内容」框完全一致（都 42px 高） */
+.dq-bottom { display: grid; grid-template-columns: 1fr; gap: 10px; align-items: stretch; }
 .dq-bottom .dq-amount { min-width: 0; }
-.dq-bottom .dq-amount input { height: 36px; }
-.dq-bottom .btn { height: 36px; justify-content: center; }
-.ds-quick select, .ds-quick input[type="text"] { height: 36px; }
+.dq-bottom .dq-amount input { height: 42px; }
+.dq-bottom .btn { width: 100%; height: 42px; justify-content: center; }
+.ds-quick select, .ds-quick input[type="text"] { height: 42px; }
 #entryForm > .type-toggle { margin-bottom: 15px; }
 
 /* 格子弹出来的「记一笔」：整体放大一档，顺序由 .entry-grid 的 areas 决定 */
@@ -1928,14 +1929,19 @@ body.modal-cell .amount-input input { height: 54px; font-size: 23px; }
 }
 .pr-note { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pr-amt { font-style: normal; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; }
-/* 每行自带日期：直接改，改完就落盘 */
+/* 每行自带日期：按钮形态，点开是同一颗日历浮层，改完立刻重排 */
 .pr-date {
-  width: 100%; box-sizing: border-box; height: 28px; padding: 0 6px;
-  border-radius: 7px; border: 1px solid var(--border); background: var(--surface);
+  display: inline-flex; align-items: center; gap: 6px; justify-content: flex-start;
+  width: 100%; box-sizing: border-box; height: 30px; padding: 0 8px;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--surface);
   color: var(--text-2); font-size: 11.5px; font-variant-numeric: tabular-nums;
-  font-family: var(--font);
+  font-family: var(--font); cursor: pointer;
+  transition: border-color .2s, background-color .2s, color .2s, box-shadow .2s;
 }
-.pr-date:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.pr-date svg { width: 13px; height: 13px; flex: 0 0 13px; color: var(--primary); }
+.pr-date b { font-weight: 650; letter-spacing: -.01em; }
+.pr-date:hover { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); color: var(--text); background: var(--surface-2); }
+.pr-date.is-open { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); background: var(--surface); color: var(--text); }
 /* 删除：一整块带边框的方形按钮，比原来的小圆点大一圈，好点也好找 */
 .pr-del {
   width: 30px; height: 30px; display: grid; place-items: center;
@@ -1980,16 +1986,72 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
-/* 滚轮翻页：整页换内容时给一段方向明确的入场，眼睛跟得上换了哪一屏 */
-@keyframes fxUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-@keyframes fxDown { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
-@keyframes fxLeft { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
-@keyframes fxRight { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: none; } }
-@keyframes fxFade { from { opacity: 0; } to { opacity: 1; } }
-.cal-grid.fx-up { animation: fxUp .3s var(--ease) both; }
-.cal-grid.fx-down { animation: fxDown .3s var(--ease) both; }
-.cal-week.fx-left { animation: fxLeft .3s var(--ease) both; }
-.cal-week.fx-right { animation: fxRight .3s var(--ease) both; }
-.cal-day.fx-fade { animation: fxFade .26s var(--ease-soft) both; }
-/* 天视图整体裁一下：入场那一瞬的位移不会撑出滚动条（周历的横向滚动留给窄屏规则，别抢） */
-.cal-day { overflow: hidden; }
+/* 翻页动效：不再是 @keyframes 从固定位移「弹」进来（那种是死的，连翻两下
+   就是两次生硬替换）。改成两段真 transition，由 JS 的 softStep 驱动：
+   容器 150ms 淡出（带一点点位移）→ 换内容 → 400ms ease-out-quint 淡回来。
+   这里只备好合成层提示与天页的边界裁剪（周历的横向滚动留给窄屏规则，别抢）。 */
+.cal-grid, .cal-week, .cal-year { will-change: opacity, transform; }
+.cal-day { overflow: hidden; will-change: opacity, transform; }
+
+/* ==================== 周末配色 / 日号主角 / 报销日历 ==================== */
+
+/* 月历：周六、周日的表头文字改浅粉（原来是主色蓝），周末那两列的日号同色；
+   今天那格仍是实心主色不描边，别的月份的格子继续灰下去 */
+.cal-weekhead span:nth-child(6), .cal-weekhead span:nth-child(7) { color: var(--weekend-ink); }
+.cal-cell.is-weekend .cal-daynum { color: var(--weekend-ink); }
+.cal-cell.is-weekend.is-today .cal-daynum { color: #fff; }
+.cal-cell.is-other.is-weekend .cal-daynum { color: var(--muted); }
+
+/* 周历：周六、周日整块表头铺粉底 —— 不是只改两个字，七列里一眼能挑出周末 */
+.wk-col.is-weekend .wk-head {
+  margin: 0 0 10px; padding: 8px 10px 10px; border-radius: 12px;
+  border-bottom-color: transparent;
+  background: color-mix(in srgb, var(--weekend-ink) 15%, var(--surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--weekend-ink) 32%, transparent);
+}
+.wk-col.is-weekend .wk-dow { color: color-mix(in srgb, var(--weekend-ink) 72%, var(--text)); }
+html[data-theme="dark"] .wk-col.is-weekend .wk-head {
+  background: color-mix(in srgb, var(--weekend-ink) 19%, var(--surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--weekend-ink) 38%, transparent);
+}
+
+/* 日期摘要栏：让「日」当主角。日号 60px、字重 800、字距收紧，上面一行
+   （星期胶囊 + 年月）退成小字配角；「日」字留一点字距浮在基线上 */
+.ds-inner .ds-big { align-items: baseline; gap: 7px; margin-top: 0; }
+.ds-inner .ds-big b {
+  font-size: 60px; font-weight: 800; line-height: .94; letter-spacing: -.075em;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.ds-inner .ds-big i { font-size: 13px; font-weight: 700; letter-spacing: .14em; color: var(--muted); padding-bottom: 6px; }
+.ds-inner .ds-head { margin-bottom: 0; }
+.ds-inner .ds-dow { height: 21px; padding: 0 9px; font-size: 10.5px; letter-spacing: .08em; }
+.ds-inner .ds-ym { font-size: 10.5px; font-weight: 650; color: var(--muted); letter-spacing: .04em; }
+@media (max-width: 940px) {
+  .ds-inner .ds-big b { font-size: 46px; }
+  .ds-inner .ds-big i { font-size: 12px; }
+}
+
+/* ---------- 报销卡的日期按钮 + 通用日历浮层 ---------- */
+.ri-date-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; position: relative; }
+.ri-date-wrap > span { font-size: 11px; color: var(--muted); }
+.ri-date-btn {
+  display: inline-flex; align-items: center; gap: 7px; width: 100%; box-sizing: border-box;
+  height: 34px; padding: 0 10px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; font-family: var(--font);
+  cursor: pointer; transition: border-color .22s, box-shadow .22s, background-color .22s;
+}
+.ri-date-btn svg { width: 15px; height: 15px; flex: 0 0 15px; color: var(--primary); }
+.ri-date-btn b { font-weight: 700; letter-spacing: -.01em; }
+.ri-date-btn:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+.ri-date-btn.is-open { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); background: var(--surface); }
+
+/* 浮层挂到 body 上按锚点定位：同一颗浮层服务添加行和列表每一行 */
+.gp-pop { position: fixed; top: 0; left: 0; z-index: 130; }
+.gp-pop .dp-grid { gap: 3px; }
+.gp-pop .dp-day { height: 34px; font-size: 12.5px; }
+
+/* 矮屏（1366×768 这类）缩到 0.72 也装不下时，左栏允许自己滚：
+   不然金额和「保存这笔」会被 overflow:hidden 直接切掉，摸不到 */
+.day-side.is-scroll { overflow: auto; }
+.day-side.is-scroll .ds-inner { padding-right: 18px; }

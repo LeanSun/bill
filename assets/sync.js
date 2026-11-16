@@ -248,7 +248,8 @@
       theme: s.theme === 'dark' ? 'dark' : 'light',
       layout: s.layout || null,
       weights: s.weights || {},
-      weightCleared: s.weightCleared || []
+      weightCleared: s.weightCleared || [],
+      pay: s.pay || null
     };
   }
   function hasContent(s) {
@@ -257,7 +258,8 @@
       Object.keys(s.edited || {}).length > 0 ||
       (s.deleted || []).length > 0 || !!s.layout ||
       Object.keys(s.weights || {}).length > 0 ||
-      (s.weightCleared || []).length > 0;
+      (s.weightCleared || []).length > 0 ||
+      !!s.pay;
   }
 
   function adopt(remote, sha) {
@@ -659,7 +661,13 @@
           added: Array.isArray(state.added) ? state.added : [],
           edited: (state.edited && typeof state.edited === 'object') ? state.edited : {},
           deleted: Array.isArray(state.deleted) ? state.deleted : [],
-          theme: state.theme === 'dark' ? 'dark' : 'light'
+          theme: state.theme === 'dark' ? 'dark' : 'light',
+          /* 导入整份备份时这几个字段以前会被丢掉（体重、排布、社保报销），
+             一起带上，备份才是真的整份还原 */
+          layout: state.layout || null,
+          weights: (state.weights && typeof state.weights === 'object') ? state.weights : {},
+          weightCleared: Array.isArray(state.weightCleared) ? state.weightCleared : [],
+          pay: state.pay || null
         };
         return ghWrite(next, { sha: cfg.sha }).then(function (res) {
           if (!res.ok) throw new Error(res.summary || res.message || '写入失败');
