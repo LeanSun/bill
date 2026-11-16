@@ -120,7 +120,7 @@ function cleanPay(o) {
 function cleanLayout(L) {
   if (!L || typeof L !== 'object' || !Array.isArray(L.order)) return null;
   const v = Number(L.v);
-  if (v !== 1 && v !== 2 && v !== 3 && v !== 4 && v !== 5) return null;
+  if (v !== 1 && v !== 2 && v !== 3 && v !== 4 && v !== 5 && v !== 6) return null;
   const order = L.order.map(x => String(x).slice(0, 32)).slice(0, 40);
   const spans = {};
   if (L.spans && typeof L.spans === 'object') {

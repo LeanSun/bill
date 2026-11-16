@@ -848,13 +848,13 @@
     var y = state.calMonth.year, m = state.calMonth.month;
     return allRecords().filter(function (r) { return r.year === y && r.month === m; });
   }
-  function matchFilters(r) {
+  /* 收支 / 星期 / 金额 / 搜索：与分类无关的那一半筛选。
+     子类按钮上的笔数和右侧金额 chip 都要按这一层算，口径才和棋盘一致。 */
+  function matchCore(r) {
     var f = state.filters;
     var q = f.q.trim().toLowerCase().replace(/[\s'’"-]/g, '');
     var wd = f.weekday;
     if (f.type !== 'all' && r.type !== f.type) return false;
-    if (f.category !== 'all' && r.category !== f.category) return false;
-    if (f.sub !== 'all' && r.sub !== f.sub) return false;
     /* 星期：数字来自图表点击（0=周一），workday / weekend 来自新增的分段控件 */
     var d = new Date(r.date + 'T00:00:00');
     if (wd && wd !== 'all') {
@@ -871,6 +871,13 @@
       if (f.amount === 'large' && a < 100) return false;
     }
     if (q && searchBlob(r).replace(/[\s'’"-]/g, '').indexOf(q) === -1) return false;
+    return true;
+  }
+  function matchFilters(r) {
+    if (!matchCore(r)) return false;
+    var f = state.filters;
+    if (f.category !== 'all' && r.category !== f.category) return false;
+    if (f.sub !== 'all' && r.sub !== f.sub) return false;
     return true;
   }
   function boardRecords() {
@@ -1293,16 +1300,16 @@
       { type: 'text', left: 'center', top: '59%', style: { text: '总支出', fill: p.muted, font: '500 11px ' + p.font, textAlign: 'center' } }
     ];
     o.series = [{
-      type: 'pie', radius: ['46%', '68%'], center: ['50%', '52%'],
+      type: 'pie', radius: ['42%', '62%'], center: ['50%', '52%'],
       avoidLabelOverlap: true, minAngle: 4,
       itemStyle: { borderColor: p.surface, borderWidth: 3, borderRadius: 6 },
       label: {
-        show: true, position: 'outside',
+        show: true, position: 'outside', alignTo: 'edge', edgeDistance: 2, bleedMargin: 0,
         formatter: function (d) { return d.name + '  {p|' + pctText(d.percent) + '}'; },
         color: p.text2, fontSize: 11.5, fontFamily: p.font, fontWeight: 600,
         rich: { p: { color: p.muted, fontSize: 10.5, fontWeight: 500 } }
       },
-      labelLine: { show: true, length: 11, length2: 14, smooth: true, lineStyle: { color: p.borderStrong, width: 1 } },
+      labelLine: { show: true, length: 7, length2: 9, smooth: true, lineStyle: { color: p.borderStrong, width: 1 } },
       labelLayout: { hideOverlap: true },
       emphasis: {
         scale: true, scaleSize: 6,
@@ -1510,7 +1517,8 @@
     });
   }
 
-  /* 总览里的魔方卡：只读 cubeLedger_v1，跟账本 store 一丁点都不交叉 */
+  /* 总览里的魔方板块：只读 cubeLedger_v1，跟账本 store 一丁点都不交叉。
+     四张数字卡各自独立成块，两张图也各有自己的卡 —— 不再挤在一个大容器里。 */
   function cubeData() {
     try {
       var raw = localStorage.getItem('cubeLedger_v1');
@@ -1521,62 +1529,108 @@
   function cubeMoney(n) {
     return '¥' + (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+  function cubePaint(el, option) {
+    if (!el || !hasEcharts) return null;
+    var chart = echarts.getInstanceByDom(el) || echarts.init(el);
+    chart.setOption(option, true);
+    return chart;
+  }
   function renderCubeOverview() {
-    var box = $('cubeKpis');
-    if (!box) return;
-    var d = cubeData(), cubes = d ? d.cubes : [], comps = d ? d.competitions : [];
+    var d = cubeData();
+    var cubes = d ? d.cubes : [], comps = d ? d.competitions : [];
     var spend = 0, compSpend = 0;
     cubes.forEach(function (x) { spend += Number(x.price) || 0; });
     comps.forEach(function (x) { compSpend += Number(x.price) || 0; });
-    box.innerHTML = [
-      ['收藏 / 购买记录', String(cubes.length)],
-      ['魔方相关总支出', cubeMoney(spend)],
-      ['参赛次数', String(comps.length)],
-      ['比赛报名费', cubeMoney(compSpend)]
-    ].map(function (it) {
-      return '<div class="cube-kpi"><span>' + esc(it[0]) + '</span><b>' + esc(it[1]) + '</b></div>';
-    }).join('');
+    var set = function (id, v) { var el = $(id); if (el) el.textContent = v; };
+    set('cubeCnt', String(cubes.length));
+    set('cubeSpend', cubeMoney(spend));
+    set('cubeComp', String(comps.length));
+    set('cubeFee', cubeMoney(compSpend));
+
     if (!hasEcharts) return;
-    var p = palette(), years = {}, types = {};
+    var p = palette();
+
+    /* 年度购买支出：面积折线，和总览其它趋势图同一套笔画 */
+    var years = {};
     cubes.forEach(function (x) {
       var y = String(x.date || '').slice(0, 4);
       if (/^\d{4}$/.test(y)) years[y] = (years[y] || 0) + (Number(x.price) || 0);
+    });
+    var yk = Object.keys(years).sort();
+    var yearChart = cubePaint($('cubeYearChart'), {
+      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+      grid: { left: 46, right: 16, top: 18, bottom: 24 },
+      tooltip: tooltipCommon(p, {
+        trigger: 'axis',
+        formatter: function (a) { return a[0].axisValue + '<br>购买支出：<b>' + cubeMoney(a[0].value) + '</b>'; }
+      }),
+      xAxis: {
+        type: 'category', data: yk, boundaryGap: yk.length < 3,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: p.border } },
+        axisLabel: { color: p.muted, fontSize: 10.5, fontFamily: p.font }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: p.muted, fontSize: 10.5, fontFamily: p.font, formatter: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; } },
+        splitLine: { lineStyle: { color: withAlpha(p.text, .08) } }
+      },
+      series: [{
+        type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        data: yk.map(function (y) { return round(years[y]); }),
+        itemStyle: { color: p.primary, borderColor: p.surface, borderWidth: 2 },
+        lineStyle: { width: 2.6, color: p.primary },
+        areaStyle: { color: gradH(withAlpha(p.primary, .26), withAlpha(p.primary, .02)) }
+      }]
+    });
+    if (yearChart) {
+      yearChart.off('click');
+      yearChart.on('click', function () { setView('cube'); });
+    }
+
+    /* 类型支出排行：跟「高频项目 TOP 10」同款横向柱 */
+    var types = {};
+    cubes.forEach(function (x) {
       var t = String(x.type || '').trim() || '未分类';
       types[t] = (types[t] || 0) + (Number(x.price) || 0);
     });
-    var yk = Object.keys(years).sort();
-    var el = $('cubeYearChart');
-    var chart = el ? (echarts.getInstanceByDom(el) || echarts.init(el)) : null;
-    if (chart) {
-      chart.setOption({
-        animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
-        grid: { left: 42, right: 12, top: 16, bottom: 22 },
-        tooltip: { trigger: 'axis', formatter: function (a) { return a[0].axisValue + '<br>购买支出：' + cubeMoney(a[0].value); } },
-        xAxis: { type: 'category', data: yk, axisTick: { show: false }, axisLine: { lineStyle: { color: p.border } }, axisLabel: { color: p.muted, fontSize: 10 } },
-        yAxis: { type: 'value', axisLabel: { color: p.muted, fontSize: 10, formatter: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; } }, splitLine: { lineStyle: { color: withAlpha(p.text, .08) } } },
-        series: [{ type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
-          data: yk.map(function (y) { return round(years[y]); }),
-          lineStyle: { width: 2.5, color: p.primary }, itemStyle: { color: p.primary },
-          areaStyle: { color: gradH(withAlpha(p.primary, .26), withAlpha(p.primary, .02)) } }]
-      }, true);
-      chart.off('click');
-      chart.on('click', function () { setView('cube'); });
-    }
     var rows = Object.keys(types).map(function (k) { return { name: k, value: round(types[k]) }; })
-      .sort(function (a, b) { return b.value - a.value; }).slice(0, 8);
-    var el2 = $('cubeTypeChart');
-    var chart2 = el2 ? (echarts.getInstanceByDom(el2) || echarts.init(el2)) : null;
-    if (chart2) {
-      var cs = [p.primary, p.violet, p.sky, p.amber, p.expense, p.income, p.catWear, p.catFun];
-      chart2.setOption({
-        animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
-        tooltip: { trigger: 'item', formatter: function (a) { return a.name + '：' + cubeMoney(a.value) + ' (' + a.percent + '%)'; } },
-        legend: { bottom: 0, itemWidth: 9, itemHeight: 9, textStyle: { color: p.muted, fontSize: 10 } },
-        series: [{ type: 'pie', radius: ['46%', '68%'], center: ['50%', '44%'], avoidLabelOverlap: true,
-          itemStyle: { borderColor: p.surface, borderWidth: 2 },
-          label: { show: false }, labelLine: { show: false },
-          data: rows.map(function (r, i) { return { name: r.name, value: r.value, itemStyle: { color: cs[i % cs.length] } }; }) }]
-      }, true);
+      .sort(function (a, b) { return b.value - a.value; }).slice(0, 8).reverse();
+    var typeChart = cubePaint($('cubeTypeChart'), {
+      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+      grid: { left: 6, right: 78, top: 8, bottom: 6, containLabel: true },
+      tooltip: tooltipCommon(p, {
+        trigger: 'item',
+        formatter: function (a) { return esc(a.name) + ' · <b>' + cubeMoney(a.value) + '</b>'; }
+      }),
+      xAxis: {
+        type: 'value',
+        axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; } },
+        splitLine: { lineStyle: { color: withAlpha(p.text, .07) } },
+        axisLine: { show: false }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'category',
+        data: rows.map(function (r) { return r.name; }),
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: p.text2, fontSize: 11.5, fontFamily: p.font, width: 96, overflow: 'truncate' }
+      },
+      series: [{
+        type: 'bar', barWidth: 12,
+        data: rows.map(function (r) {
+          return { value: r.value, itemStyle: { color: gradH(withAlpha(p.primary, .32), p.primary), borderRadius: [0, 6, 6, 0] } };
+        }),
+        label: {
+          show: true, position: 'right', distance: 8,
+          formatter: function (a) { return cubeMoney(a.value); },
+          color: p.text2, fontSize: 10.5, fontFamily: p.font
+        },
+        emphasis: { itemStyle: { shadowBlur: 12, shadowColor: withAlpha(p.primary, .28) } }
+      }]
+    });
+    if (typeChart) {
+      typeChart.off('click');
+      typeChart.on('click', function () { setView('cube'); });
     }
   }
 
@@ -1789,42 +1843,54 @@
     syncFilterSeg(catBox);
 
     /* 子类：换分类 / 换肤 / 笔数变化才重建；同一分类里换子类只挪滑块 */
-    var names = [], counts = {}, tot = 0, subAmount = 0;
-    /* 收支筛选先生效：金额 chip 跟着「全部 / 支 / 收」走，子项笔数也同一口径 */
-    var typed = rangeRecords().filter(function (r) {
-      return state.filters.type === 'all' || r.type === state.filters.type;
-    });
+    var names = [], counts = {}, tot = 0;
+    /* 笔数按「收支 / 金额 / 星期 / 搜索」这一层算，跟右侧金额 chip 同一口径 */
+    var core = rangeRecords().filter(matchCore);
     if (cat !== 'all') {
-      typed.forEach(function (r) {
+      core.forEach(function (r) {
         if (r.category !== cat) return;
         counts[r.sub] = (counts[r.sub] || 0) + 1;
         tot++;
-        if (state.filters.sub === 'all' || r.sub === state.filters.sub) subAmount += r.amount;
       });
       names = subCatNames(cat);
-    } else {
-      typed.forEach(function (r) { subAmount += r.amount; });
     }
-    /* 右侧金额统计：跟着当前粒度走（年 / 月 / 周 / 日），
-       取 rangeRecords() 的区间，和上面子类笔数同一份口径 */
+
+    /* 右侧金额统计：和上方所有筛选一起联动 —— 分类 / 子类 / 收支 / 金额档 /
+       星期 / 搜索全叠上之后，取当前粒度区间（年 / 月 / 周 / 日）的合计。
+       收支分开算：支出绿、收入红，跟账本的配色口径一致。 */
+    var expSum = 0, incSum = 0;
+    rangeRecords().filter(matchFilters).forEach(function (r) {
+      if (r.type === 'income') incSum += r.amount;
+      else expSum += r.amount;
+    });
     var sumBox = $('subSum');
     if (sumBox) {
-      /* 「全部」没有子项按钮，但 chip 照留 —— 它现在显示当前收支口径的区间总额 */
       sumBox.hidden = false;
       var label = ({ year: '年统计', month: '月统计', week: '周统计', day: '日统计' })[state.scale] || '统计';
-      var lab = sumBox.querySelector('span'), val = sumBox.querySelector('b');
-      if (lab) lab.textContent = label;
-      if (val) val.textContent = fmtBig(subAmount);
-      /* 账本口径：收入红、支出绿；全部时不偏向任何一边 */
-      var sumColor = state.filters.type === 'income' ? p.income
-        : state.filters.type === 'expense' ? p.expense
-        : (cat === '收入' ? p.income : '');
-      sumBox.style.setProperty('--sum-color', sumColor);
+      var expOn = expSum > 0 || !incSum;
+      var incOn = incSum > 0;
+      var body = '<span class="ss-lab">' + label + '</span>';
+      if (expOn) {
+        body += '<b class="ss-num is-exp"><i>支</i>' + fmtBig(expSum) + '</b>';
+      }
+      if (incOn) {
+        body += '<b class="ss-num is-inc"><i>收</i>' + fmtBig(incSum) + '</b>';
+      }
+      sumBox.innerHTML = body;
+      sumBox.setAttribute('aria-label', label + '：支出 ' + fmtBig(expSum) + '，收入 ' + fmtBig(incSum));
     }
     var subSig = names.length ? theme + '|' + p.primary + '|' + colSig + '|' + cat + '|' + names.join(',') + '|' +
       names.map(function (n) { return counts[n] || 0; }).join(',') + '|' + tot + '|' +
-      state.filters.sub + '|' + Math.round(subAmount * 100) + '|' + state.scale + '|' +
-      state.filters.type : 'all|' + Math.round(subAmount * 100) + '|' + state.scale + '|' + state.filters.type;
+      state.filters.sub + '|' + state.scale + '|' + state.filters.type :
+      'all|' + state.scale + '|' + state.filters.type;
+    var sumSig = state.scale + '|' + state.filters.type + '|' + cat + '|' + state.filters.sub + '|' +
+      state.filters.weekday + '|' + (state.filters.amount || 'all') + '|' + state.filters.q + '|' +
+      Math.round(expSum * 100) + '|' + Math.round(incSum * 100) + '|' + theme;
+    if (sumBox && sumBox.dataset.sig !== sumSig) {
+      sumBox.dataset.sig = sumSig;
+      sumBox.classList.add('is-swap');
+      setTimeout(function () { sumBox.classList.remove('is-swap'); }, 220);
+    }
     if (subBox.dataset.sig !== subSig) {
       var sub = '';
       if (names.length) {
@@ -2692,10 +2758,7 @@
     for (var j = 0; j < navs.length; j++) navs[j].classList.toggle('is-active', navs[j].dataset.view === view);
     /* 日历页要锁一整屏，正文底距归零，否则那 56px 会把日历顶出一截 */
     var main = document.querySelector('.main');
-    if (main) {
-      main.classList.toggle('is-calendar', view === 'calendar');
-      main.classList.toggle('is-cube', view === 'cube');
-    }
+    if (main) main.classList.toggle('is-calendar', view === 'calendar');
     writeRoute(view, false);
     if (view === 'calendar') renderBoard();
     if (view === 'cube') mountCube();
@@ -3542,23 +3605,23 @@
     var gap = payVal('payGap', pay.gap);
     var gross = wage - ip;
     var net = gross - gap;
+    /* 合计不再挤在表格最后一行（六列宽里数字会被截断），
+       单独做一条三格摘要：个人 / 公司 / 应发，再加上实发那一格横幅。 */
     var foot = $('payFoot');
     if (foot) {
       foot.innerHTML =
-        '<tr class="pay-total"><th>合计</th><td></td>' +
-        '<td class="pay-ip">' + fmtYuan(ip) + '</td>' +
-        '<td class="pay-ic">' + fmtYuan(ic) + '</td>' +
-        '<td class="pay-sum">' + fmtYuan(ip + ic) + '</td></tr>' +
-        '<tr class="pay-gross"><th>应发</th><td colspan="4"><b>' + fmtYuan(gross) + '</b><i>工资 − 个人缴费</i></td></tr>' +
-        '<tr class="pay-net"><th>实发</th><td colspan="4"><b>' + fmtYuan(net) + '</b>' +
+        '<div class="ps-cell"><span>个人合计</span><b class="is-exp">' + fmtYuan(ip) + '</b></div>' +
+        '<div class="ps-cell"><span>公司合计</span><b>' + fmtYuan(ic) + '</b></div>' +
+        '<div class="ps-cell"><span>缴费共计</span><b>' + fmtYuan(ip + ic) + '</b></div>' +
+        '<div class="ps-cell is-gross"><span>应发</span><b>' + fmtYuan(gross) + '</b><i>工资 − 个人缴费</i></div>' +
+        '<div class="ps-cell is-net"><span>实发</span><b>' + fmtYuan(net) + '</b>' +
         '<i>应发 − 差距 ' + fmtYuan(gap) + ' · 绩效 ' + fmtYuan(payVal('payPerf', pay.perf)) +
-        ' · 补贴 ' + fmtYuan(payVal('paySubsidy', pay.subsidy)) + '</i></td></tr>';
+        ' · 补贴 ' + fmtYuan(payVal('paySubsidy', pay.subsidy)) + '</i></div>';
     }
-    /* 卡头一行说清结论：个人一共扣多少、公司一共承担多少、最后到手多少 */
+    /* 卡头只留一句结论：每月到底到手多少 */
     var sub = $('paySub');
     if (sub) {
-      sub.textContent = '个人 ' + fmtYuan(ip) + ' · 公司 ' + fmtYuan(ic) +
-        ' · 实发 ' + fmtYuan(net);
+      sub.textContent = '每年合计 ' + fmtYuan(net * 12) + ' · 本月到手 ' + fmtYuan(net);
     }
   }
   function sortReimb() {
@@ -3965,10 +4028,9 @@
 
       var item = e.target.closest('[data-id]');
       if (item) {
-        /* 月/周格子里的条目也算格子的一部分：切到天视图看当日明细。
-           天页里点具体那一笔才进编辑，明细分类行同理。 */
-        var holder = item.closest('.cal-cell[data-date], .wk-col[data-date]');
-        if (holder) { jumpToDay(holder.dataset.date); return; }
+        /* 点具体某一笔（月历 / 周历 / 日页都一样）直接开编辑弹窗，
+           不再把人甩到当天的页面 —— 只是想改个数，不该丢上下文。
+           想看当日明细走别的入口：双击格子、或格子右上角的「+N」。 */
         var rec = allRecords().filter(function (r) { return r.id === item.dataset.id; })[0];
         if (rec) openModal(rec);
         return;
@@ -4455,11 +4517,15 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 5,
-    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top', 'cube', 'salary', 'reimb'],
+    v: 6,
+    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
+      'cubecnt', 'cubespend', 'cubecomp', 'cubefee', 'cubeyear', 'cubetype', 'salary', 'reimb'],
     spans: {
       kpi: [12, 3], calheat: [12, 7], trend: [5, 6], donut: [3, 6], balance: [4, 6],
-      weight: [5, 5], stack: [4, 5], top: [3, 5], cube: [12, 8], salary: [6, 11], reimb: [6, 8]
+      weight: [5, 5], stack: [4, 5], top: [3, 5],
+      cubecnt: [3, 3], cubespend: [3, 3], cubecomp: [3, 3], cubefee: [3, 3],
+      cubeyear: [6, 5], cubetype: [6, 5],
+      salary: [6, 11], reimb: [6, 8]
     }
   };
   var ovGrid = null, ovEditing = false;
@@ -4482,7 +4548,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 5 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 6 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -4498,7 +4564,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 5, order: [], spans: {} };
+    var L = { v: 6, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;

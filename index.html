@@ -204,16 +204,43 @@
             <div class="chart chart-lg" id="chartTop" data-page-node-id="u7mkeTEDOkx5oLJHoQCa6N"></div>
           </article>
 
-          <article class="card chart-card span-2 cube-overview-card" style="--i:7" data-oid="cube">
+          <article class="card cube-stat-card" style="--i:7" data-oid="cubecnt">
+            <span class="cs-lab">收藏 / 购买记录</span>
+            <b class="cs-num" id="cubeCnt">0</b>
+            <span class="cs-hint">件魔方</span>
+          </article>
+
+          <article class="card cube-stat-card" style="--i:7" data-oid="cubespend">
+            <span class="cs-lab">魔方相关支出</span>
+            <b class="cs-num" id="cubeSpend">¥0.00</b>
+            <span class="cs-hint">累计器械花费</span>
+          </article>
+
+          <article class="card cube-stat-card" style="--i:7" data-oid="cubecomp">
+            <span class="cs-lab">参赛次数</span>
+            <b class="cs-num" id="cubeComp">0</b>
+            <span class="cs-hint">场 WCA 与自办赛</span>
+          </article>
+
+          <article class="card cube-stat-card" style="--i:7" data-oid="cubefee">
+            <span class="cs-lab">比赛报名费</span>
+            <b class="cs-num" id="cubeFee">¥0.00</b>
+            <span class="cs-hint">累计报名支出</span>
+          </article>
+
+          <article class="card chart-card span-2" style="--i:7" data-oid="cubeyear">
             <div class="card-head">
-              <div><h3>魔方总览</h3><p>独立账本 · 不参与收支统计</p></div>
+              <div><h3>魔方年度购买趋势</h3><p>按年份累计，点击柱子查看那一年</p></div>
               <button type="button" class="btn btn-ghost cube-goto" id="cubeGotoBtn">查看魔方 ↗</button>
             </div>
-            <div class="cube-kpis" id="cubeKpis"></div>
-            <div class="cube-ov-charts">
-              <div class="cube-ov-cell"><h4>年度购买趋势</h4><div class="cube-ov-chart" id="cubeYearChart"></div></div>
-              <div class="cube-ov-cell"><h4>类型支出排行</h4><div class="cube-ov-chart" id="cubeTypeChart"></div></div>
+            <div class="chart chart-lg" id="cubeYearChart"></div>
+          </article>
+
+          <article class="card chart-card span-2" style="--i:7" data-oid="cubetype">
+            <div class="card-head">
+              <div><h3>魔方类型支出排行</h3><p>金额最高的几种，点条目跳到魔方页</p></div>
             </div>
+            <div class="chart chart-lg" id="cubeTypeChart"></div>
           </article>
 
           <article class="card chart-card span-2 pay-card" style="--i:7" data-oid="salary">
@@ -232,8 +259,8 @@
               <table class="pay-table">
                 <thead><tr><th>项目</th><th>比例<i>个人 / 公司</i></th><th>个人缴费</th><th>公司缴费</th><th>共计</th></tr></thead>
                 <tbody id="payRows"></tbody>
-                <tfoot id="payFoot"></tfoot>
               </table>
+              <div class="pay-summary" id="payFoot"></div>
             </div>
           </article>
 

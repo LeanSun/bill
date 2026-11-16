@@ -1859,16 +1859,16 @@ body.modal-cell .amount-input input { height: 54px; font-size: 23px; }
   color: var(--text); font-size: 18px; font-weight: 780; letter-spacing: -.02em;
   font-variant-numeric: tabular-nums; outline: none;
 }
+/* 表格只负责明细；合计 / 应发 / 实发挪到下面的摘要条，数字不再被切 */
 .pay-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
 .pay-table th, .pay-table td {
-  padding: 9px 12px; font-size: 13.5px; border-bottom: 1px solid var(--border);
+  padding: 8px 9px; font-size: 13px; border-bottom: 1px solid var(--border);
   text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* 列宽写死：比例那列要放下两个百分号输入框，其余四列均分更方便对读 */
-.pay-table th:nth-child(1), .pay-table td:nth-child(1) { width: 24%; }
-.pay-table th:nth-child(2), .pay-table td:nth-child(2) { width: 26%; }
-.pay-table th:nth-child(3), .pay-table td:nth-child(3) { width: 17%; }
-.pay-table th:nth-child(4), .pay-table td:nth-child(4) { width: 17%; }
+.pay-table th:nth-child(1), .pay-table td:nth-child(1) { width: 21%; }
+.pay-table th:nth-child(2), .pay-table td:nth-child(2) { width: 31%; }
+.pay-table th:nth-child(3), .pay-table td:nth-child(3) { width: 16%; }
+.pay-table th:nth-child(4), .pay-table td:nth-child(4) { width: 16%; }
 .pay-table th:nth-child(5), .pay-table td:nth-child(5) { width: 16%; }
 .pay-table thead th { font-size: 12px; font-weight: 650; color: var(--muted); padding-bottom: 7px; }
 .pay-table thead th:first-child { text-align: left; }
@@ -1889,15 +1889,36 @@ body.modal-cell .amount-input input { height: 54px; font-size: 23px; }
 .pay-rate i { font-style: normal; font-size: 11px; color: var(--muted); }
 .pay-ip, .pay-sum { font-weight: 700; }
 .pay-ic { color: var(--muted); font-weight: 600; }
-.pay-total th, .pay-total td { border-top: 2px solid var(--border-strong); font-size: 14px; font-weight: 780; }
-.pay-gross th, .pay-net th { font-size: 13px; }
-.pay-gross td b, .pay-net td b {
-  font-size: 21px; font-weight: 800; letter-spacing: -.025em;
-  color: var(--text); margin-right: 10px;
+/* 摘要条：三格缴费 + 应发 / 实发两条宽格 */
+.pay-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.pay-summary .ps-cell {
+  grid-column: span 2; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 12px; border-radius: 11px;
+  background: var(--surface-2); border: 1px solid var(--border);
 }
-.pay-net td b { color: var(--income); }
-.pay-gross td i, .pay-net td i { font-style: normal; font-size: 11.5px; color: var(--muted); }
-.pay-net td { background: color-mix(in srgb, var(--income) 8%, transparent); }
+.pay-summary .ps-cell span { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.pay-summary .ps-cell b {
+  font-size: 16px; font-weight: 780; letter-spacing: -.025em; color: var(--text);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pay-summary .ps-cell b.is-exp { color: var(--expense); }
+.pay-summary .ps-cell i { font-style: normal; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pay-summary .ps-cell.is-gross,
+.pay-summary .ps-cell.is-net { grid-column: span 3; }
+.pay-summary .ps-cell.is-gross b { font-size: 19px; }
+.pay-summary .ps-cell.is-net {
+  background: color-mix(in srgb, var(--income) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--income) 30%, var(--border));
+}
+.pay-summary .ps-cell.is-net b { font-size: 22px; color: var(--income); }
+@media (max-width: 900px) {
+  .pay-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pay-summary .ps-cell,
+  .pay-summary .ps-cell.is-gross,
+  .pay-summary .ps-cell.is-net { grid-column: span 1; }
+  .pay-summary .ps-cell.is-net { grid-column: 1 / -1; }
+}
 
 /* ---------- 报销费用 ---------- */
 .reimb-card { min-height: 0; overflow: auto; }
@@ -2142,46 +2163,70 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
   .cube-frame { height: calc(100dvh - 78px); min-height: 460px; border-radius: 12px; }
 }
 
-/* ---------- 总览里的魔方卡：数据只读 cubeLedger_v1，不进账本 ---------- */
-.cube-overview-card .card-head { align-items: flex-start; }
+/* ---------- 总览里的魔方板块：数据只读 cubeLedger_v1，不进账本 ----------
+   四个数字各自一张卡，趋势和排行也各占一张，不再挤在一个大容器里。 */
 .cube-goto { padding: 6px 10px; font-size: 11.5px; white-space: nowrap; }
-.cube-kpis {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0 14px;
+.cube-stat-card {
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  padding: 12px 15px; min-width: 0; cursor: pointer;
+  transition: border-color .2s var(--ease), transform .2s var(--ease), box-shadow .2s var(--ease);
 }
-.cube-kpi {
-  min-width: 0; padding: 11px 12px; border-radius: var(--radius-sm);
-  background: var(--surface-2); border: 1px solid var(--border);
+.cube-stat-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card), 0 10px 24px -18px var(--primary);
 }
-.cube-kpi span { display: block; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cube-kpi b {
-  display: block; margin-top: 5px; font-size: 20px; font-weight: 750; letter-spacing: -.03em;
-  color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.cube-stat-card .cs-lab {
+  font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 5px;
 }
-.cube-ov-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.cube-ov-cell { min-width: 0; }
-.cube-ov-cell h4 { margin: 0 0 6px; font-size: 12px; font-weight: 650; color: var(--text-2); }
-.cube-ov-chart { width: 100%; height: 186px; }
+.cube-stat-card .cs-lab::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%; flex: 0 0 5px;
+  background: var(--primary); opacity: .55;
+}
+.cube-stat-card .cs-num {
+  font-size: 22px; font-weight: 780; letter-spacing: -.035em; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cube-stat-card .cs-hint { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 900px) {
-  .cube-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cube-ov-charts { grid-template-columns: minmax(0, 1fr); }
+  .cube-stat-card .cs-num { font-size: 19px; }
 }
 
 /* 子类筛选行：按钮收窄，右侧让位给当前区间的金额统计 */
 .fx-sub-slot .sub-seg { flex: 1 1 auto; min-width: 0; }
 .fx-sub-slot .sub-seg .ct-sub { padding-left: 1px; padding-right: 1px; }
 .cat-seg .ct-sub b, .sub-seg .ct-sub b { padding: 0 3px; margin-left: 2px; font-size: 10px; }
+/* 金额统计固定贴在筛选行最右侧：不论有没有子类按钮，都靠右站 */
+.fx-sub-slot { justify-content: space-between; }
 .sub-sum {
-  flex: 0 0 auto; min-width: 116px; display: flex; align-items: center; justify-content: flex-end; gap: 7px;
-  padding: 0 11px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
+  flex: 0 0 auto; margin-left: auto; min-width: 132px; height: 100%;
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 0 12px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
 }
 .sub-sum[hidden] { display: none; }
-.sub-sum span { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
-.sub-sum b {
-  font-size: 14px; font-weight: 750; letter-spacing: -.02em; color: var(--sum-color, var(--text));
-  font-variant-numeric: tabular-nums; white-space: nowrap;
+.sub-sum .ss-lab {
+  font-size: 10.5px; color: var(--muted); white-space: nowrap; letter-spacing: .01em;
+}
+.sub-sum .ss-num {
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font-size: 14px; font-weight: 750; letter-spacing: -.02em; white-space: nowrap;
+}
+.sub-sum .ss-num i { font-style: normal; font-size: 10px; font-weight: 650; opacity: .78; }
+.sub-sum .is-exp { color: var(--expense); }
+.sub-sum .is-inc { color: var(--income); }
+/* 数字变了轻轻闪一下，扫一眼就知道刚才那下筛选算到哪了 */
+.sub-sum.is-swap .ss-num { animation: sumSwap .22s var(--ease); }
+@keyframes sumSwap {
+  from { opacity: .35; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
 }
 @media (max-width: 760px) {
-  .sub-sum { min-width: 0; flex: 1 1 100%; height: 28px; justify-content: space-between; }
+  .fx-sub-slot { flex-wrap: wrap; }
+  .sub-sum { min-width: 0; flex: 1 1 100%; height: 30px; justify-content: space-between; }
 }
 
 .cube-loading{
@@ -2193,10 +2238,3 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .cube-loading[hidden]{display:none}
 .cube-spin{width:15px;height:15px;border:2px solid var(--border-strong);border-top-color:var(--primary);border-radius:50%;animation:cubeSpin .8s linear infinite}
 @keyframes cubeSpin{to{transform:rotate(360deg)}}
-
-/* 魔方页整屏铺开：父层不再留一圈 padding，iframe 也不要自己的卡片边框 */
-.main.is-cube { padding: 0; }
-.main.is-cube .cube-frame {
-  height: 100dvh; min-height: 0; border: 0; border-radius: 0; box-shadow: none;
-}
-.main.is-cube .cube-loading { inset: 0; border: 0; border-radius: 0; }

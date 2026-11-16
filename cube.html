@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔方统计 · 轻账</title>
-<link rel="stylesheet" href="https://cdn.cubing.net/v0/css/@cubing/icons/css">
+<link rel="stylesheet" href="assets/cubing-icons.css">
 <style>
 
 :root{--bg:#f4f6fb;--card:#fff;--ink:#182230;--muted:#758195;--line:#e8edf4;--blue:#4f6ef7;--blue2:#eaf0ff;--green:#16a085;--orange:#f59e0b;--red:#e45c6b;--shadow:0 8px 28px rgba(34,52,84,.06);--soft:#f1f4f9}
@@ -808,6 +808,237 @@ html[data-theme="dark"] .topbar-note .dot{background:var(--green)}
 @media(max-width:1100px){.topbar-note span:last-child{display:none}}
 @media(max-width:900px){.topbar{gap:10px;padding:8px 12px}.topbar .brand small{display:none}.topbar .nav{flex:1 1 auto;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}.topbar .nav::-webkit-scrollbar{display:none}}
 @media(max-width:560px){.topbar .brand strong{display:none}.topbar .nav button{padding:7px 10px;font-size:12px}.topbar .nav .ico{display:none}}
+
+/* 图标统一跟文字同色、跟字号同高（cubing icons 字体，和 cuberoot 图标库同一套上游） */
+.ts-ico { display:inline-flex; align-items:center; margin-right:6px; color:var(--blue); }
+.ts-ico .cubing-icon { font-size:15px; line-height:1; }
+.ts-ico .event-fallback { font-size:11px; opacity:.7 }
+/* 深色模式：把原版写死的浅色底 / 浅色线换成令牌，页面和图表才不会一块白一块黑 */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .stat,
+html[data-theme="dark"] .panel>section { background:var(--card); border-color:var(--line); }
+html[data-theme="dark"] .type-spend-track,
+html[data-theme="dark"] .lube-rank-track,
+html[data-theme="dark"] .wca-progress-track,
+html[data-theme="dark"] .chart,
+html[data-theme="dark"] .cal-week { background:var(--soft) }
+html[data-theme="dark"] .type-spend-track,
+html[data-theme="dark"] .lube-rank-track,
+html[data-theme="dark"] .wca-progress-track { background:#202a3c }
+html[data-theme="dark"] .type-spend-row:hover,
+html[data-theme="dark"] .lube-rank-row:hover { background:var(--blue2) }
+html[data-theme="dark"] .type-spend-name,
+html[data-theme="dark"] .type-spend-row strong { color:var(--ink) }
+html[data-theme="dark"] .type-spend-row small,
+html[data-theme="dark"] .lube-rank-row small { color:var(--muted) }
+html[data-theme="dark"] table th { background:var(--soft); color:var(--muted) }
+html[data-theme="dark"] .cal-pop,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .year-color-dialog,
+html[data-theme="dark"] .dropdown,
+html[data-theme="dark"] .menu { background:var(--card); border-color:var(--line); color:var(--ink) }
+html[data-theme="dark"] .event,
+html[data-theme="dark"] .cube-tag,
+html[data-theme="dark"] .pill,
+html[data-theme="dark"] .chip { background:var(--soft); border-color:var(--line); color:var(--text-2,#c9d3e4) }
+html[data-theme="dark"] .search input,
+html[data-theme="dark"] .lube-tools input,
+html[data-theme="dark"] .lube-tools select { background:var(--soft); border-color:var(--line); color:var(--ink) }
+html[data-theme="dark"] .topbar { box-shadow:none }
+html[data-theme="dark"] .overview-actions,
+html[data-theme="dark"] .lube-intro,
+html[data-theme="dark"] .lube-guide-note {
+  background:linear-gradient(112deg,#161e2d 0%,#151d2a 54%,#14201f 100%); border-color:var(--line);
+}
+html[data-theme="dark"] .overview-welcome>strong,
+html[data-theme="dark"] .lube-intro-copy h2,
+html[data-theme="dark"] .lube-guide-note strong { color:var(--ink) }
+html[data-theme="dark"] .chart-unit { background:var(--soft); color:var(--muted) }
+html[data-theme="dark"] .stat .hint,
+html[data-theme="dark"] .small-note { color:var(--muted) }
+html[data-theme="dark"] .mini-year-bar i { background:linear-gradient(180deg,#8fa2ff,#526cf2) }
+html[data-theme="dark"] canvas { background:transparent !important }
+
+/* ---- 深色主题收口：原版后置规则把顶栏 / 导航 / 标签的浅色写死了，
+        这里用 !important 拉回令牌值，页面才不会被切成一块块白 ---- */
+html[data-theme="dark"] .topbar{background:var(--card)!important;border-bottom-color:var(--line)!important;box-shadow:none!important}
+html[data-theme="dark"] .nav{background:var(--soft)!important;border-color:var(--line)!important}
+html[data-theme="dark"] .nav-glide{background:#243047!important;border:1px solid #33415c!important;box-shadow:0 2px 10px rgba(0,0,0,.45)!important}
+html[data-theme="dark"] .nav button{color:var(--muted)!important}
+html[data-theme="dark"] .nav button.active{color:var(--ink)!important}
+html[data-theme="dark"] .cube-tag,
+html[data-theme="dark"] .cube-type-tag,
+html[data-theme="dark"] .cube-brand-tag{background:var(--soft)!important;border-color:var(--line)!important;color:var(--ink)!important}
+html[data-theme="dark"] .cube-stat,
+html[data-theme="dark"] .cube-stats>div{background:var(--soft)!important;border-color:var(--line)!important}
+html[data-theme="dark"] .cube-stat span{color:var(--muted)!important}
+html[data-theme="dark"] .cube-stat strong{color:var(--ink)!important}
+html[data-theme="dark"] #cubeRows tr,
+html[data-theme="dark"] #compRows tr{color:var(--ink)}
+html[data-theme="dark"] #cubeRows td,
+html[data-theme="dark"] #compRows td{color:var(--ink);border-color:rgba(120,140,170,.22)!important}
+html[data-theme="dark"] #cubeRows td *,
+html[data-theme="dark"] #compRows td *{color:inherit}
+html[data-theme="dark"] .cube-date,
+html[data-theme="dark"] .comp-index,
+html[data-theme="dark"] .cube-index{color:var(--muted)!important}
+html[data-theme="dark"] .cube-edit-tag,
+html[data-theme="dark"] .cube-tag{color:var(--ink)!important;background:var(--soft)!important;border-color:var(--line)!important}
+html[data-theme="dark"] .cube-brand-label,
+html[data-theme="dark"] .brand-wordmark{color:var(--ink)!important}
+/* 厂家 logo 是深色描边的透明图，深底上直接铺会看不见：给一层浅色小底板。
+   底板只在图片真正加载成功后出现（.is-loaded），否则露出下面的文字兜底，
+   远程图挂了也不会剩一个空框。 */
+html[data-theme="dark"] .brand-logo.is-loaded,
+html[data-theme="dark"] .cube-brand-tag .brand-logo.is-loaded,
+html[data-theme="dark"] #cubeRows .cube-brand-tag .brand-logo.is-loaded,
+html[data-theme="dark"] #cubes .cube-brand-tag .brand-logo.is-loaded{
+  background:rgba(255,255,255,.94)!important;border-radius:7px;padding:2px 5px;box-sizing:border-box;
+}
+.brand-logo .brand-fallback{
+  font-style:normal;font-size:11px;font-weight:800;line-height:1.1;letter-spacing:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;color:inherit;
+  display:flex;align-items:center;justify-content:center;width:100%;height:100%;
+}
+.brand-logo img{display:none}
+.brand-logo.is-loaded img{display:block}
+.brand-logo.is-loaded .brand-fallback{display:none}
+
+/* ===== 深色收口 v2 =====
+   第 1 段那些选择器带 #id + !important，权重比 html[data-theme] .class 高，
+   于是深色下表格表头 / index / 编辑按钮仍被写死成 #111827（深底深字）。
+   这里把前缀换成同样带 id 的组合，权重拉平后再压一层。 */
+html[data-theme="dark"] #cubes .cube-table th,
+html[data-theme="dark"] #compRows th,
+html[data-theme="dark"] #cubeRows .cube-edit-tag,
+html[data-theme="dark"] #cubeRows .cube-index,
+html[data-theme="dark"] #compRows .comp-index,
+html[data-theme="dark"] .comp-table .cube-edit-tag{
+  color:var(--ink)!important;
+  background:var(--soft)!important;
+  border-color:var(--line)!important;
+}
+html[data-theme="dark"] #cubes .cube-table th,
+html[data-theme="dark"] #compRows th{
+  background:var(--soft)!important;
+  border-bottom-color:var(--line)!important;
+}
+html[data-theme="dark"] #cubeRows .cube-index,
+html[data-theme="dark"] #compRows .comp-index{ color:var(--muted)!important; background:transparent!important }
+
+/* 图表底板：浅色主题下 .radarChart 有一层 #fbfcff→#f5f8ff 的渐变，
+   深色主题沿用同样的「比卡片亮一点」的层次，只是换成 --soft，不再是一块白 */
+html[data-theme="dark"] .radarChart,
+html[data-theme="dark"] .lubcard .radarChart{
+  background:var(--soft)!important;
+  border:1px solid var(--line)!important;
+}
+html[data-theme="dark"] .annual-comp-chart,
+html[data-theme="dark"] .overview-chart,
+html[data-theme="dark"] #typeBreakdown{ background:transparent!important; border-color:transparent!important }
+
+/* 目录 / 弹窗 / 摘要块里的写死白底 */
+html[data-theme="dark"] #data .catalog-grid>div{
+  background:var(--soft)!important; border-color:var(--line)!important;
+}
+html[data-theme="dark"] .modal .modalfoot{
+  background:var(--card)!important; border-top-color:var(--line)!important;
+}
+html[data-theme="dark"] .lube-summary>div{
+  background:var(--soft)!important; border-color:var(--line)!important;
+}
+html[data-theme="dark"] .lube-summary strong{ color:var(--ink)!important }
+html[data-theme="dark"] .lube-summary span{ color:var(--muted)!important }
+html[data-theme="dark"] .overview-actions{
+  background:linear-gradient(112deg,#151d2b 0%,#141c29 54%,#13211f 100%)!important;
+  border-color:var(--line)!important;
+}
+html[data-theme="dark"] .overview-welcome>strong{ color:var(--ink)!important }
+html[data-theme="dark"] .overview-kicker{ color:#8ba0ff!important }
+html[data-theme="dark"] .inline-link{ color:#8ba0ff!important }
+
+/* 行 hover / 轨道色 */
+html[data-theme="dark"] .tablewrap tbody tr:hover,
+html[data-theme="dark"] #compRows tr:hover{ background:var(--blue2)!important }
+html[data-theme="dark"] .lube-rank-row:hover,
+html[data-theme="dark"] .type-spend-row:hover{ background:var(--blue2)!important }
+
+/* 色板与危险按钮 */
+html[data-theme="dark"] .year-color-swatch{
+  border-color:var(--line)!important;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.26)!important;
+}
+html[data-theme="dark"] .catalog-editor-actions button.danger,
+html[data-theme="dark"] #yearColorEditor .year-color-dialog-actions button:first-child{
+  background:rgba(229,72,77,.16)!important;
+  color:#ff9aa0!important;
+  border-color:rgba(229,72,77,.36)!important;
+}
+html[data-theme="dark"] .catalog-editor-actions button:not(.ghost):not(.danger){
+  background:#4f6ef7!important; border-color:#4f6ef7!important; color:#fff!important;
+}
+html[data-theme="dark"] .toast{ background:#243047!important; color:var(--ink)!important; border:1px solid #33415c!important }
+
+/* ===== 深色收口 v3：润滑油指南 / 图表底板 / 进度条 ===== */
+html[data-theme="dark"] .lubcard,
+html[data-theme="dark"] .lube-card{ background:var(--card)!important; border-color:var(--line)!important }
+html[data-theme="dark"] #lubricants .lube-map{
+  background:var(--soft)!important; border-color:var(--line)!important;
+}
+html[data-theme="dark"] #lubricants .lube-compare{
+  background:var(--soft)!important; border-color:var(--line)!important;
+}
+html[data-theme="dark"] #lubricants .lube-compare-track,
+html[data-theme="dark"] .cube-chart-track,
+html[data-theme="dark"] .side-chart-track,
+html[data-theme="dark"] .wca-progress-track{ background:#202a3c!important }
+html[data-theme="dark"] #lubricants .metric-chip{
+  background:rgba(109,139,255,.13)!important;
+  border-color:rgba(109,139,255,.30)!important;
+  color:#c3cde4!important;
+}
+html[data-theme="dark"] #lubricants .metric-chip b{ color:var(--ink)!important }
+html[data-theme="dark"] .lubtext{ color:var(--muted)!important }
+html[data-theme="dark"] .lube-rank-num{ color:var(--muted)!important }
+html[data-theme="dark"] .lube-rank-name{ color:var(--ink)!important }
+html[data-theme="dark"] #lubricants .lube-rank-row{ border-bottom-color:var(--line)!important }
+html[data-theme="dark"] .lube-copy-btn{
+  background:var(--soft)!important; color:var(--muted)!important; border-color:var(--line)!important;
+}
+html[data-theme="dark"] .lubtitle{ color:var(--ink) }
+html[data-theme="dark"] .lubsubtitle{ color:var(--muted) }
+
+/* 筛选按钮 / 标签 */
+html[data-theme="dark"] .comp-tools-card .clear-selected{
+  background:var(--soft)!important; color:var(--muted)!important; border-color:var(--line)!important;
+}
+html[data-theme="dark"] .comp-tools-card .clear-selected:hover{
+  background:var(--blue2)!important; border-color:var(--blue)!important;
+}
+html[data-theme="dark"] .selected-filter{
+  background:rgba(109,139,255,.15)!important;
+  border-color:rgba(109,139,255,.34)!important;
+  color:#a8b8ff!important;
+}
+html[data-theme="dark"] .selected-filter span{ color:inherit!important }
+
+/* 备份 / 历史 / 日历弹层 */
+html[data-theme="dark"] .update-hero,
+html[data-theme="dark"] .update-detail,
+html[data-theme="dark"] .year-color-item,
+html[data-theme="dark"] .catalog-editor-dialog,
+html[data-theme="dark"] .cal-nav{ background:var(--card)!important; border-color:var(--line)!important; color:var(--ink)!important }
+html[data-theme="dark"] .cal-close:hover{ background:var(--soft)!important }
+html[data-theme="dark"] .catalog-editor-field input,
+html[data-theme="dark"] .page-controls select,
+html[data-theme="dark"] .lube-tools select{
+  background:var(--soft)!important; border-color:var(--line)!important; color:var(--ink)!important;
+}
+html[data-theme="dark"] .wca-mark{ background:var(--soft)!important; border-color:var(--line)!important; color:var(--muted)!important }
+html[data-theme="dark"] .catalog-mini-icon{ background:transparent!important }
+html[data-theme="dark"] .tablewrap tbody tr:hover{ background:var(--blue2)!important }
+html[data-theme="dark"] #cubeRows .cube-type-tag,
+html[data-theme="dark"] #cubeRows .cube-brand-tag{ background:var(--soft)!important; border-color:var(--line)!important }
 </style>
 
 <!-- ai-page-reload:1794569598391 -->
@@ -819,20 +1050,36 @@ html[data-theme="dark"] .topbar-note .dot{background:var(--green)}
 (function(){
   var applyTheme=function(t){
     if(t!=='light'&&t!=='dark')return;
+    if(document.documentElement.getAttribute('data-theme')===t&&window.__themeReady)return;
     document.documentElement.setAttribute('data-theme',t);
-    if(window.echarts){
-      document.querySelectorAll('div[id]').forEach(function(el){
-        try{var c=echarts.getInstanceByDom(el);if(c)c.resize()}catch(e){}
-      });
-    }
+    window.__themeReady=true;
+    document.documentElement.setAttribute('data-theme-paint',t);
+    /* 主题一变整页重画：图表里写死的轴线 / 标签 / 图例颜色都按新主题重算，
+       只 resize 会让画布留在旧配色上 */
+    try{
+      if(typeof window.renderAll==='function'){window.renderAll();}
+      else if(window.echarts){
+        document.querySelectorAll('div[id]').forEach(function(el){
+          try{var c=echarts.getInstanceByDom(el);if(c)c.resize()}catch(e){}
+        });
+      }
+    }catch(e){}
   };
+  var saved='light';
+  try{saved=localStorage.getItem('qingzhang.theme.v1')||'light'}catch(e){}
+  var parentTheme='';
   try{
     var p=window.parent;
     if(p&&p!==window&&p.document&&p.document.documentElement)
-      applyTheme(p.document.documentElement.getAttribute('data-theme')||'light');
+      parentTheme=p.document.documentElement.getAttribute('data-theme')||'';
   }catch(e){}
+  applyTheme(parentTheme||saved);
   window.addEventListener('message',function(e){
     if(e&&e.data&&e.data.__ledgerTheme) applyTheme(e.data.__ledgerTheme);
+  });
+  /* 在同一个页面里切主题（或账本那边写了 localStorage）也跟着变 */
+  window.addEventListener('storage',function(e){
+    if(e&&e.key==='qingzhang.theme.v1'&&e.newValue) applyTheme(e.newValue);
   });
 })();
 
@@ -841,8 +1088,52 @@ const INITIAL = window.CUBE_INITIAL || {cubes:[],competitions:[],lubricants:[],m
 let db=loadDB(),activeForm={kind:null,id:null},cubePage=0,compPage=0;const PAGE_SIZE=10,CUBE_PAGE_SIZE=10;let selectedCubeTypes=[],selectedCubeBrands=[];
 function loadDB(){try{const x=localStorage.getItem('cubeLedger_v1');if(x){const d=JSON.parse(x);if(d.cubes&&d.competitions&&d.lubricants){const legacy=['333bf','333oh','333fm','clock','minx','pyram','skewb','sq1','444bf','555bf','333mbf','other'];d.competitions=d.competitions.map(c=>{const base=INITIAL.competitions.find(i=>i.id===c.id);if(base&&!c.eventStatuses&&JSON.stringify(c.events||[])===JSON.stringify(legacy))return {...c,events:base.events.slice(),eventStatuses:{...base.eventStatuses}};return c});d.competitions=d.competitions.map(c=>({...c,wca:typeof c.wca==='boolean'?c.wca:/WCA/i.test(String(c.name||'')),eventStatuses:c.eventStatuses||Object.fromEntries((c.events||[]).map(e=>[e,'attended']))}));d.meta=d.meta||{};d.meta.catalogIcons=d.meta.catalogIcons||{};return d}}}catch(e){}const d=structuredClone(INITIAL);d.competitions=d.competitions.map(c=>({...c,wca:typeof c.wca==='boolean'?c.wca:/WCA/i.test(String(c.name||'')),eventStatuses:c.eventStatuses||Object.fromEntries((c.events||[]).map(e=>[e,'attended']))}));d.meta=d.meta||{};d.meta.catalogIcons=d.meta.catalogIcons||{};return d}
 function saveDB(){localStorage.setItem('cubeLedger_v1',JSON.stringify(db));renderAll()}
+/* 深色模式兜底：原版有些部件把 #fff / #f2f6fb 写死在行内或后置规则里，
+   主题变量管不到。这里在每次重绘后扫一遍，把仍然发白的底压成一层薄高光，
+   整页才是一块完整的深色，而不是「深色页面里嵌着几张白卡」。 */
+function harmonizeDark(){
+  var dark=isDarkUI();
+  document.querySelectorAll('[data-hm-light]').forEach(function(el){
+    el.style.removeProperty('background-color');
+    el.removeAttribute('data-hm-light');
+  });
+  if(!dark) return;
+  document.querySelectorAll('.card, .stat, .panel, .cube-stat, .lube-card, .comp-card, .chart, .selected-filters, .cube-stats, td, th, .tag, .cube-tag, .event, .wca-mark, .brand-logo').forEach(function(el){
+    var bg=getComputedStyle(el).backgroundColor;
+    var m=/^rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)$/.exec(bg);
+    if(!m) return;
+    var r=+m[1],g=+m[2],b=+m[3],a=m[4]?parseFloat(m[4]):1;
+    if(a>0.35 && r>185 && g>185 && b>185){
+      el.setAttribute('data-hm-light','1');
+      el.style.setProperty('background-color','rgba(255,255,255,.045)','important');
+    }
+  });
+}
 function money(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+/* 图表配色统一从 CSS 变量里取：浅色 / 深色两套主题各有一套值，
+   不再把 #fff / #e6ebf2 写死在 option 里（深色下那些白边和白底就是问题根） */
+function fade(hex,a){var h=String(hex||'').trim().replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c}).join('');if(h.length!==6)return 'rgba(120,140,170,'+a+')';var n=parseInt(h,16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'}
+function CT(){
+  var cs=getComputedStyle(document.documentElement);
+  var v=function(n,f){return (cs.getPropertyValue(n)||'').trim()||f};
+  var line=v('--line','#e6ebf2'),ink=v('--ink','#1a2433'),muted=v('--muted','#8b97a9');
+  return {card:v('--card','#ffffff'),line:line,muted:muted,ink:ink,label:muted,legend:muted,
+    split:fade(ink,.10),blue:v('--blue','#526cf2'),green:v('--green','#10a06a'),
+    red:v('--red','#e5484d'),soft:v('--soft','#f8fafd')};
+}
+/* 每个 option 出门前统一补底层色：画布透明、提示框跟着主题 */
+function ctOpt(o){
+  var t=CT();
+  o.backgroundColor='transparent';
+  o.textStyle=Object.assign({color:t.label,fontFamily:'inherit'},o.textStyle||{});
+  if(o.tooltip){
+    o.tooltip.backgroundColor=t.card;o.tooltip.borderColor=t.line;
+    o.tooltip.textStyle=Object.assign({color:t.ink,fontSize:12},o.tooltip.textStyle||{});
+    o.tooltip.extraCssText='border-radius:10px;box-shadow:0 14px 34px -18px rgba(0,0,0,.5);';
+  }
+  return o;
+}
 function dateText(s){return s||'—'}
 function sum(arr,key){return arr.reduce((a,x)=>a+(Number(x[key])||0),0)}
 function unique(a){return [...new Set(a.filter(x=>x!==null&&x!==undefined&&String(x).trim()!==''))].sort((a,b)=>String(a).localeCompare(String(b),'zh-CN'))}
@@ -928,7 +1219,9 @@ document.addEventListener('click',e=>{if(!e.target.closest('#catalogPopup')&&!e.
 function editCatalogIcon(key,index){const name=getOptions(key)[index];pendingCatalogEdit={key,index,oldName:name};document.getElementById('catalogEditName').value=name;document.getElementById('catalogEditIcon').value=db.meta?.catalogIcons?.[key]?.[name]||'';document.getElementById('catalogEditor').classList.add('open')}
 function editCatalog(key,index){editCatalogIcon(key,index)}
 function removeCatalog(key,index){const arr=getOptions(key),v=arr[index];if(!confirm(`确定从可选列表中删除“${v}”？历史记录不会被删除。`))return;arr.splice(index,1);saveDB();toast('选项已删除')}
-function renderAll(){updateFilters();renderOverview();renderCubes();renderComps();renderLubricants();renderDataOverview();renderCatalogs();renderYearColorControls()}
+function renderAll(){updateFilters();renderOverview();renderCubes();renderComps();renderLubricants();renderDataOverview();renderCatalogs();renderYearColorControls()
+  try{harmonizeDark()}catch(e){}
+}
 
 const TYPE_LABELS={'三阶':'333','二阶':'222','四阶':'444','五阶':'555','六阶':'666','七阶':'777','五魔方':'minx','金字塔':'pyram','斜转':'skewb','魔表':'clock','SQ1':'sq1','三阶盲拧':'333bf','单手':'333oh','最少步':'333fm','四阶盲拧':'444bf','五阶盲拧':'555bf','多盲':'333mbf'};
 const BRAND_LOGOS={
@@ -940,7 +1233,19 @@ const BRAND_LOGOS={
 function typeLabel(type){const raw=String(type||'未分类').trim();const aliases={'3x3':'333','3x3x3':'333','三阶魔方':'333','三阶':'333','2x2':'222','2x2x2':'222','二阶魔方':'222','二阶':'222','四阶魔方':'444','四阶':'444','五阶魔方':'555','五阶':'555','六阶魔方':'666','六阶':'666','七阶魔方':'777'};const options=typeof getOptions==='function'?getOptions('types'):[];if(options.includes(raw))return raw;const key=TYPE_LABELS[raw]||aliases[raw.toLowerCase()]||raw;const canonical=options.find(v=>(TYPE_LABELS[v]||aliases[String(v).toLowerCase()]||v)===key);return canonical||key}
 function sameCubeType(a,b){const x=typeLabel(a).trim().toLowerCase(),y=typeLabel(b).trim().toLowerCase();return x===y||String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase()}
 function typeIcon(type){const name=String(type||'');const url=db.meta?.catalogIcons?.types?.[name];return url?`<img class="custom-type-icon" src="${esc(url)}" alt="" onerror="this.style.display='none'">`:eventIcon(typeLabel(name))}
-function brandLogo(brand){const b=String(brand||'').trim();const custom=db.meta?.catalogIcons?.brands?.[b];if(custom)return `<span class="brand-cell"><span class="brand-logo"><img src="${esc(custom)}" alt="${esc(b)}" loading="lazy" onerror="this.parentElement.textContent=this.alt;this.parentElement.style.fontSize='11px';this.parentElement.style.fontWeight='800'"></span></span>`;const key=Object.keys(BRAND_LOGOS).find(k=>b.toLowerCase()===k.toLowerCase());if(key){const logo=BRAND_LOGOS[key];return `<span class="brand-cell"><span class="brand-logo"><img src="${logo.src}" alt="${esc(b)}" loading="lazy" onerror="this.parentElement.textContent=this.alt;this.parentElement.style.fontSize='11px';this.parentElement.style.fontWeight='800'"></span></span>`}const short=({'梦图':'梦图','裕鑫':'裕鑫','永骏':'永骏','圣手':'圣手','地摊':'地摊','杂牌':'杂牌','foxi':'foxi','凌奥':'凌奥','小丸号':'小丸号','百变魔王':'百变魔王'})[b]||b||'未标注';return `<span class="brand-cell"><span class="brand-wordmark">${esc(short)}</span></span>`}
+function brandLogo(brand){
+  const b=String(brand||'').trim();
+  const custom=db.meta?.catalogIcons?.brands?.[b];
+  const key=Object.keys(BRAND_LOGOS).find(k=>b.toLowerCase()===k.toLowerCase());
+  /* 厂家标识一律「先出文字，图到了再盖上去」：
+     远程 logo 挂了 / 被墙 / loading=lazy 没触发，都不会剩一个空框。
+     文字用 color:inherit，深色主题下跟着标签的浅色文字走。 */
+  const src=custom||(key?BRAND_LOGOS[key].src:'');
+  const short=({'梦图':'梦图','裕鑫':'裕鑫','永骏':'永骏','圣手':'圣手','地摊':'地摊','杂牌':'杂牌','foxi':'foxi','凌奥':'凌奥','小丸号':'小丸号','百变魔王':'百变魔王'})[b]
+    ||b||'未标注';
+  if(!src)return `<span class="brand-cell"><span class="brand-wordmark">${esc(short)}</span></span>`;
+  return `<span class="brand-cell"><span class="brand-logo"><em class="brand-fallback">${esc(short)}</em><img src="${esc(src)}" alt="" onload="this.parentElement.classList.add('is-loaded')" onerror="this.remove()"></span></span>`;
+}
 function eventStatusClass(comp,event){return comp.eventStatuses&&comp.eventStatuses[event]==='missed'?'status-missed':''}
 const CITY_PROVINCE={'上海':'上海市','北京':'北京市','天津':'天津市','重庆':'重庆市','哈尔滨':'黑龙江省','牡丹江':'黑龙江省','沈阳':'辽宁省','丹东':'辽宁省','西安':'陕西省','南京':'江苏省','金坛':'江苏省','德清':'浙江省','杭州':'浙江省','合肥':'安徽省','徐州':'江苏省','彭城':'江苏省','天津':'天津市','广州':'广东省','深圳':'广东省','成都':'四川省','武汉':'湖北省','济南':'山东省','青岛':'山东省','长春':'吉林省','大连':'辽宁省','苏州':'江苏省','宁波':'浙江省'};
 const EN_CITY_CN={'beijing':'北京','shanghai':'上海','guangzhou':'广州','shenzhen':'深圳','chengdu':'成都','hangzhou':'杭州','wuhan':'武汉','nanjing':'南京','suzhou':'苏州',"xi'an":'西安','xian':'西安','jinan':'济南','qingdao':'青岛','tianjin':'天津','chongqing':'重庆','shenyang':'沈阳','changchun':'长春','hefei':'合肥','changsha':'长沙','kunming':'昆明','xiamen':'厦门','fuzhou':'福州','nanchang':'南昌','zhengzhou':'郑州','taiyuan':'太原','lanzhou':'兰州','wenzhou':'温州','ningbo':'宁波','wuxi':'无锡','dongguan':'东莞','foshan':'佛山','zhuhai':'珠海','guilin':'桂林','sanya':'三亚','haikou':'海口','nanning':'南宁','guiyang':'贵阳','liuzhou':'柳州','zunyi':'遵义','guigang':'贵港','liupanshui':'六盘水','mianyang':'绵阳','yibin':'宜宾','leshan':'乐山','neijiang':'内江','zigong':'自贡','luzhou':'泸州','dazhou':'达州','xuzhou':'徐州','changzhou':'常州','yancheng':'盐城','taizhou':'泰州','nantong':'南通','huaian':'淮安','suqian':'宿迁','lianyungang':'连云港','yangzhou':'扬州','zhenjiang':'镇江','jinhua':'金华','shaoxing':'绍兴','jiaxing':'嘉兴','huzhou':'湖州','quzhou':'衢州','zhoushan':'舟山','lishui':'丽水','yangjiang':'阳江','jiangmen':'江门','zhongshan':'中山','huizhou':'惠州','shantou':'汕头','jieyang':'揭阳','zhanjiang':'湛江','maoming':'茂名','zhaoqing':'肇庆','qingyuan':'清远','shaoguan':'韶关','meizhou':'梅州','shanwei':'汕尾','heyuan':'河源','yunfu':'云浮','chaozhou':'潮州','zhuzhou':'株洲','xiangtan':'湘潭','yueyang':'岳阳','changde':'常德','zhangjiajie':'张家界','yiyang':'益阳','chenzhou':'郴州','yongzhou':'永州','huaihua':'怀化','loudi':'娄底','hengyang':'衡阳','shaoyang':'邵阳','xuchang':'许昌','luoyang':'洛阳','kaifeng':'开封','nanyang':'南阳','xinyang':'信阳','zhoukou':'周口','luohe':'漯河','pingdingshan':'平顶山','xinxiang':'新乡','jiaozuo':'焦作','anyang':'安阳','hebi':'鹤壁','puyang':'濮阳','sanmenxia':'三门峡','shangqiu':'商丘','zhumadian':'驻马店','jincheng':'晋城','datong':'大同','yuncheng':'运城','linfen':'临汾','changzhi':'长治','yangquan':'阳泉','shuozhou':'朔州','xinzhou':'忻州','jinzhong':'晋中','lvliang':'吕梁','baoding':'保定','tangshan':'唐山','shijiazhuang':'石家庄','handan':'邯郸','xingtai':'邢台','langfang':'廊坊','cangzhou':'沧州','hengshui':'衡水','zhangjiakou':'张家口','chengde':'承德','qinhuangdao':'秦皇岛','haerbin':'哈尔滨','mudanjiang':'牡丹江','daqing':'大庆','qiqihar':'齐齐哈尔','jixi':'鸡西','hegang':'鹤岗','shuangyashan':'双鸭山','jiamusi':'佳木斯','qitaihe':'七台河','heihe':'黑河','suihua':'绥化','jilin':'吉林','siping':'四平','liaoyuan':'辽源','tonghua':'通化','baishan':'白山','songyuan':'松原','baicheng':'白城','yanbian':'延边','anshan':'鞍山','fushun':'抚顺','benxi':'本溪','dandong':'丹东','jinzhou':'锦州','yingkou':'营口','fuxin':'阜新','liaoyang':'辽阳','panjin':'盘锦','tieling':'铁岭','chaoyang':'朝阳','huludao':'葫芦岛','zibo':'淄博','zaozhuang':'枣庄','dongying':'东营','yantai':'烟台','weifang':'潍坊','jining':'济宁','taian':'泰安','weihai':'威海','rizhao':'日照','laiwu':'莱芜','linyi':'临沂','dezhou':'德州','liaocheng':'聊城','binzhou':'滨州','heze':'菏泽','qujing':'曲靖','yuxi':'玉溪','baoshan':'保山','zhaotong':'昭通','lijiang':'丽江','puer':'普洱','lincang':'临沧','chuxiong':'楚雄','honghe':'红河','wenshan':'文山','xishuangbanna':'西双版纳','dali':'大理','dehong':'德宏','nujiang':'怒江','diqing':'迪庆','zhangye':'张掖','jiuquan':'酒泉','wuwei':'武威','jinchang':'金昌','baiyin':'白银','tianshui':'天水','pingliang':'平凉','qingyang':'庆阳','dingxi':'定西','longnan':'陇南','linxia':'临夏','xining':'西宁','haidong':'海东','yinchuan':'银川','shizuishan':'石嘴山','wuzhong':'吴忠','guyuan':'固原','zhongwei':'中卫','urumqi':'乌鲁木齐','karamay':'克拉玛依','turpan':'吐鲁番','hami':'哈密','changji':'昌吉','korla':'库尔勒','akesu':'阿克苏','kashi':'喀什','hotan':'和田','yili':'伊犁','tacheng':'塔城','altay':'阿勒泰','shihezi':'石河子','hohhot':'呼和浩特','baotou':'包头','wuhai':'乌海','chifeng':'赤峰','tongliao':'通辽','ordos':'鄂尔多斯','hulunbuir':'呼伦贝尔','bayannur':'巴彦淖尔','wulanchabu':'乌兰察布','xingan':'兴安','xilingol':'锡林郭勒','alxa':'阿拉善','lhasa':'拉萨','shigatse':'日喀则','shannan':'山南','nagqu':'那曲','ngari':'阿里','nyingchi':'林芝','chamdo':'昌都','taipei':'台北','kaohsiung':'高雄','taichung':'台中','tainan':'台南','hsinchu':'新竹','keelung':'基隆','hualien':'花莲','taoyuan':'桃园','chiayi':'嘉义','taitung':'台东','penghu':'澎湖','hong kong':'香港','hongkong':'香港','macao':'澳门','macau':'澳门','new taipei':'新北','gaoxiong':'高雄'};
@@ -977,7 +1282,10 @@ const YEAR_COLOR_KEY='cubeLedger_yearRowColors_v1';
 const YEAR_PALETTE=['#f2f7ff','#f2fbf5','#fff7ed','#fdf2f8','#f5f3ff','#fefce8','#ecfeff','#f8fafc','#fff1f2','#f0fdf4'];
 function readYearColors(){try{return JSON.parse(localStorage.getItem(YEAR_COLOR_KEY)||'{}')||{}}catch(e){return {}}}
 function allRecordYears(){return [...new Set([...(db.cubes||[]),...(db.competitions||[])].map(x=>String(x.date||'').slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort((a,b)=>b.localeCompare(a))}
-function yearRowColor(kind,date){const y=String(date||'').slice(0,4);if(!/^\d{4}$/.test(y))return '#ffffff';const all=readYearColors();if(all['year:'+y])return all['year:'+y];if(all[kind+':'+y])return all[kind+':'+y];const years=allRecordYears().sort();const idx=Math.max(0,years.indexOf(y));return YEAR_PALETTE[idx%YEAR_PALETTE.length]}
+function isDarkUI(){return document.documentElement.getAttribute('data-theme')==='dark'}
+/* 年份底色在深色主题下压成一层薄高光：浅色原值直接铺上来会糊成一块白 */
+function tintRow(c){if(!isDarkUI())return c;const h=String(c||'').replace('#','');if(h.length!==6)return 'transparent';const n=parseInt(h,16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+',0.16)'}
+function yearRowColor(kind,date){const y=String(date||'').slice(0,4);if(!/^\d{4}$/.test(y))return '#ffffff';const all=readYearColors();if(all['year:'+y])return tintRow(all['year:'+y]);if(all[kind+':'+y])return tintRow(all[kind+':'+y]);const years=allRecordYears().sort();const idx=Math.max(0,years.indexOf(y));return tintRow(YEAR_PALETTE[idx%YEAR_PALETTE.length])}
 function renderYearColorControls(){const host=document.getElementById('sharedYearColors');if(!host)return;const years=allRecordYears(),saved=readYearColors();host.innerHTML=years.length?years.map(y=>{const value=saved['year:'+y]||saved['cube:'+y]||saved['comp:'+y]||yearRowColor('cube',y+'-01-01');return `<div class="year-color-item"><span><i style="background:${value}"></i>${y} 年</span><button type="button" class="year-color-swatch" style="background:${value}" aria-label="编辑 ${y} 年颜色" onclick="openYearColorEditor('${y}','${value}')"></button></div>`}).join(''):'<div class="muted">暂无带日期的记录</div>'}
 let pendingYearColor={year:'',original:'#ffffff',value:'#ffffff'};function openYearColorEditor(year,color){pendingYearColor={year,original:color,value:color};const back=document.getElementById('yearColorEditor');if(!back)return;document.getElementById('yearColorTitle').textContent=year+' 年颜色设置';document.getElementById('yearColorPicker').value=color;document.getElementById('yearColorHex').value=color.toUpperCase();document.getElementById('yearColorHex').setCustomValidity('');back.classList.add('open')}function closeYearColorEditor(){const back=document.getElementById('yearColorEditor');if(back)back.classList.remove('open')}function syncYearHexFromPicker(value){pendingYearColor.value=value;document.getElementById('yearColorHex').value=value.toUpperCase();document.getElementById('yearColorHex').setCustomValidity('')}function syncYearPickerFromHex(){const input=document.getElementById('yearColorHex'),v=input.value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v)){pendingYearColor.value=v;document.getElementById('yearColorPicker').value=v;input.setCustomValidity('')}else input.setCustomValidity('请输入 #RRGGBB 格式的十六进制颜色')}function confirmYearColor(){const input=document.getElementById('yearColorHex');syncYearPickerFromHex();if(!/^#[0-9a-fA-F]{6}$/.test(input.value.trim())){input.reportValidity();return}setYearRowColor(pendingYearColor.year,input.value.trim());closeYearColorEditor()}function setYearRowColor(year,color){const all=readYearColors();all['year:'+year]=color;delete all['cube:'+year];delete all['comp:'+year];localStorage.setItem(YEAR_COLOR_KEY,JSON.stringify(all));renderCubes();renderComps();renderYearColorControls()}
 function renderComps(){if(!document.getElementById('compRows'))return;let arr=getComps(),pages=Math.max(1,Math.ceil(arr.length/PAGE_SIZE));compPage=Math.min(compPage,pages-1);let page=arr.slice(compPage*PAGE_SIZE,(compPage+1)*PAGE_SIZE);document.getElementById('compRows').innerHTML=page.map((x,i)=>{const isWca=!!x.wca;const link=compUrl(x);const shownEvents=(x.events||[]).slice(0,9);return `<tr style="background-color:${yearRowColor('comp',x.date)}"><td class="comp-index">${compPage*PAGE_SIZE+i+1}</td><td>${dateText(x.date)}</td><td>${isWca?wcaIcon():'—'}</td><td class="comp-name-cell"><a class="comp-link" href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="${esc(x.name)}">${esc(x.name)}</a></td><td class="money">${money(x.price)}</td><td><div class="events">${shownEvents.map(e=>`<span class="event ${eventStatusClass(x,e)}" title="单击切换参加状态：${x.eventStatuses?.[e]==='missed'?'未参加':'已参加'}" onclick="toggleCompEventStatus('${x.id}','${esc(e)}')">${eventIcon(e)} <span>${esc(e)}</span></span>`).join('')||'—'}</div></td><td><div class="rowactions"><button type="button" class="cube-tag cube-edit-tag" onclick="openComp('${x.id}')">✎ 编辑</button></div></td></tr>`}).join('')||'<tr><td colspan="7" class="empty">没有符合条件的比赛</td></tr>';document.getElementById('compPageInfo').textContent=`共 ${arr.length} 场 · 第 ${compPage+1}/${pages} 页 · 每页 10 场`;const cps=document.getElementById('compPageSelect');if(cps){cps.innerHTML=Array.from({length:pages},(_,i)=>`<option value="${i}" ${i===compPage?'selected':''}>${i+1}</option>`).join('');cps.disabled=pages<=1}document.getElementById('compCount').textContent=arr.length;document.getElementById('compSum').textContent=money(sum(arr,'price'));renderCompSelectedFilters();renderCompCharts(arr)}
@@ -991,9 +1299,9 @@ function renderOverview(){
 if(!document.getElementById('statCubes'))return;
 document.getElementById('statCubes').textContent=db.cubes.length;document.getElementById('statSpend').textContent=money(sum(db.cubes,'price'));document.getElementById('statComps').textContent=db.competitions.length;document.getElementById('statCompSpend').textContent=money(sum(db.competitions,'price'));
 const overviewStats=document.querySelectorAll('.overview-stats .stat');overviewStats.forEach((card,i)=>{card.onclick=()=>switchTab(i<2?'cubes':'competitions');card.setAttribute('role','button');card.setAttribute('tabindex','0');card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.click()}}});
-let ys={};db.cubes.forEach(x=>{if(x.date){let y=String(x.date).slice(0,4);if(/^\d{4}$/.test(y))ys[y]=(ys[y]||0)+(Number(x.price)||0)}});let years=Object.keys(ys).sort();const yearEl=document.getElementById('yearChart');if(window.echarts&&years.length){yearEl.style.display='block';yearEl.style.height='190px';const chart=echarts.getInstanceByDom(yearEl)||echarts.init(yearEl);chart.setOption({animationDuration:650,animationEasing:'cubicOut',grid:{left:42,right:14,top:20,bottom:24},tooltip:{trigger:'axis',formatter:p=>`${p[0].axisValue}<br>购买支出：${money(p[0].value)}<br><span style="color:#7d8aa2">点击查看该年记录</span>`},xAxis:{type:'category',data:years,axisTick:{show:false},axisLine:{lineStyle:{color:'#d7deeb'}},axisLabel:{color:'#7e8ba1',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#8b96a8',fontSize:10,formatter:v=>v>=1000?'¥'+(v/1000)+'k':'¥'+v},splitLine:{lineStyle:{color:'rgba(130,145,170,.14)'}}},series:[{type:'line',smooth:true,symbol:'circle',symbolSize:8,data:years.map(y=>Math.round(ys[y]*100)/100),lineStyle:{width:3,color:'#526cf2'},itemStyle:{color:'#526cf2',borderColor:'#fff',borderWidth:2},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(82,108,242,.34)'},{offset:1,color:'rgba(82,108,242,.02)'}])},label:{show:false},emphasis:{focus:'series'}}]},true);chart.off('click');chart.on('click',p=>jumpToCubeYear(String(p.name)))}else{yearEl.innerHTML=years.length?years.map(y=>`<button class="mini-year-bar" onclick="jumpToCubeYear('${y}')"><span>${money(ys[y])}</span><i style="height:${Math.max(4,ys[y]/Math.max(1,...Object.values(ys))*100)}%"></i><b>${y}</b></button>`).join(''):'<div class="empty">暂无带日期的购买记录</div>'}
-let types={};db.cubes.forEach(x=>{let k=x.type||'未分类';types[k]=(types[k]||0)+(Number(x.price)||0)});const t=Object.entries(types).sort((a,b)=>b[1]-a[1]).slice(0,8),maxType=Math.max(1,...t.map(x=>x[1]));const typeEl=document.getElementById('typeBreakdown');if(window.echarts&&t.length){typeEl.style.display='block';typeEl.style.height='232px';const tc=echarts.getInstanceByDom(typeEl)||echarts.init(typeEl);tc.setOption({animationDuration:750,animationEasing:'cubicOut',color:['#526cf2','#7c93ff','#69d4bd','#f0b45c','#ef7d9a','#9b8cf0','#5bb8e8','#c9a0ff'],tooltip:{trigger:'item',formatter:p=>`${p.name}<br>${money(p.value)} · ${p.percent}%`},legend:{type:'plain',orient:'horizontal',bottom:2,left:'center',itemWidth:12,itemHeight:12,itemGap:14,padding:[2,6],textStyle:{fontSize:12,fontWeight:600,color:'#526184'}},series:[{type:'pie',radius:['42%','66%'],center:['50%','42%'],avoidLabelOverlap:true,itemStyle:{borderColor:'#fff',borderWidth:2,borderRadius:4},label:{show:false},labelLine:{show:false},emphasis:{scale:true,scaleSize:7,label:{show:true,fontSize:12,fontWeight:'bold',color:'#33415c',formatter:'{b}\n{d}%'}},data:t.map(([k,v])=>({name:k,value:Math.round(v*100)/100}))}]},true);tc.off('click');tc.on('click',p=>jumpToCubeType(String(p.name)))}else{typeEl.style.display='grid';typeEl.style.height='auto';typeEl.innerHTML=t.length?t.map(([k,v])=>`<button class="type-spend-row" onclick="jumpToCubeType('${esc(k).replace(/'/g,"\\'")}')" title="点击筛选 ${esc(k)}"><span class="type-spend-name">${esc(typeGlyph(k))} ${esc(k)}</span><span class="type-spend-track"><i style="width:${v/maxType*100}%"></i></span><strong>${money(v)}</strong><small>${sum(db.cubes.filter(x=>(x.type||'未分类')===k),'price')?Math.round(v/Math.max(1,sum(db.cubes,'price'))*100):0}%</small></button>`).join(''):'<div class="empty">暂无支出数据</div>';}
-let compYears={};db.competitions.forEach(x=>{if(x.date){const y=String(x.date).slice(0,4);if(/^\d{4}$/.test(y))compYears[y]=(compYears[y]||0)+1}});const cy=Object.keys(compYears).sort();const cel=document.getElementById('compYearChart');if(cel){if(window.echarts&&cy.length){const cc=echarts.getInstanceByDom(cel)||echarts.init(cel);cc.setOption({animationDuration:700,animationEasing:'cubicOut',grid:{left:34,right:12,top:16,bottom:22},tooltip:{trigger:'axis',formatter:p=>`${p[0].axisValue}<br>比赛场次：${p[0].value} 场<br><span style="color:#7d8aa2">点击查看该年比赛</span>`},xAxis:{type:'category',data:cy,axisTick:{show:false},axisLine:{lineStyle:{color:'#d7deeb'}},axisLabel:{color:'#7e8ba1',fontSize:11}},yAxis:{type:'value',minInterval:1,axisLabel:{color:'#8b96a8',fontSize:10},splitLine:{lineStyle:{color:'rgba(130,145,170,.14)'}}},series:[{type:'bar',data:cy.map(y=>({value:compYears[y],itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#69d4bd'},{offset:1,color:'#1b9f8e'}]),borderRadius:[6,6,1,1]}})),barMaxWidth:36,label:{show:true,position:'top',fontSize:10,color:'#526273'}}]},true);cc.off('click');cc.on('click',p=>jumpToCompYear(String(p.name)))}else{cel.innerHTML=cy.length?cy.map(y=>`<button class="mini-year-bar green" onclick="jumpToCompYear('${y}')"><span>${compYears[y]} 场</span><i style="height:${Math.max(4,compYears[y]/Math.max(1,...Object.values(compYears))*100)}%"></i><b>${y}</b></button>`).join(''):'<div class="empty">暂无带日期的比赛记录</div>'}}
+let ys={};db.cubes.forEach(x=>{if(x.date){let y=String(x.date).slice(0,4);if(/^\d{4}$/.test(y))ys[y]=(ys[y]||0)+(Number(x.price)||0)}});let years=Object.keys(ys).sort();const yearEl=document.getElementById('yearChart');if(window.echarts&&years.length){yearEl.style.display='block';yearEl.style.height='190px';const chart=echarts.getInstanceByDom(yearEl)||echarts.init(yearEl);chart.setOption(ctOpt({animationDuration:650,animationEasing:'cubicOut',grid:{left:42,right:14,top:20,bottom:24},tooltip:{trigger:'axis',formatter:p=>`${p[0].axisValue}<br>购买支出：${money(p[0].value)}<br><span style="color:#7d8aa2">点击查看该年记录</span>`},xAxis:{type:'category',data:years,axisTick:{show:false},axisLine:{lineStyle:{color:CT().line}},axisLabel:{color:CT().muted,fontSize:11}},yAxis:{type:'value',axisLabel:{color:CT().muted,fontSize:10,formatter:v=>v>=1000?'¥'+(v/1000)+'k':'¥'+v},splitLine:{lineStyle:{color:CT().split}}},series:[{type:'line',smooth:true,symbol:'circle',symbolSize:8,data:years.map(y=>Math.round(ys[y]*100)/100),lineStyle:{width:3,color:'#526cf2'},itemStyle:{color:'#526cf2',borderColor:CT().card,borderWidth:2},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(82,108,242,.34)'},{offset:1,color:'rgba(82,108,242,.02)'}])},label:{show:false},emphasis:{focus:'series'}}]}),true);chart.off('click');chart.on('click',p=>jumpToCubeYear(String(p.name)))}else{yearEl.innerHTML=years.length?years.map(y=>`<button class="mini-year-bar" onclick="jumpToCubeYear('${y}')"><span>${money(ys[y])}</span><i style="height:${Math.max(4,ys[y]/Math.max(1,...Object.values(ys))*100)}%"></i><b>${y}</b></button>`).join(''):'<div class="empty">暂无带日期的购买记录</div>'}
+let types={};db.cubes.forEach(x=>{let k=x.type||'未分类';types[k]=(types[k]||0)+(Number(x.price)||0)});const t=Object.entries(types).sort((a,b)=>b[1]-a[1]).slice(0,8),maxType=Math.max(1,...t.map(x=>x[1]));const typeEl=document.getElementById('typeBreakdown');if(window.echarts&&t.length){typeEl.style.display='block';typeEl.style.height='232px';const tc=echarts.getInstanceByDom(typeEl)||echarts.init(typeEl);tc.setOption(ctOpt({animationDuration:750,animationEasing:'cubicOut',color:['#526cf2','#7c93ff','#69d4bd','#f0b45c','#ef7d9a','#9b8cf0','#5bb8e8','#c9a0ff'],tooltip:{trigger:'item',formatter:p=>`${p.name}<br>${money(p.value)} · ${p.percent}%`},legend:{type:'plain',orient:'horizontal',bottom:2,left:'center',itemWidth:12,itemHeight:12,itemGap:14,padding:[2,6],textStyle:{fontSize:12,fontWeight:600,color:CT().legend}},series:[{type:'pie',radius:['42%','66%'],center:['50%','42%'],avoidLabelOverlap:true,itemStyle:{borderColor:CT().card,borderWidth:2,borderRadius:4},label:{show:false},labelLine:{show:false},emphasis:{scale:true,scaleSize:7,label:{show:true,fontSize:12,fontWeight:'bold',color:CT().ink,formatter:'{b}\n{d}%'}},data:t.map(([k,v])=>({name:k,value:Math.round(v*100)/100}))}]}),true);tc.off('click');tc.on('click',p=>jumpToCubeType(String(p.name)))}else{typeEl.style.display='grid';typeEl.style.height='auto';typeEl.innerHTML=t.length?t.map(([k,v])=>`<button class="type-spend-row" onclick="jumpToCubeType('${esc(k).replace(/'/g,"\\'")}')" title="点击筛选 ${esc(k)}"><span class="type-spend-name"><span class="ts-ico">${eventIcon(typeLabel(k))}</span>${esc(k)}</span><span class="type-spend-track"><i style="width:${v/maxType*100}%"></i></span><strong>${money(v)}</strong><small>${sum(db.cubes.filter(x=>(x.type||'未分类')===k),'price')?Math.round(v/Math.max(1,sum(db.cubes,'price'))*100):0}%</small></button>`).join(''):'<div class="empty">暂无支出数据</div>';}
+let compYears={};db.competitions.forEach(x=>{if(x.date){const y=String(x.date).slice(0,4);if(/^\d{4}$/.test(y))compYears[y]=(compYears[y]||0)+1}});const cy=Object.keys(compYears).sort();const cel=document.getElementById('compYearChart');if(cel){if(window.echarts&&cy.length){const cc=echarts.getInstanceByDom(cel)||echarts.init(cel);cc.setOption(ctOpt({animationDuration:700,animationEasing:'cubicOut',grid:{left:34,right:12,top:16,bottom:22},tooltip:{trigger:'axis',formatter:p=>`${p[0].axisValue}<br>比赛场次：${p[0].value} 场<br><span style="color:#7d8aa2">点击查看该年比赛</span>`},xAxis:{type:'category',data:cy,axisTick:{show:false},axisLine:{lineStyle:{color:CT().line}},axisLabel:{color:CT().muted,fontSize:11}},yAxis:{type:'value',minInterval:1,axisLabel:{color:CT().muted,fontSize:10},splitLine:{lineStyle:{color:CT().split}}},series:[{type:'bar',data:cy.map(y=>({value:compYears[y],itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#69d4bd'},{offset:1,color:'#1b9f8e'}]),borderRadius:[6,6,1,1]}})),barMaxWidth:36,label:{show:true,position:'top',fontSize:10,color:CT().muted}}]}),true);cc.off('click');cc.on('click',p=>jumpToCompYear(String(p.name)))}else{cel.innerHTML=cy.length?cy.map(y=>`<button class="mini-year-bar green" onclick="jumpToCompYear('${y}')"><span>${compYears[y]} 场</span><i style="height:${Math.max(4,compYears[y]/Math.max(1,...Object.values(compYears))*100)}%"></i><b>${y}</b></button>`).join(''):'<div class="empty">暂无带日期的比赛记录</div>'}}
 }
 function jumpToCubeYear(year){switchTab('cubes');const el=document.getElementById('cubeYearFilter');if(el){el.value=year;cubePage=0;renderCubes()}}
 function jumpToCubeType(type){selectedCubeTypes=[type];selectedCubeBrands=[];const b=document.getElementById('cubeBrandFilter');if(b)b.value='';switchTab('cubes');const y=document.getElementById('cubeYearFilter');if(y)y.value='';const t=document.getElementById('cubeTypeFilter');if(t)t.value=type;cubePage=0;renderCubes()}
@@ -1022,10 +1330,10 @@ function renderLubeMap(arr,sortMode){
   const groups={};
   arr.forEach(x=>{const g=x.oilType||'参考';if(!groups[g])groups[g]=[];groups[g].push(x)});
   const palette=['#526bf0','#28a879','#f59e0b','#ed626b','#8b5cf6','#4f83e8','#0fb5c9','#e07b39','#94a3b8'];
-  const series=Object.keys(groups).map((g,gi)=>({name:g,type:'scatter',symbolSize:d=>14+(Number(d[2])||0)*4,itemStyle:{color:palette[gi%palette.length],opacity:.88,borderColor:'#fff',borderWidth:1.2},data:groups[g].map(x=>({value:[Number(x.tack)||0,Number(x.slip)||0,Number(x.lasting)||0],spec:x.spec,oilType:x.oilType,raw:{tack:x.tack,slip:x.slip,lasting:x.lasting}}))}));
-  const opt={color:palette,grid:{left:50,right:18,top:16,bottom:46},tooltip:{trigger:'item',formatter:p=>`<b>${esc(p.data.spec)}</b><br>油种：${esc(p.data.oilType||'—')}<br>增粘 ${lubeFmt(p.data.raw.tack)} · 润滑 ${lubeFmt(p.data.raw.slip)} · 持久 ${lubeFmt(p.data.raw.lasting)}`},legend:{type:'scroll',bottom:2,textStyle:{color:'#5b6b85',fontSize:11}},xAxis:{name:'增粘性 →',nameLocation:'middle',nameGap:26,min:-1.5,max:6,splitLine:{lineStyle:{color:'#eef2f8'}},axisLine:{lineStyle:{color:'#cdd6e6'}},axisLabel:{color:'#7a8aa3'}},yAxis:{name:'润滑性',min:0,max:7,splitLine:{lineStyle:{color:'#eef2f8'}},axisLine:{lineStyle:{color:'#cdd6e6'}},axisLabel:{color:'#7a8aa3'}},series:series};
+  const series=Object.keys(groups).map((g,gi)=>({name:g,type:'scatter',symbolSize:d=>14+(Number(d[2])||0)*4,itemStyle:{color:palette[gi%palette.length],opacity:.88,borderColor:CT().card,borderWidth:1.2},data:groups[g].map(x=>({value:[Number(x.tack)||0,Number(x.slip)||0,Number(x.lasting)||0],spec:x.spec,oilType:x.oilType,raw:{tack:x.tack,slip:x.slip,lasting:x.lasting}}))}));
+  const opt={color:palette,grid:{left:50,right:18,top:16,bottom:46},tooltip:{trigger:'item',formatter:p=>`<b>${esc(p.data.spec)}</b><br>油种：${esc(p.data.oilType||'—')}<br>增粘 ${lubeFmt(p.data.raw.tack)} · 润滑 ${lubeFmt(p.data.raw.slip)} · 持久 ${lubeFmt(p.data.raw.lasting)}`},legend:{type:'scroll',bottom:2,textStyle:{color:CT().muted,fontSize:11}},xAxis:{name:'增粘性 →',nameLocation:'middle',nameGap:26,min:-1.5,max:6,splitLine:{lineStyle:{color:CT().split}},axisLine:{lineStyle:{color:CT().line}},axisLabel:{color:CT().muted}},yAxis:{name:'润滑性',min:0,max:7,splitLine:{lineStyle:{color:CT().split}},axisLine:{lineStyle:{color:CT().line}},axisLabel:{color:CT().muted}},series:series};
   if(!lubeMapChart){lubeMapChart=echarts.init(el);if(!window._lubeCharts)window._lubeCharts=[];if(!window._lubeCharts.includes(lubeMapChart))window._lubeCharts.push(lubeMapChart);lubeMapChart.on('click',p=>{if(p.data&&p.data.spec)focusLubeCard(p.data.spec)})}
-  lubeMapChart.setOption(opt,true);
+  lubeMapChart.setOption(ctOpt(opt),true);
   setTimeout(()=>{if(lubeMapChart)lubeMapChart.resize()},60);
 }
 function renderLubricants(){const searchEl=document.getElementById('lubeSearch'),filterEl=document.getElementById('lubeOilFilter');const q=(searchEl?.value||'').toLowerCase().trim();const kinds=[...new Set(db.lubricants.map(x=>x.oilType||'未分类').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-CN'));if(filterEl){const old=filterEl.value;filterEl.innerHTML='<option value="">全部油种</option>'+kinds.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('');filterEl.value=kinds.includes(old)?old:''}const category=filterEl?.value||'';let arr=db.lubricants.filter(x=>(!q||JSON.stringify(x).toLowerCase().includes(q))&&(!category||(x.oilType||'未分类')===category));const sortMode=document.getElementById('lubeSort')?.value||'slip';const metric=x=>sortMode==='tack'?(Number(x.tack)||0):sortMode==='lasting'?(Number(x.lasting)||0):sortMode==='balanced'?((Number(x.slip)||0)+(Number(x.tack)||0)+(Number(x.lasting)||0)):(Number(x.slip)||0);arr.sort((a,b)=>metric(b)-metric(a));const full=db.lubricants.filter(x=>[x.slip,x.tack,x.lasting].filter(v=>v!==null&&v!==undefined&&v!=='').length===3).length;document.getElementById('lubeResultCount').textContent=arr.length;document.getElementById('lubeCategoryCount').textContent=kinds.length;document.getElementById('lubeScoreCoverage').textContent=db.lubricants.length?Math.round(full/db.lubricants.length*100)+'%':'—';document.getElementById('lubeVisibleCount').textContent=arr.length+' 项';const active=[];if(q)active.push('搜索：'+q);if(category)active.push('类别：'+category);document.getElementById('lubeActiveFilters').innerHTML=active.length?active.map(x=>`<span class="selected-filter">${esc(x)}</span>`).join(''):'<span class="muted small-note">当前显示全部类别</span>';renderLubRanking(arr,sortMode);renderLubeMap(arr,sortMode);document.getElementById('lubeGrid').innerHTML=arr.map((x,i)=>`<article class="lubcard" style="--card-order:${i}"><div class="lubtop"><div class="swatch" style="background:${colors[x.color]||'#e6eaf2'}"></div><div class="lube-title-wrap"><div class="lubtitle">${esc(x.spec)} <span class="lube-color-label">${esc(x.color||'未标色')}</span></div><div class="lubsubtitle">${esc(x.feature||'')} ${x.oilType?'· '+esc(x.oilType):''}</div></div><button class="lube-copy-btn" title="复制型号" onclick="copyLubeSpec('${esc(x.spec).replace(/'/g,"\\'")}')">⧉</button></div><div class="lube-compare" aria-label="润滑油属性对比">${lubeMetrics(x)}</div><div class="lubtext"><b>手感</b><span>${esc(x.feel||'原表未填写')}</span></div><div class="lubtext"><b>适用</b><span>${esc(x.use||'原表未填写')}</span></div></article>`).join('')||'<div class="empty">没有匹配的润滑油，请调整搜索词或类别筛选。</div>';}
