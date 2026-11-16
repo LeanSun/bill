@@ -204,6 +204,18 @@
             <div class="chart chart-lg" id="chartTop" data-page-node-id="u7mkeTEDOkx5oLJHoQCa6N"></div>
           </article>
 
+          <article class="card chart-card span-2 cube-overview-card" style="--i:7" data-oid="cube">
+            <div class="card-head">
+              <div><h3>魔方总览</h3><p>独立账本 · 不参与收支统计</p></div>
+              <button type="button" class="btn btn-ghost cube-goto" id="cubeGotoBtn">查看魔方 ↗</button>
+            </div>
+            <div class="cube-kpis" id="cubeKpis"></div>
+            <div class="cube-ov-charts">
+              <div class="cube-ov-cell"><h4>年度购买趋势</h4><div class="cube-ov-chart" id="cubeYearChart"></div></div>
+              <div class="cube-ov-cell"><h4>类型支出排行</h4><div class="cube-ov-chart" id="cubeTypeChart"></div></div>
+            </div>
+          </article>
+
           <article class="card chart-card span-2 pay-card" style="--i:7" data-oid="salary">
             <div class="card-head">
               <div><h3>社保</h3><p id="paySub">基数、比例、工资都能改，改完立刻重算</p></div>
@@ -314,6 +326,25 @@
             <button type="button" class="ct-ico ct-filter-toggle" id="ctFilterToggle" aria-label="展开筛选" aria-expanded="false" aria-controls="ctFilters" title="筛选">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
             </button>
+          </div>
+          <div class="ct-filters" id="ctFilters" data-page-node-id="n0dqWsEQbE6fwMrurJ0zrL">
+            <div class="seg cat-seg" id="catRow" role="group" aria-label="分类筛选" data-page-node-id="fRmios4gFc91OSU5DsZDDz"><span class="seg-ind" aria-hidden="true" data-page-node-id="YKmcJsbyKlKcG39fpAdJRF"></span></div>
+            <div class="fx-cell fx-main" data-page-node-id="9UVcjnRj9IazMpWjo8nGM4">
+              <div class="seg fx-seg" id="amountSeg" role="group" aria-label="金额筛选" data-page-node-id="9SGTbiPf4lgRjsHd0ASaar"><span class="seg-ind" aria-hidden="true" data-page-node-id="aEEGYDTWFcbuoHAZXxE04I"></span>
+                <button type="button" data-amount="all" class="is-active" data-page-node-id="tQfRdXt20ntxRz6d2pTyCA">金额</button>
+                <button type="button" data-amount="small" title="单笔 ≤ 20 元" data-page-node-id="nadj4HjKShVj7HIqsi1w0O">≤20</button>
+                <button type="button" data-amount="mid" title="单笔 20 — 100 元" data-page-node-id="xPIfCRTrOZr5vNZQHt9KIs">20~100</button>
+                <button type="button" data-amount="large" title="单笔 ≥ 100 元" data-page-node-id="4XChSgsbvBsvqZTVwOnfy6">≥100</button>
+              </div>
+              <div class="seg fx-seg" id="weekdaySeg" role="group" aria-label="星期筛选" data-page-node-id="n3zMhS6U6ZNWwgMFPN9JM6"><span class="seg-ind" aria-hidden="true" data-page-node-id="d6lEHJ1LGfvkkx15Cf0tec"></span>
+                <button type="button" data-weekday="all" class="is-active" data-page-node-id="nEyIsnwJx87AROYCq1AN0E">星期</button>
+                <button type="button" data-weekday="workday" data-page-node-id="OAMq97oLCZVHA2L3A31ajO">工作日</button>
+                <button type="button" data-weekday="weekend" data-page-node-id="mz2JAUOT7EteNIvoiWukSO">周末</button>
+              </div>
+            </div>
+            <div class="fx-cell fx-sub-slot" data-page-node-id="5OO2ujQ5yZ3QsvIHJKiXx1">
+              <div class="seg sub-seg" id="subRow" role="group" aria-label="子类筛选" hidden data-page-node-id="HuS3BNPVzGP9rBV9x2Um8A"><span class="seg-ind" aria-hidden="true" data-page-node-id="3X0xGJZ0sDfiCI2KUHpcro"></span></div>
+            </div>
           </div>
         </div>
 

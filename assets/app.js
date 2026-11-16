@@ -1510,7 +1510,78 @@
     });
   }
 
+  /* 总览里的魔方卡：只读 cubeLedger_v1，跟账本 store 一丁点都不交叉 */
+  function cubeData() {
+    try {
+      var raw = localStorage.getItem('cubeLedger_v1');
+      var d = raw ? JSON.parse(raw) : null;
+      return (d && Array.isArray(d.cubes) && Array.isArray(d.competitions)) ? d : null;
+    } catch (e) { return null; }
+  }
+  function cubeMoney(n) {
+    return '¥' + (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function renderCubeOverview() {
+    var box = $('cubeKpis');
+    if (!box) return;
+    var d = cubeData(), cubes = d ? d.cubes : [], comps = d ? d.competitions : [];
+    var spend = 0, compSpend = 0;
+    cubes.forEach(function (x) { spend += Number(x.price) || 0; });
+    comps.forEach(function (x) { compSpend += Number(x.price) || 0; });
+    box.innerHTML = [
+      ['收藏 / 购买记录', String(cubes.length)],
+      ['魔方相关总支出', cubeMoney(spend)],
+      ['参赛次数', String(comps.length)],
+      ['比赛报名费', cubeMoney(compSpend)]
+    ].map(function (it) {
+      return '<div class="cube-kpi"><span>' + esc(it[0]) + '</span><b>' + esc(it[1]) + '</b></div>';
+    }).join('');
+    if (!hasEcharts) return;
+    var p = palette(), years = {}, types = {};
+    cubes.forEach(function (x) {
+      var y = String(x.date || '').slice(0, 4);
+      if (/^\d{4}$/.test(y)) years[y] = (years[y] || 0) + (Number(x.price) || 0);
+      var t = String(x.type || '').trim() || '未分类';
+      types[t] = (types[t] || 0) + (Number(x.price) || 0);
+    });
+    var yk = Object.keys(years).sort();
+    var el = $('cubeYearChart');
+    var chart = el ? (echarts.getInstanceByDom(el) || echarts.init(el)) : null;
+    if (chart) {
+      chart.setOption({
+        animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+        grid: { left: 42, right: 12, top: 16, bottom: 22 },
+        tooltip: { trigger: 'axis', formatter: function (a) { return a[0].axisValue + '<br>购买支出：' + cubeMoney(a[0].value); } },
+        xAxis: { type: 'category', data: yk, axisTick: { show: false }, axisLine: { lineStyle: { color: p.border } }, axisLabel: { color: p.muted, fontSize: 10 } },
+        yAxis: { type: 'value', axisLabel: { color: p.muted, fontSize: 10, formatter: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; } }, splitLine: { lineStyle: { color: withAlpha(p.text, .08) } } },
+        series: [{ type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+          data: yk.map(function (y) { return round(years[y]); }),
+          lineStyle: { width: 2.5, color: p.primary }, itemStyle: { color: p.primary },
+          areaStyle: { color: gradH(withAlpha(p.primary, .26), withAlpha(p.primary, .02)) } }]
+      }, true);
+      chart.off('click');
+      chart.on('click', function () { setView('cube'); });
+    }
+    var rows = Object.keys(types).map(function (k) { return { name: k, value: round(types[k]) }; })
+      .sort(function (a, b) { return b.value - a.value; }).slice(0, 8);
+    var el2 = $('cubeTypeChart');
+    var chart2 = el2 ? (echarts.getInstanceByDom(el2) || echarts.init(el2)) : null;
+    if (chart2) {
+      var cs = [p.primary, p.violet, p.sky, p.amber, p.expense, p.income, p.catWear, p.catFun];
+      chart2.setOption({
+        animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+        tooltip: { trigger: 'item', formatter: function (a) { return a.name + '：' + cubeMoney(a.value) + ' (' + a.percent + '%)'; } },
+        legend: { bottom: 0, itemWidth: 9, itemHeight: 9, textStyle: { color: p.muted, fontSize: 10 } },
+        series: [{ type: 'pie', radius: ['46%', '68%'], center: ['50%', '44%'], avoidLabelOverlap: true,
+          itemStyle: { borderColor: p.surface, borderWidth: 2 },
+          label: { show: false }, labelLine: { show: false },
+          data: rows.map(function (r, i) { return { name: r.name, value: r.value, itemStyle: { color: cs[i % cs.length] } }; }) }]
+      }, true);
+    }
+  }
+
   function renderCharts(view, mode) {
+    if (view === 'overview') renderCubeOverview();
     if (!hasEcharts) return;
     var prevMode = RENDER_MODE;
     if (mode) RENDER_MODE = mode;
@@ -2572,6 +2643,12 @@
   function bindCubeFrame() {
     var b = $('cubeOpenBtn');
     if (b) b.addEventListener('click', function () { window.open('cube.html', '_blank', 'noopener'); });
+    var g = $('cubeGotoBtn');
+    if (g) g.addEventListener('click', function () { setView('cube'); });
+    /* 魔方子页在另一个 localStorage 键里写数据，storage 事件同步刷新总览卡 */
+    window.addEventListener('storage', function (e) {
+      if (e && e.key === 'cubeLedger_v1') renderCubeOverview();
+    });
   }
 
   function setView(view) {
@@ -4347,11 +4424,11 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 4,
-    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top', 'salary', 'reimb'],
+    v: 5,
+    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top', 'cube', 'salary', 'reimb'],
     spans: {
       kpi: [12, 3], calheat: [12, 7], trend: [5, 6], donut: [3, 6], balance: [4, 6],
-      weight: [5, 5], stack: [4, 5], top: [3, 5], salary: [6, 11], reimb: [6, 8]
+      weight: [5, 5], stack: [4, 5], top: [3, 5], cube: [12, 8], salary: [6, 11], reimb: [6, 8]
     }
   };
   var ovGrid = null, ovEditing = false;
@@ -4374,7 +4451,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 4 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 5 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -4390,7 +4467,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 4, order: [], spans: {} };
+    var L = { v: 5, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;

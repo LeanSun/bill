@@ -2140,3 +2140,27 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 @media (max-width: 760px) {
   .cube-frame { height: calc(100dvh - 78px); min-height: 460px; border-radius: 12px; }
 }
+
+/* ---------- 总览里的魔方卡：数据只读 cubeLedger_v1，不进账本 ---------- */
+.cube-overview-card .card-head { align-items: flex-start; }
+.cube-goto { padding: 6px 10px; font-size: 11.5px; white-space: nowrap; }
+.cube-kpis {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0 14px;
+}
+.cube-kpi {
+  min-width: 0; padding: 11px 12px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.cube-kpi span { display: block; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cube-kpi b {
+  display: block; margin-top: 5px; font-size: 20px; font-weight: 750; letter-spacing: -.03em;
+  color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cube-ov-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cube-ov-cell { min-width: 0; }
+.cube-ov-cell h4 { margin: 0 0 6px; font-size: 12px; font-weight: 650; color: var(--text-2); }
+.cube-ov-chart { width: 100%; height: 186px; }
+@media (max-width: 900px) {
+  .cube-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cube-ov-charts { grid-template-columns: minmax(0, 1fr); }
+}
