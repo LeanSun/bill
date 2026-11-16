@@ -2194,50 +2194,35 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
   .cube-stat-card .cs-num { font-size: 19px; }
 }
 
-/* 四格并成一条：一条横带分成四扇门，点哪格进哪格 */
-.cube-stat-strip {
-  display: flex; align-items: stretch;
-  padding: 0; overflow: hidden; min-height: 84px;
+/* 魔方速览：四条横排朗读，标签靠左、数字靠右。
+   原来四格横排平摊，每格只有 1/4 卡宽，¥6,073.29 这种金额直接被省略号吃掉，
+   现在每条独占整行，金额再长也放得下。 */
+.cube-stat-list {
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 8px 6px;
 }
-.cube-stat-strip .css-cell {
-  flex: 1 1 0;
-  display: flex; flex-direction: column; justify-content: center; gap: 3px;
-  padding: 14px 16px; min-width: 0; cursor: pointer;
+.cube-stat-list .csl-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline; gap: 6px;
+  padding: 8px 10px; border-radius: 10px; cursor: pointer;
   transition: background .2s var(--ease);
 }
-.cube-stat-strip .css-cell + .css-cell { border-left: 1px solid var(--border); }
-.cube-stat-strip .css-cell:hover { background: var(--surface-2); }
-.cube-stat-strip .css-cell:focus-visible {
+.cube-stat-list .csl-row + .csl-row { box-shadow: inset 0 1px 0 var(--border); }
+.cube-stat-list .csl-row:hover { background: var(--surface-2); }
+.cube-stat-list .csl-row:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
   outline-offset: -2px;
 }
-.cube-stat-strip .cs-lab {
-  font-size: 11px; color: var(--muted); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-  display: flex; align-items: center; gap: 5px;
-}
-.cube-stat-strip .cs-lab::before {
-  content: ""; width: 5px; height: 5px; border-radius: 50%; flex: 0 0 5px;
-  background: var(--primary); opacity: .55;
-}
-.cube-stat-strip .cs-num {
-  font-size: 21px; font-weight: 780; letter-spacing: -.035em; color: var(--text);
-  font-variant-numeric: tabular-nums; line-height: 1.15;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.cube-stat-strip .cs-hint {
-  font-size: 10px; color: var(--muted); white-space: nowrap;
+.cube-stat-list .csl-lab {
+  font-size: 11.5px; color: var(--muted); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
-@media (max-width: 900px) {
-  .cube-stat-strip { flex-wrap: wrap; }
-  .cube-stat-strip .css-cell { flex: 1 1 45%; }
-  .cube-stat-strip .css-cell:nth-child(3) {
-    border-left: 0; border-top: 1px solid var(--border);
-  }
-  .cube-stat-strip .css-cell:nth-child(4) { border-top: 1px solid var(--border); }
-  .cube-stat-strip .cs-num { font-size: 19px; }
+.cube-stat-list .csl-val {
+  font-size: 16.5px; font-weight: 780; letter-spacing: -.02em;
+  color: var(--text); font-variant-numeric: tabular-nums;
+  text-align: right; white-space: nowrap;
 }
+.cube-stat-list .csl-unit { font-size: 10.5px; color: var(--muted); }
 
 /* 子类筛选行：按钮收窄，右侧让位给当前区间的金额统计 */
 .fx-sub-slot .sub-seg { flex: 1 1 auto; min-width: 0; }

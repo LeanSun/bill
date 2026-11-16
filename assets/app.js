@@ -976,6 +976,7 @@
     Object.keys(charts).forEach(function (id) { if (charts[id]) charts[id].resize(); });
     fitDaySide();
   }
+  window.addEventListener('resize', debounce(resizeAll, 160));
   function bindClick(id, handler) {
     if (!hasEcharts) return;
     var c = charts[id];
@@ -1529,9 +1530,39 @@
   function cubeMoney(n) {
     return '¥' + (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+  /* 柱尾标签用的短金额：¥983 / ¥1.2k，省掉两位小数，
+     卡片被拉窄时标签才不会顶出图框 */
+  function cubeMoneyShort(n) {
+    var v = Number(n) || 0;
+    if (Math.abs(v) >= 1000) return '¥' + (Math.round(v / 100) / 10) + 'k';
+    return '¥' + Math.round(v);
+  }
+  /* 容器尺寸变了要重算画布：ECharts 只在 init 那一刻量一次容器，
+     卡片改宽窄（拖布局、换分栏）之后它还按老尺寸画，
+     轴标签和柱尾数字就跑到框外面去了。这里盯住容器，变一次 resize 一次。 */
+  var _chartRO = null;
+  function watchChartRO() {
+    if (typeof ResizeObserver === 'undefined' || !hasEcharts) return;
+    if (!_chartRO) {
+      _chartRO = new ResizeObserver(function (entries) {
+        entries.forEach(function (en) {
+          var inst = echarts.getInstanceByDom(en.target);
+          if (inst) inst.resize();
+        });
+      });
+    }
+    ['cubeYearChart', 'cubeTypeChart'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { try { _chartRO.observe(el); } catch (e) {} }
+    });
+  }
   function cubePaint(el, option) {
     if (!el || !hasEcharts) return null;
     var chart = echarts.getInstanceByDom(el) || echarts.init(el);
+    /* 必须登记进统一注册表：resizeAll 只认 charts 里的实例，
+       之前魔方这两张图没登记，卡片改宽窄后画布一直是旧尺寸，
+       图和标签就顶着框边跑出去了。 */
+    if (el.id) charts[el.id] = chart;
     chart.setOption(option, true);
     return chart;
   }
@@ -1592,7 +1623,7 @@
     var yk = Object.keys(years).sort();
     var yearChart = cubePaint($('cubeYearChart'), {
       animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
-      grid: { left: 46, right: 16, top: 18, bottom: 24 },
+      grid: { left: 6, right: 14, top: 18, bottom: 22, containLabel: true },
       tooltip: tooltipCommon(p, {
         trigger: 'axis',
         formatter: function (a) { return a[0].axisValue + '<br>购买支出：<b>' + cubeMoney(a[0].value) + '</b>'; }
@@ -1631,7 +1662,7 @@
       .sort(function (a, b) { return b.value - a.value; }).slice(0, 8).reverse();
     var typeChart = cubePaint($('cubeTypeChart'), {
       animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
-      grid: { left: 6, right: 78, top: 8, bottom: 6, containLabel: true },
+      grid: { left: 6, right: 96, top: 8, bottom: 6, containLabel: true },
       tooltip: tooltipCommon(p, {
         trigger: 'item',
         formatter: function (a) { return esc(a.name) + ' · <b>' + cubeMoney(a.value) + '</b>'; }
@@ -1655,7 +1686,7 @@
         }),
         label: {
           show: true, position: 'right', distance: 8,
-          formatter: function (a) { return cubeMoney(a.value); },
+          formatter: function (a) { return cubeMoneyShort(a.value); },
           color: p.text2, fontSize: 10.5, fontFamily: p.font
         },
         emphasis: { itemStyle: { shadowBlur: 12, shadowColor: withAlpha(p.primary, .28) } }
@@ -1665,6 +1696,8 @@
       typeChart.off('click');
       typeChart.on('click', function (a) { jumpCube({ tab: 'cubes', type: String(a.name) }); });
     }
+
+    watchChartRO();
   }
 
   function renderCharts(view, mode) {
