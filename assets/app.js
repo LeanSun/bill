@@ -3936,17 +3936,28 @@
   }
 
   /* ---------------- 翻页：连续滚动 ----------------
-     不再是淡入淡出。滚轮每一下都在推动棋盘本身：旧内容跟着指针走，
-     下一页从另一侧同步顶上来 —— 两页同屏滑动，走到 94% 才交割，
-     此时旧内容已经完全出框，换页那一帧看不出来换过。
-     实现上拍一张旧内容的快照（ghost）盖在原位，真节点腾出来装新页，
-     ghost 负责「滑出去」，真节点负责「滑进来」。箭头 / ← → 走同一套，
-     只是进度由 rAF 匀速推到 1。四档方向：月/年/日竖向，周横向。 */
-  var SOFT_SPAN = 200;          /* 累积 200px 滚轮量 = 翻一整页（两格滚轮） */
-  var SOFT_TRIG = .94;          /* 走到 94% 就交割，剩下 6% 由 110ms 补完 */
+     滚轮不再「一格跳半页」，也不是「每帧补剩余距离的一个比例」——
+     后者第一帧补得最多，一帧就是一百多像素，就是那种「一耸」的硬。
+     这里用临界阻尼弹簧：位置 p、速度 v，每帧按
+         a = ω²(goal − p) − 2ω·v
+     积分。速度是连续的，没有一帧会突然加速，起手是从静止柔起、
+     中段匀速带过、末尾自己收力停住 —— 三段的加速度都在变，位置不变。
+     滚轮只改目标（一格 ≈ 0.28 页），谁滚得快目标叠得远，画面跟着加速。
+     两页同屏：旧内容拍快照（ghost）滑出去，真节点装新页滑进来，
+     p 到 1 才交割 —— 那一帧新旧完全重合，看不见换页。
+     四档方向：月/年/日竖向，周横向。 */
+  var SOFT_SPAN = 300;          /* 滚轮量累计 300px = 一整页；一格 100px ≈ 1/3 页 */
+  var SOFT_W = 16;              /* 弹簧角频率（rad/s）：越小越绵，越大越跟手 */
+  var SOFT_W_TIGHT = 18;        /* 结算段略硬一点，收得干净 */
+  var SOFT_IDLE = 150;          /* 停手多久开始结算 */
+  var SOFT_COMMIT = .16;        /* 结算时进度超过这里就交割，否则原路退回 */
   var wheelLock = 0;
-  var soft = { on: false, el: null, ghost: null, host: null, p: 0, axis: 'y', size: 0, dir: 1, head: null };
-  var softIdle = 0, softRaf = 0, softKill = 0;
+  var soft = {
+    on: false, el: null, ghost: null, host: null,
+    p: 0, v: 0, aim: 0, axis: 'y', size: 0, dir: 1, head: null,
+    tight: false, queue: 0
+  };
+  var softIdle = 0, softRaf = 0, softKill = 0, softLast = 0;
 
   function softTarget() {
     var s = state.scale;
@@ -3967,7 +3978,9 @@
       soft.el.style.willChange = '';
     }
     soft.on = false; soft.el = null; soft.ghost = null; soft.host = null;
-    soft.p = 0; soft.size = 0; soft.head = null;
+    soft.p = 0; soft.v = 0; soft.aim = 0; soft.size = 0; soft.head = null;
+    soft.tight = false; soft.queue = 0;
+    softLast = 0;
   }
 
   /* 标题 / 计数先按住不动：滑到一半就报出下个月会很跳，交割那一刻才换 */
@@ -4043,7 +4056,8 @@
     host.appendChild(ghost);
 
     soft.on = true; soft.el = el; soft.ghost = ghost; soft.host = host;
-    soft.axis = axis; soft.size = size; soft.dir = dir; soft.p = 0;
+    soft.axis = axis; soft.size = size; soft.dir = dir;
+    soft.p = 0; soft.v = 0; soft.aim = 0; soft.tight = false;
     el.style.willChange = 'transform';
     softPaint(0);
     var oldHead = headSnap();
@@ -4056,93 +4070,121 @@
   /* 交割：已经滑到底，把 ghost 撤掉，真节点归位 —— 此刻它本就在 0 */
   function softSettle() {
     if (!soft.on) return;
-    var el = soft.el;
+    var el = soft.el, dir = soft.dir, next = soft.queue || 0;
     if (el) { el.style.transition = 'none'; }
     headApply(soft.head);
-    wheelLock = Date.now() + 110;
+    wheelLock = Date.now() + 46;   /* 只挡同一个 notch 的重入，不掐后续滚轮 */
+    softReset();
+    /* 快速连滚时多出来的一格：交割完立刻接上下一页，中间不留空档 */
+    if (next > 0 && softStart(dir)) { soft.aim = 1; soft.tight = true; softGlide(); }
+  }
+
+  /* 退回：p 已经走回 0，把旧页重新渲进真节点，撤掉 ghost */
+  function softRollback() {
+    if (!soft.on) return;
+    var dir = soft.dir;
+    soft.p = 0; soft.v = 0; soft.aim = 0;
+    softPaint(0);                  /* 同一帧内完成，浏览器不会画出错位的那一页 */
+    shiftCalStep(-dir);
     softReset();
   }
 
-  /* 滚轮：进度跟手，触顶就交割；停手还没到 94% 就原路退回 */
-  function softWheel(d) {
-    var dir = d > 0 ? 1 : -1;
-    if (soft.on && dir !== soft.dir) {
-      /* 中途换向：还没走远就先归位，重新起手 */
-      if (soft.p < .5) { softCancel(); return; }
-      softFinish(); return;
-    }
-    if (!softStart(dir)) { shiftCalStep(dir); return; }
-    var add = Math.min(220, Math.abs(d)) / SOFT_SPAN;
-    soft.p = Math.min(1, soft.p + add);
-    if (soft.p >= SOFT_TRIG) { softFinish(); return; }
-    softPaint(soft.p);
-    if (softIdle) clearTimeout(softIdle);
-    /* 停手：过半就当这一格滚够了（一格滚轮 100px 正好半页），
-       没到 0.38 才原路弹回 —— 触控板轻扫不会误翻 */
-    softIdle = setTimeout(function () {
-      softIdle = 0;
-      if (soft.p >= .38) softFinish(); else softCancel();
-    }, 150);
+  /* 弹簧引擎：唯一的运动来源。子步长固定 1/120s 积分，掉帧也不会炸；
+     速度连续 —— 这是「丝滑」的全部秘密，位置每帧前进多少不重要，
+     重要的是每帧的加速度收得住。 */
+  function softGlide() {
+    if (softRaf) return;
+    softLast = 0;
+    softRaf = requestAnimationFrame(function step(ts) {
+      softRaf = 0;
+      if (!soft.on) return;
+      var dt = softLast ? Math.min(34, ts - softLast) / 1000 : 1 / 60;
+      softLast = ts;
+      var w = soft.tight ? SOFT_W_TIGHT : SOFT_W;
+      var k = w * w, c = 2 * w;          /* 临界阻尼：不弹、不过冲 */
+      var left = dt;
+      while (left > 0) {
+        var h = Math.min(left, 1 / 120);
+        soft.v += (k * (soft.aim - soft.p) - c * soft.v) * h;
+        soft.p += soft.v * h;
+        left -= h;
+      }
+      if (soft.p >= 1) { soft.p = 1; if (soft.v > 0) soft.v = 0; }
+      else if (soft.p <= 0) { soft.p = 0; if (soft.v < 0) soft.v = 0; }
+
+      /* 到站：位置贴住目标、速度也落下来了，就把 p 吸到目标上再判结果。
+         这一步很关键 —— 只「停住」不「吸附」，p 会永远卡在 0.996 上。 */
+      var arrived = Math.abs(soft.aim - soft.p) < .004 && Math.abs(soft.v) < .12;
+      if (arrived) soft.p = soft.aim;
+      softPaint(soft.p);
+
+      if (soft.p >= 1) { softSettle(); return; }
+      if (soft.p <= 0) { softRollback(); return; }
+      if (arrived) return;               /* 停在半路，等下一个滚轮把它推完 */
+      softRaf = requestAnimationFrame(step);
+    });
   }
 
-  /* 走完最后一段（94% → 100%），110ms 收口 */
+  /* 滚轮：只改目标，运动交给弹簧；停手 200ms 后结算。
+     一格（100px）≈ 0.28 页，超过 22% 就认这一页 —— 单格也能翻，
+     但翻的过程是几十帧走完的，不是一帧跳过去。 */
+  function softWheel(d) {
+    var dir = d > 0 ? 1 : -1;
+    var mag = Math.min(150, Math.abs(d));
+    if (mag < .6) return;
+    if (soft.on && dir !== soft.dir) {
+      /* 中途换向：按「就近归属」处理 —— 没到一半就原路回上一页，
+         过了一半就把这一页走完。回程要丢掉攒下的连滚，别把人往反方向带 */
+      soft.queue = 0;
+      soft.tight = true;
+      soft.aim = soft.p < .5 ? 0 : 1;
+      softGlide();
+      return;
+    }
+    /* 这一页已经排满了，再来一格就记在账上，交割后紧接着翻 —— 连滚不丢手感 */
+    if (soft.on && soft.aim >= 1) { soft.queue = Math.min(1, soft.queue + 1); return; }
+    if (!softStart(dir)) { shiftCalStep(dir); return; }
+    if (soft.aim < 1) soft.aim = Math.min(1, soft.aim + mag / SOFT_SPAN);
+    softGlide();
+    if (softIdle) clearTimeout(softIdle);
+    softIdle = setTimeout(function () {
+      softIdle = 0;
+      if (!soft.on) return;
+      soft.tight = true;                       /* 结算段稍硬一点，收得干净 */
+      /* 走得够远、或者还在往前冲（快速一甩）都算数；只有慢吞吞挪了几步才退回 */
+      soft.aim = (soft.p >= SOFT_COMMIT || soft.v > .8) ? 1 : 0;
+      softGlide();
+    }, SOFT_IDLE);
+  }
+
+  /* 交割到满页：只改目标，运动交给弹簧 —— 从当前速度接着走，不重新起手 */
   function softFinish() {
     if (!soft.on) return;
     if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
-    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
-    var from = soft.p, t0 = 0, el = soft.el, dur = 110;
-    function frame(ts) {
-      if (!soft.on || soft.el !== el) return;
-      if (!t0) t0 = ts;
-      var k = Math.min(1, (ts - t0) / dur);
-      soft.p = from + (1 - from) * k;
-      softPaint(soft.p);
-      if (k < 1) softRaf = requestAnimationFrame(frame);
-      else { softRaf = 0; softSettle(); }
-    }
-    softRaf = requestAnimationFrame(frame);
+    soft.tight = true;
+    soft.aim = 1;
+    softGlide();
   }
 
-  /* 原路退回：ghost 回到原位，再把状态退回上一页 */
-  function softCancel() {
-    if (!soft.on) return;
-    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
-    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
-    var from = soft.p, dir = soft.dir, t0 = 0, el = soft.el, dur = 210;
-    function frame(ts) {
-      if (!soft.on || soft.el !== el) return;
-      if (!t0) t0 = ts;
-      var k = Math.min(1, (ts - t0) / dur);
-      var e = 1 - Math.pow(1 - k, 3);
-      soft.p = from * (1 - e);
-      softPaint(soft.p);
-      if (k < 1) { softRaf = requestAnimationFrame(frame); return; }
-      softRaf = 0;
-      soft.p = 0; softPaint(0);
-      shiftCalStep(-dir);        /* 退回上一页（渲染完 el 里和 ghost 同一份内容） */
-      softReset();
-    }
-    softRaf = requestAnimationFrame(frame);
-  }
-
-  /* 箭头 / ← →：进度由 0 匀速推到 1，同一套两页滑动 */
+  /* 箭头 / ← →：定时曲线推到 1，比滚轮更「有主见」，但不硬切 */
   function softStep(dir) {
     closeCmp();
     if (!softStart(dir)) { shiftCalStep(dir); return; }
     if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
-    var t0 = 0, el = soft.el, dur = 330;
     if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
-    function frame(ts) {
+    var t0 = 0, el = soft.el, dur = 430;
+    softLast = 0;
+    softRaf = requestAnimationFrame(function step(ts) {
+      softRaf = 0;
       if (!soft.on || soft.el !== el) return;
       if (!t0) t0 = ts;
       var k = Math.min(1, (ts - t0) / dur);
-      var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      var e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
       soft.p = e;
       softPaint(soft.p);
-      if (k < 1) softRaf = requestAnimationFrame(frame);
-      else { softRaf = 0; softSettle(); }
-    }
-    softRaf = requestAnimationFrame(frame);
+      if (k < 1) { softRaf = requestAnimationFrame(step); return; }
+      softSettle();
+    });
   }
 
   function bindWheelPaging() {
@@ -4159,10 +4201,14 @@
         if (dp.open || cmpOpen || (window.QZ && window.QZ.pickOpen && window.QZ.pickOpen())) return;
         if (z.skip && e.target.closest && e.target.closest(z.skip)) return;
         /* 横着滚认横、竖着滚认竖：鼠标滚轮和触控板两个方向都吃得下 */
-        var d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        if (!d) return;
+        var raw = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (!raw) return;
         e.preventDefault();
         if (Date.now() < wheelLock) return;
+        /* 统一成像素：按行滚的老设备 ×16，按页滚的 ×320 */
+        var d = raw;
+        if (e.deltaMode === 1) d = raw * 16;
+        else if (e.deltaMode === 2) d = raw * 320;
         softWheel(d);
       }, { passive: false });
     });
@@ -4226,9 +4272,13 @@
      同一份排布；要固化成默认，把保存下来的 JSON 抄进 DEFAULT_LAYOUT 即可。 */
   var LAYOUT_KEY = 'qingzhang.overview.layout.v1';
   var OV_COLS = 12;
+  /* 默认布局：这就是「现在这一版」的总览排列，2026-11-16 定版。
+     顺序 / 跨度都按屏幕上的样子逐格抄下来，改布局版本号（v:3）让任何
+     更早存进浏览器或云端的旧布局直接作废 —— 从此打开就是这一版，
+     换设备、清缓存、换浏览器都是同一张。要再改节奏，就在总览里排好、
+     点「复制布局」，把 JSON 抄回这里，版本号再顶一格。 */
   var DEFAULT_LAYOUT = {
-    /* v2：工资板块拆成「社保 + 报销」两张，旧的坐标不能复用，版本号顶一格让老布局自动作废 */
-    v: 2,
+    v: 3,
     order: ['kpi', 'trend', 'donut', 'balance', 'weight', 'calheat', 'stack', 'top', 'salary', 'reimb'],
     spans: {
       kpi: [12, 3], trend: [12, 7], donut: [6, 7], balance: [6, 7], weight: [12, 6],
@@ -4255,7 +4305,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 2 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 3 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -4271,7 +4321,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 2, order: [], spans: {} };
+    var L = { v: 3, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;

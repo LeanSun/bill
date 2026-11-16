@@ -2015,14 +2015,17 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--weekend-ink) 38%, transparent);
 }
 
-/* 日期摘要栏：让「日」当主角。日号 60px、字重 800、字距收紧，上面一行
-   （星期胶囊 + 年月）退成小字配角；「日」字留一点字距浮在基线上 */
+/* 日期摘要栏：让「日」当主角。日号 60px、字重 600、字距收紧，上面一行
+   （星期胶囊 + 年月）退成小字配角；「日」字留一点字距浮在基线上。
+   800 / 600 在 Windows 的 Segoe UI 上都会落到 SemiBold 以上的档位，
+   大写数字一眼就「糊」。450 落到 Regular —— 60px 下笔画才干净，
+   字形靠字距和行高站住，不靠加粗压人。 */
 .ds-inner .ds-big { align-items: baseline; gap: 7px; margin-top: 0; }
 .ds-inner .ds-big b {
-  font-size: 60px; font-weight: 800; line-height: .94; letter-spacing: -.075em;
+  font-size: 60px; font-weight: 450; line-height: .96; letter-spacing: -.045em;
   font-variant-numeric: tabular-nums; color: var(--text);
 }
-.ds-inner .ds-big i { font-size: 13px; font-weight: 700; letter-spacing: .14em; color: var(--muted); padding-bottom: 6px; }
+.ds-inner .ds-big i { font-size: 13px; font-weight: 500; letter-spacing: .14em; color: var(--muted); padding-bottom: 6px; }
 .ds-inner .ds-head { margin-bottom: 0; }
 .ds-inner .ds-dow { height: 21px; padding: 0 9px; font-size: 10.5px; letter-spacing: .08em; }
 .ds-inner .ds-ym { font-size: 10.5px; font-weight: 650; color: var(--muted); letter-spacing: .04em; }
