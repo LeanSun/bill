@@ -2055,3 +2055,65 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
    不然金额和「保存这笔」会被 overflow:hidden 直接切掉，摸不到 */
 .day-side.is-scroll { overflow: auto; }
 .day-side.is-scroll .ds-inner { padding-right: 18px; }
+
+/* 周历日号：原来 38px / 750 太压场，读起来像标题抢正文；
+   降一档到 35px / 600，字距收紧，数字还是列头的主角但不吼 */
+.wk-day { font-size: 35px; font-weight: 600; letter-spacing: -.03em; }
+
+/* ==================== 连续滚动翻页 / 体重卡重排 ==================== */
+
+/* 翻页用两页同屏滑动：棋盘裁边，旧内容快照浮在里面跟着走 */
+.cal-board { position: relative; }
+.soft-ghost {
+  position: absolute; z-index: 4; pointer-events: none;
+  will-change: transform; backface-visibility: hidden;
+}
+.cal-grid, .cal-week, .cal-day, .cal-year { will-change: auto; }
+
+/* 体重记录：读数 / 变化量 / 迷你线 / 区间，四层各就各位。
+   旧版把大数字、灰字说明、折线三块并排塞在一行，线被挤到右边缘还飘 */
+.ins-weight { display: block; cursor: pointer; }
+.iw-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.iw-val { display: flex; align-items: baseline; gap: 3px; min-width: 0; }
+.iw-val b {
+  font-size: 25px; font-weight: 750; line-height: 1; letter-spacing: -.045em;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.iw-val i { font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+.iw-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.iw-when {
+  font-size: 10px; color: var(--muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 104px;
+}
+.iw-delta {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px;
+  height: 18px; padding: 0 6px; border-radius: 6px;
+  font-size: 10px; font-weight: 700; font-style: normal;
+  font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+}
+/* 涨红跌绿：这套色阶不能借 --expense / --income —— 账本里支出是绿、收入是红，
+   借过来会变成「胖了发绿」。体重自带一套固定的涨跌色 */
+.iw-delta.is-up { color: #d9542f; background: color-mix(in srgb, #d9542f 12%, transparent); }
+.iw-delta.is-down { color: #0f9d63; background: color-mix(in srgb, #0f9d63 13%, transparent); }
+.iw-delta.is-flat { color: var(--muted); background: var(--surface-3); }
+
+.iw-sparkwrap { position: relative; margin: 7px 0 3px; }
+.iw-spark { display: block; width: 100%; height: 34px; }
+.iw-spark polygon { fill: color-mix(in srgb, var(--primary) 11%, transparent); }
+.iw-spark polyline {
+  fill: none; stroke: var(--primary); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+}
+.iw-dot {
+  position: absolute; width: 6px; height: 6px; margin: 0; border-radius: 50%;
+  background: var(--primary); transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px var(--surface-2); pointer-events: none;
+}
+.iw-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 9.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+.iw-empty { display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+.iw-empty b { font-size: 12px; font-weight: 650; color: var(--text-2); }
+.iw-empty span { font-size: 10px; color: var(--muted); }

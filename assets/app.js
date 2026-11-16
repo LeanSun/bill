@@ -1105,6 +1105,7 @@
     return same ? dateKey(t) : dateKey(new Date(state.calMonth.year, state.calMonth.month - 1, 1));
   }
   function setScale(s) {
+    if (soft && soft.on) softReset();   /* 翻滚到一半换粒度：先把快照收掉 */
     state.scale = s;
     if (s === 'day' || s === 'week') {
       if (!state.anchorDate) {
@@ -1402,12 +1403,12 @@
       /* dimension: 1 = 取 [日期, 排名] 里的排名维度。
          不写的话 ECharts 默认取末维（笔数），整张图会被笔数染色 */
       dimension: 1,
-      min: 0, max: 100, calculable: true, orient: 'horizontal',
-      /* 滑杆：厚 26（原来 12，翻一倍多，点得中、也拖得动），
-         长度 420，文字 13px —— 「贵 / 省」原来 10px，凑近才看得清 */
-      left: 'center', bottom: 2, itemWidth: 26, itemHeight: 420,
-      text: ['贵', '省'], textGap: 14,
-      textStyle: { color: p.muted, fontSize: 13, fontFamily: p.font },
+      min: 0, max: 100, calculable: false, orient: 'horizontal',
+      /* 滑杆回到上一版：条宽 12、长 390、文字 10px。
+         26 / 420 / 13px 那一版太抢眼，把日历格挤得没地方呼吸 */
+      left: 'center', bottom: 0, itemWidth: 12, itemHeight: 390,
+      text: ['贵', '省'], textGap: 10,
+      textStyle: { color: p.muted, fontSize: 10, fontFamily: p.font },
       handleStyle: { shadowBlur: 10, shadowColor: 'rgba(24,39,75,.2)' },
       inRange: {
         color: [
@@ -1419,9 +1420,8 @@
       }
     };
     o.calendar = {
-      /* 底部让出 54px 给那条加粗的滑杆（26px 条 + 13px 文字 + 间隙），
-         否则日历格会压到滑杆上 */
-      top: 38, left: 46, right: 24, bottom: 54, cellSize: ['auto', 13], range: String(y),
+      /* 底部让出 34px 给滑杆（细条款 + 10px 文字） */
+      top: 38, left: 46, right: 24, bottom: 34, cellSize: ['auto', 13], range: String(y),
       itemStyle: { color: mixColor(p.surface, p.border, .55), borderColor: p.surface, borderWidth: 1.5, borderRadius: 3 },
       yearLabel: { show: false },
       monthLabel: { color: p.text2, fontSize: 10.5, fontWeight: 600, fontFamily: p.font, nameMap: 'cn', margin: 8 },
@@ -2174,7 +2174,9 @@
       ? '<div class="ins-stack">' + stack + '</div><div class="ins-legend">' + legend + '</div>'
       : '<div class="ins-none">今天还没有支出分类</div>';
 
-    /* 5) 体重记录：接新增的每日体重，给出当天值 / 较上次 / 最近 7 次迷你线 */
+    /* 5) 体重记录：一条读数 + 一个变化量 + 一条迷你线。
+       以前是「大数字 / 一行灰字 / 线飘在右边」三块各说各的，
+       现在收成三层：读数与变化量对齐、线独占一行、底下补区间。 */
     var w = state.store.weights || {};
     var wkeys = Object.keys(w).filter(function (k) {
       return /^\d{4}-\d{2}-\d{2}$/.test(k) && isFinite(Number(w[k]));
@@ -2182,26 +2184,50 @@
     var cur = w[key] ? Number(w[key]) : 0;
     var prevKeys = wkeys.filter(function (k) { return k < key; });
     var prev = prevKeys.length ? Number(w[prevKeys[prevKeys.length - 1]]) : 0;
-    var diff = cur && prev ? cur - prev : 0;
+    var lastKey = wkeys.length ? wkeys[wkeys.length - 1] : '';
+    var show = cur || (lastKey ? Number(w[lastKey]) : 0);
+    /* 变化量：今天有记录就跟上一次比；没有就跟最近两次比 */
+    var delta = 0;
+    if (cur && prev) delta = cur - prev;
+    else if (!cur && wkeys.length > 1) delta = Number(w[lastKey]) - Number(w[wkeys[wkeys.length - 2]]);
+    var wWhen = cur ? '今日' : (lastKey ? '最近一次 · ' + lastKey.slice(5).replace('-', '/') : '');
     var wLast = wkeys.slice(-7).map(function (k) { return Number(w[k]); });
     var wlo = wLast.length ? Math.min.apply(null, wLast) : 0;
     var whi = wLast.length ? Math.max.apply(null, wLast) : 1;
+    /* 7 个点摊在 4 — 156 之间，纵向留 6 — 26，尾部圆点不贴边 */
     var wpts = wLast.map(function (v, i) {
-      var px = 3 + i * (154 / Math.max(1, wLast.length - 1));
-      var py = 30 - ((v - wlo) / Math.max(.1, whi - wlo)) * 24;
-      return px.toFixed(1) + ',' + py.toFixed(1);
-    }).join(' ');
-    var wSpark = wLast.length > 1
-      ? '<svg class="ins-wspark" viewBox="0 0 160 34" preserveAspectRatio="none" aria-hidden="true">' +
-        '<polyline points="' + wpts + '" fill="none" stroke="' + p.primary + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>'
-      : '';
+      var px = 4 + i * (152 / Math.max(1, wLast.length - 1));
+      var py = 26 - ((v - wlo) / Math.max(.1, whi - wlo)) * 20;
+      return [px.toFixed(1), py.toFixed(1)];
+    });
+    var wSpark = '';
+    if (wLast.length > 1) {
+      var poly = wpts.map(function (q) { return q.join(','); }).join(' ');
+      var tail = wpts[wpts.length - 1];
+      wSpark = '<div class="iw-sparkwrap">' +
+        '<svg class="iw-spark" viewBox="0 0 160 36" preserveAspectRatio="none" aria-hidden="true">' +
+        '<polygon points="' + poly + ' 156,36 4,36"/>' +
+        '<polyline points="' + poly + '"/>' +
+        '</svg>' +
+        /* 末端那颗点是 HTML 画圆的：SVG 横向拉满会把圆压成椭圆 */
+        '<i class="iw-dot" style="left:' + (Number(tail[0]) / 160 * 100).toFixed(2) +
+        '%;top:' + (Number(tail[1]) / 36 * 100).toFixed(2) + '%"></i>' +
+        '</div>';
+    }
+    var dCls = Math.abs(delta) < .05 ? 'is-flat' : (delta > 0 ? 'is-up' : 'is-down');
     var weightCard = wkeys.length
       ? '<div class="ins-weight" data-focus-weight="1" title="点这里跳到体重输入框">' +
-        '<b>' + (cur ? cur.toFixed(1) : w[wkeys[wkeys.length - 1]].toFixed(1)) + '<i>kg</i></b>' +
-        '<span>' + (cur ? '今日体重' : '最近一次 ' + wkeys[wkeys.length - 1].slice(5)) +
-        (cur && prev ? ' · 较上次 ' + (diff >= 0 ? '+' : '−') + Math.abs(diff).toFixed(1) + ' kg' : '') + '</span>' +
-        wSpark + '</div>'
-      : '<div class="ins-none" data-focus-weight="1">还没有体重记录 · 点这里去记一条</div>';
+        '<div class="iw-top"><div class="iw-val"><b>' + show.toFixed(1) + '</b><i>kg</i></div>' +
+        '<div class="iw-meta"><span class="iw-when">' + wWhen + '</span>' +
+        (Math.abs(delta) >= .05
+          ? '<em class="iw-delta ' + dCls + '">' + (delta > 0 ? '▲' : '▼') + ' ' + Math.abs(delta).toFixed(1) + '</em>'
+          : '<em class="iw-delta is-flat">—</em>') +
+        '</div></div>' +
+        wSpark +
+        '<div class="iw-foot"><span>最近 ' + wLast.length + ' 次</span>' +
+        '<span>' + wlo.toFixed(1) + ' – ' + whi.toFixed(1) + ' kg</span></div>' +
+        '</div>'
+      : '<div class="iw-empty" data-focus-weight="1"><b>还没记过体重</b><span>点这里记第一条</span></div>';
 
     /* 3) 还剩多少：一行一件事。标题在左、结论在右，横条只表达"已经用掉多少"，
        下面一行写清参照与分子分母，不用再猜百分比是谁比谁。 */
@@ -2514,6 +2540,7 @@
   /* ---------------- 视图 / 分段控件 ---------------- */
   function setView(view) {
     if (!VIEW_META[view]) return;
+    if (soft && soft.on) softReset();
     state.view = view;
     var views = document.querySelectorAll('.view');
     for (var i = 0; i < views.length; i++) views[i].classList.toggle('is-active', views[i].id === 'view-' + view);
@@ -3539,6 +3566,25 @@
       if (sub) sub.textContent = ({ both: '按自然月汇总', expense: '仅显示支出', income: '仅显示收入' })[v];
       renderTrend(palette());
     });
+    /* 消费日历的年份按钮跟着数据走：补进 2022 / 2023 之后不能再写死三年 */
+    (function () {
+      var box = $('calendarYear');
+      if (!box) return;
+      var want = YEARS.slice();
+      var have = [].map.call(box.querySelectorAll('button'), function (b) { return Number(b.getAttribute('data-cy')); });
+      if (want.length === have.length && want.every(function (y, i) { return y === have[i]; })) return;
+      var ind = box.querySelector('.seg-ind');
+      box.innerHTML = '';
+      if (ind) box.appendChild(ind);
+      want.forEach(function (y) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.setAttribute('data-cy', String(y));
+        b.textContent = String(y);
+        if (y === state.calendarYear) b.className = 'is-active';
+        box.appendChild(b);
+      });
+    })();
     bindSeg($('calendarYear'), 'data-cy', function (v) {
       state.calendarYear = Number(v);
       renderCalendar(palette());
@@ -3889,43 +3935,216 @@
     openByTap = { key: '', t: 0 };
   }
 
-  /* ---------------- 翻页：丝滑出入 ----------------
-     旧版用 @keyframes 从位移 20px「弹」进来，位移是死的、缓动也是死的，
-     连滚两下就是两次生硬的替换。现在改成两段真 transition：
-     先 150ms 淡出（同时带一点点位移），内容在最低点换掉，再用
-     0.4s 的 ease-out-quint 淡回来 —— 眼睛读到的是"内容滑走了再滑回来"
-     而不是"画面闪了一下"。四档各给一个方向：
-     月历竖向、周历横向、天页纯淡入、年历竖向 + 轻微缩放。 */
-  var wheelAcc = 0, wheelLock = 0, softTimer = 0;
-  var SOFT_OUT = 150, SOFT_IN = 400;
+  /* ---------------- 翻页：连续滚动 ----------------
+     不再是淡入淡出。滚轮每一下都在推动棋盘本身：旧内容跟着指针走，
+     下一页从另一侧同步顶上来 —— 两页同屏滑动，走到 94% 才交割，
+     此时旧内容已经完全出框，换页那一帧看不出来换过。
+     实现上拍一张旧内容的快照（ghost）盖在原位，真节点腾出来装新页，
+     ghost 负责「滑出去」，真节点负责「滑进来」。箭头 / ← → 走同一套，
+     只是进度由 rAF 匀速推到 1。四档方向：月/年/日竖向，周横向。 */
+  var SOFT_SPAN = 200;          /* 累积 200px 滚轮量 = 翻一整页（两格滚轮） */
+  var SOFT_TRIG = .94;          /* 走到 94% 就交割，剩下 6% 由 110ms 补完 */
+  var wheelLock = 0;
+  var soft = { on: false, el: null, ghost: null, host: null, p: 0, axis: 'y', size: 0, dir: 1, head: null };
+  var softIdle = 0, softRaf = 0, softKill = 0;
+
   function softTarget() {
     var s = state.scale;
     return s === 'year' ? $('calYearBoard')
       : s === 'month' ? $('calGrid')
       : s === 'week' ? $('calWeekGrid') : $('calDayBoard');
   }
-  function softStep(dir) {
-    var scale = state.scale, el = softTarget();
-    closeCmp();
-    if (!el) { shiftCalStep(dir); return; }
-    if (softTimer) { clearTimeout(softTimer); softTimer = 0; }
-    var dx = scale === 'week' ? (dir > 0 ? 16 : -16) : 0;
-    var dy = scale === 'day' ? 4 : scale === 'week' ? 0 : (dir > 0 ? 11 : -11);
-    var sc = scale === 'year' ? .994 : 1;
-    el.style.transition = 'opacity ' + SOFT_OUT + 'ms cubic-bezier(.4,0,.85,1),' +
-      ' transform ' + SOFT_OUT + 'ms cubic-bezier(.4,0,.85,1)';
-    el.style.opacity = '0';
-    el.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0)' + (sc === 1 ? '' : ' scale(' + sc + ')');
-    softTimer = setTimeout(function () {
-      softTimer = 0;
-      shiftCalStep(dir);
-      el.style.transition = 'opacity ' + SOFT_IN + 'ms cubic-bezier(.16,.84,.3,1),' +
-        ' transform ' + (SOFT_IN + 40) + 'ms cubic-bezier(.16,.84,.3,1)';
-      void el.offsetWidth;              /* 让上面的 transition 先落地，不然会瞬移 */
-      el.style.opacity = '1';
-      el.style.transform = 'none';
-    }, SOFT_OUT);
+  function softAxisOf(s) { return s === 'week' ? 'x' : 'y'; }
+
+  function softReset() {
+    if (softKill) { clearTimeout(softKill); softKill = 0; }
+    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
+    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
+    if (soft.ghost && soft.ghost.parentNode) soft.ghost.parentNode.removeChild(soft.ghost);
+    if (soft.el) {
+      soft.el.style.transition = '';
+      soft.el.style.transform = '';
+      soft.el.style.willChange = '';
+    }
+    soft.on = false; soft.el = null; soft.ghost = null; soft.host = null;
+    soft.p = 0; soft.size = 0; soft.head = null;
   }
+
+  /* 标题 / 计数先按住不动：滑到一半就报出下个月会很跳，交割那一刻才换 */
+  function headSnap() {
+    var o = { t: null, s: null, e: null };
+    var a = $('calTitleText'), b = $('calSub'), c = $('calTitle'), d = $('boardEmpty');
+    if (a) { o.t = [a.textContent, a.getAttribute('title') || '']; }
+    if (b) { o.s = [b.textContent, b.getAttribute('title') || '']; }
+    if (c) o.c = c.className;
+    /* 空态浮层也跟着旧页走：滑到一半就冒出「没有匹配的记录」会很跳 */
+    if (d) o.e = d.hidden;
+    return o;
+  }
+  function headApply(o) {
+    if (!o) return;
+    var a = $('calTitleText'), b = $('calSub'), c = $('calTitle');
+    if (o.t && a) { a.textContent = o.t[0]; a.setAttribute('title', o.t[1]); }
+    if (o.s && b) { b.textContent = o.s[0]; b.setAttribute('title', o.s[1]); }
+    if (o.c && c) c.className = o.c;
+    var d = $('boardEmpty');
+    if (o.e !== null && o.e !== undefined && d) d.hidden = o.e;
+  }
+
+  /* 一帧的排布：旧页顺着滚动方向出框，新页从另一侧按比例顶上来 */
+  function softPaint(p) {
+    if (!soft.on || !soft.el || !soft.ghost) return;
+    var s = soft.size, dir = soft.dir;
+    var mag = Math.max(0, Math.min(1, p));
+    var out = -dir * mag * s;
+    var inn = dir * (1 - mag) * s;
+    if (soft.axis === 'x') {
+      soft.ghost.style.transform = 'translate3d(' + out + 'px,0,0)';
+      soft.el.style.transform = 'translate3d(' + inn + 'px,0,0)';
+    } else {
+      soft.ghost.style.transform = 'translate3d(0,' + out + 'px,0)';
+      soft.el.style.transform = 'translate3d(0,' + inn + 'px,0)';
+    }
+  }
+
+  /* 起手：给旧内容拍快照、把新页渲染进真节点并先摆到框外 */
+  function softStart(dir) {
+    var el = softTarget();
+    if (!el) return false;
+    if (soft.on && soft.el === el && soft.dir === dir) return true;
+    softReset();
+    var host = el.parentNode;
+    if (!host) return false;
+    el.style.transition = 'none';
+    el.style.transform = '';
+    void el.offsetWidth;
+    var hb = host.getBoundingClientRect(), eb = el.getBoundingClientRect();
+    var axis = softAxisOf(state.scale);
+    var size = axis === 'x' ? eb.width : eb.height;
+    if (!size || !eb.width) return false;
+
+    var ghost = el.cloneNode(true);
+    ghost.removeAttribute('id');
+    var kids = ghost.querySelectorAll('[id]');
+    for (var i = 0; i < kids.length; i++) kids[i].removeAttribute('id');
+    ghost.classList.add('soft-ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.style.position = 'absolute';
+    ghost.style.left = (eb.left - hb.left) + 'px';
+    ghost.style.top = (eb.top - hb.top) + 'px';
+    ghost.style.width = eb.width + 'px';
+    ghost.style.height = eb.height + 'px';
+    ghost.style.margin = '0';
+    ghost.style.zIndex = '4';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.transition = 'none';
+    ghost.style.transform = 'none';
+    ghost.style.willChange = 'transform';
+    host.appendChild(ghost);
+
+    soft.on = true; soft.el = el; soft.ghost = ghost; soft.host = host;
+    soft.axis = axis; soft.size = size; soft.dir = dir; soft.p = 0;
+    el.style.willChange = 'transform';
+    softPaint(0);
+    var oldHead = headSnap();
+    shiftCalStep(dir);           /* 真节点里现在装的是下一页，还在框外 */
+    soft.head = headSnap();      /* 新页的标题先收着，交割时再放出来 */
+    headApply(oldHead);
+    return true;
+  }
+
+  /* 交割：已经滑到底，把 ghost 撤掉，真节点归位 —— 此刻它本就在 0 */
+  function softSettle() {
+    if (!soft.on) return;
+    var el = soft.el;
+    if (el) { el.style.transition = 'none'; }
+    headApply(soft.head);
+    wheelLock = Date.now() + 110;
+    softReset();
+  }
+
+  /* 滚轮：进度跟手，触顶就交割；停手还没到 94% 就原路退回 */
+  function softWheel(d) {
+    var dir = d > 0 ? 1 : -1;
+    if (soft.on && dir !== soft.dir) {
+      /* 中途换向：还没走远就先归位，重新起手 */
+      if (soft.p < .5) { softCancel(); return; }
+      softFinish(); return;
+    }
+    if (!softStart(dir)) { shiftCalStep(dir); return; }
+    var add = Math.min(220, Math.abs(d)) / SOFT_SPAN;
+    soft.p = Math.min(1, soft.p + add);
+    if (soft.p >= SOFT_TRIG) { softFinish(); return; }
+    softPaint(soft.p);
+    if (softIdle) clearTimeout(softIdle);
+    /* 停手：过半就当这一格滚够了（一格滚轮 100px 正好半页），
+       没到 0.38 才原路弹回 —— 触控板轻扫不会误翻 */
+    softIdle = setTimeout(function () {
+      softIdle = 0;
+      if (soft.p >= .38) softFinish(); else softCancel();
+    }, 150);
+  }
+
+  /* 走完最后一段（94% → 100%），110ms 收口 */
+  function softFinish() {
+    if (!soft.on) return;
+    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
+    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
+    var from = soft.p, t0 = 0, el = soft.el, dur = 110;
+    function frame(ts) {
+      if (!soft.on || soft.el !== el) return;
+      if (!t0) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur);
+      soft.p = from + (1 - from) * k;
+      softPaint(soft.p);
+      if (k < 1) softRaf = requestAnimationFrame(frame);
+      else { softRaf = 0; softSettle(); }
+    }
+    softRaf = requestAnimationFrame(frame);
+  }
+
+  /* 原路退回：ghost 回到原位，再把状态退回上一页 */
+  function softCancel() {
+    if (!soft.on) return;
+    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
+    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
+    var from = soft.p, dir = soft.dir, t0 = 0, el = soft.el, dur = 210;
+    function frame(ts) {
+      if (!soft.on || soft.el !== el) return;
+      if (!t0) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur);
+      var e = 1 - Math.pow(1 - k, 3);
+      soft.p = from * (1 - e);
+      softPaint(soft.p);
+      if (k < 1) { softRaf = requestAnimationFrame(frame); return; }
+      softRaf = 0;
+      soft.p = 0; softPaint(0);
+      shiftCalStep(-dir);        /* 退回上一页（渲染完 el 里和 ghost 同一份内容） */
+      softReset();
+    }
+    softRaf = requestAnimationFrame(frame);
+  }
+
+  /* 箭头 / ← →：进度由 0 匀速推到 1，同一套两页滑动 */
+  function softStep(dir) {
+    closeCmp();
+    if (!softStart(dir)) { shiftCalStep(dir); return; }
+    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
+    var t0 = 0, el = soft.el, dur = 330;
+    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
+    function frame(ts) {
+      if (!soft.on || soft.el !== el) return;
+      if (!t0) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur);
+      var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      soft.p = e;
+      softPaint(soft.p);
+      if (k < 1) softRaf = requestAnimationFrame(frame);
+      else { softRaf = 0; softSettle(); }
+    }
+    softRaf = requestAnimationFrame(frame);
+  }
+
   function bindWheelPaging() {
     [
       { el: $('calGrid'), skip: '' },
@@ -3943,14 +4162,8 @@
         var d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
         if (!d) return;
         e.preventDefault();
-        if (Date.now() < wheelLock) { wheelAcc = 0; return; }
-        wheelAcc += d;
-        /* 累积过阈值才翻一屏，触控板上一点点滑动不会连翻好几页 */
-        if (Math.abs(wheelAcc) < 34) return;
-        var dir = wheelAcc > 0 ? 1 : -1;
-        wheelAcc = 0;
-        wheelLock = Date.now() + SOFT_OUT + SOFT_IN - 60;
-        softStep(dir);
+        if (Date.now() < wheelLock) return;
+        softWheel(d);
       }, { passive: false });
     });
   }
