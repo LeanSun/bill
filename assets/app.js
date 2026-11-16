@@ -184,7 +184,8 @@
   /* 总览与分析已合并进同一页；导航只剩两个入口，默认落在日历。 */
   var VIEW_META = {
     overview: ['总览', '收支总览与图表，汇总在同一页。'],
-    calendar: ['日历', '一个月的所有流水，尽在一页日历。点格子记一笔，双击看当天明细。']
+    calendar: ['日历', '一个月的所有流水，尽在一页日历。点格子记一笔，双击看当天明细。'],
+    cube: ['魔方', '魔方收藏、比赛记录与润滑油指南。独立数据，不进收支账。']
   };
 
   /* ---------------- 工具 ---------------- */
@@ -2543,6 +2544,26 @@
   }
 
   /* ---------------- 视图 / 分段控件 ---------------- */
+  /* 魔方统计是一个独立子应用：iframe 只在第一次进这一页时才加载，
+     两边各用各的 localStorage（cubeLedger_v1 / qingzhang.*），互不读写。 */
+  function cubeTheme() {
+    var f = $('cubeFrame');
+    if (f && f.contentWindow) {
+      try { f.contentWindow.postMessage({ __ledgerTheme: state.theme }, '*'); } catch (e) { /* noop */ }
+    }
+  }
+  function mountCube() {
+    var f = $('cubeFrame');
+    if (!f) return;
+    if (!f.getAttribute('src')) f.setAttribute('src', 'cube.html');
+    f.addEventListener('load', cubeTheme, { once: true });
+    cubeTheme();
+  }
+  function bindCubeFrame() {
+    var b = $('cubeOpenBtn');
+    if (b) b.addEventListener('click', function () { window.open('cube.html', '_blank', 'noopener'); });
+  }
+
   function setView(view) {
     if (!VIEW_META[view]) return;
     if (soft && soft.on) softReset();
@@ -2556,6 +2577,7 @@
     if (main) main.classList.toggle('is-calendar', view === 'calendar');
     writeRoute(view, false);
     if (view === 'calendar') renderBoard();
+    if (view === 'cube') mountCube();
     requestAnimationFrame(function () {
       /* 日历在 rAF 里再排一次：此时视图已可见，格子高度才是真值，
          一屏能塞几条条目才算得准 */
@@ -2570,9 +2592,10 @@
   var ROUTE_ALIAS = {
     home: 'overview', overview: 'overview', index: 'overview',
     analysis: 'overview', stats: 'overview', trend: 'overview',
-    calendar: 'calendar', week: 'calendar', month: 'calendar', year: 'calendar', day: 'calendar'
+    calendar: 'calendar', week: 'calendar', month: 'calendar', year: 'calendar', day: 'calendar',
+    cube: 'cube', '魔方': 'cube'
   };
-  var ROUTE_CANON = { overview: 'home', calendar: 'calendar' };
+  var ROUTE_CANON = { overview: 'home', calendar: 'calendar', cube: 'cube' };
 
   function parseRoute() {
     var h = String(location.hash || '').replace(/^#\/?/, '');
@@ -3254,6 +3277,7 @@
        筛选区在日历页，切主题时人可能正停在总览，所以这里直接无条件重排一遍。 */
     renderCatBar(palette());
     refreshAfterColor();
+    cubeTheme();
   }
 
   /* 配色自定义的读写口子，条目定义在 CAT_COLOR_DEFS */
@@ -4747,6 +4771,7 @@
     buildSelectOptions();
     bindEvents();
     bindFilterCollapse();
+    bindCubeFrame();
     bindDatePicker();
     bindHoverTip();
     state.layout = readLayout();

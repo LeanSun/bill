@@ -2127,3 +2127,24 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
   .ct-filter-toggle { display: grid; }
   .ct-filters.is-collapsed { display: none; }
 }
+
+/* ---------- 魔方统计子应用 ----------
+   独立页面塞进 iframe：数据、localStorage、图表实例都不跟账本共享。
+   父页面只负责给一个跟账本一致的壳和深浅色。 */
+#view-cube.is-active { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.cube-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 2px 4px;
+}
+.cube-head h2 { margin: 0; font-size: 19px; font-weight: 750; letter-spacing: -.02em; color: var(--text); }
+.cube-head p { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+.cube-frame {
+  flex: 1 1 auto; width: 100%; min-height: calc(100dvh - 148px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow-card);
+}
+@media (max-width: 760px) {
+  .cube-head { align-items: flex-start; }
+  .cube-head .btn { white-space: nowrap; }
+  .cube-frame { min-height: calc(100dvh - 160px); border-radius: 12px; }
+}

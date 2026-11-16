@@ -211,6 +211,8 @@ assets/
   app.js                状态、渲染、图表、筛选、记账、主题、hash 路由
   sync.js               云同步层：登录、推拉、冲突二选一、备份导入导出
   boot.js               私人数据门禁：凭证匹配才去私有仓库取 BILL_DATA
+  cube.html             魔方统计子应用（iframe 载入，独立 localStorage）
+  cube-history.js       魔方统计的历史版本页面快照，点更新日志时才加载（约 14MB）
   echarts.min.js        图表库（本地引入，无 CDN 依赖）
 server/
   server.js             零依赖后端：静态站 + 鉴权 API + JSON 存储 + 备份
@@ -264,6 +266,18 @@ node server/server.js
 数据落在 `server\data\`：`password.txt`（口令）、`secret.key`（令牌密钥）、`state.json`（账本增量层）、`backups\`（最近 20 份历史）。整个目录照常被 `.gitignore` 挡在仓库外，但**记得自己备份** —— 换电脑或重装系统时它才是你的全部线上改动。
 
 手机 / 平板在同一 Wi-Fi 下访问 `http://本机IP:8787`（启动日志会列出）。第一次绑 0.0.0.0 时 Windows 防火墙可能弹窗，允许「专用网络」即可。
+
+---
+
+## 魔方统计（独立子应用）
+
+左侧导航第三项「魔方」是独立的魔方统计页：总览、魔方统计、比赛记录、润滑油指南、数据与备份、更新日志六个页签全部保留，功能与原版一致。它以 iframe 嵌在账单站里，父页面只提供外壳和深浅色同步，不读写它的任何数据。
+
+- **数据完全隔离**：魔方那边只写 `localStorage['cubeLedger_v1']`，账本写 `qingzhang.*`（`qingzhang.ledger.v1` / `pay` / `weights` / `layout` …）。两边按键名分开，魔方的 125 条收藏 / 32 场比赛不会进收支图，账单的 2958 笔也不会出现在魔方统计里；云同步只推送账本 store，不带魔方数据
+- **按需加载**：第一次点「魔方」才给 iframe 设 `src`，历史版本快照另外放在 `assets/cube-history.js`（约 14 MB），只有点「更新日志」里某个历史快照按钮时才下载，不拖慢账本首屏
+- **风格统一**：CSS 设计令牌换成账本的浅 / 深两套（背景、卡片、边框、文字、主色、圆角、阴影），主题按钮切换时父页面用 `postMessage` 通知 iframe 同步换色
+- **可独立打开**：页面右上角「新窗口打开 ↗」直接在新标签页打开 `cube.html`，布局和功能一样
+- 依赖：ECharts 用项目本地 `assets/echarts.min.js`，魔方项目的 cubing 图标 CSS 仍走 CDN（离线时 icon 字体会缺，文字与统计不受影响）
 
 ---
 
