@@ -2120,3 +2120,65 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .iw-empty { display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
 .iw-empty b { font-size: 12px; font-weight: 650; color: var(--text-2); }
 .iw-empty span { font-size: 10px; color: var(--muted); }
+
+/* ---------- 滚动手感现场调参（SOFT_W） ----------
+   滑杆 + 数字框同步同一个变量；popover 挂在按钮旁边的零宽锚点上，
+   不占工具条的一格，展开也不会把筛选区挤到下一行。 */
+.ct-feel-btn.is-on { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.ct-feel { position: relative; flex: 0 0 0; width: 0; height: 0; }
+.feel-pop {
+  position: absolute; top: calc(100% + 10px); right: -8px; z-index: 60;
+  width: 304px; box-sizing: border-box; padding: 14px;
+  border-radius: 15px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow-pop); animation: dpIn .24s var(--ease) backwards;
+}
+.feel-head { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.feel-head code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10.5px;
+  color: var(--primary); background: var(--primary-soft); padding: 2px 6px; border-radius: 5px;
+}
+.feel-hint { margin: 7px 0 12px; font-size: 11.5px; line-height: 1.6; color: var(--muted); }
+.feel-row { display: flex; align-items: center; gap: 9px; }
+.feel-row input[type="range"] {
+  flex: 1 1 auto; min-width: 0; height: 5px; margin: 0; border-radius: 5px;
+  background: var(--surface-3); accent-color: var(--primary); cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+}
+.feel-row input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%;
+  background: var(--primary); border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--primary); cursor: grab;
+}
+.feel-row input[type="range"]::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%; background: var(--primary);
+  border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--primary); cursor: grab;
+}
+.feel-row input[type="number"] {
+  width: 54px; height: 32px; flex: 0 0 54px; box-sizing: border-box; text-align: center;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2);
+  color: var(--text); font-family: var(--font); font-size: 13px; font-weight: 650;
+  font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield;
+}
+.feel-row input[type="number"]::-webkit-inner-spin-button,
+.feel-row input[type="number"]::-webkit-outer-spin-button { appearance: none; -webkit-appearance: none; margin: 0; }
+.feel-row output {
+  width: 26px; flex: 0 0 26px; text-align: right; font-size: 12px;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.feel-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 12px; font-size: 10.5px; color: var(--muted);
+}
+.feel-foot button {
+  padding: 5px 9px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-2); font-family: var(--font); font-size: 11px; cursor: pointer;
+}
+.feel-foot button:hover { color: var(--primary); border-color: var(--primary); }
+
+/* 手机：筛选默认折叠，工具条压到一行，别挡住下面的日历 / 记一笔 */
+.ct-filter-toggle { display: none; }
+@media (max-width: 760px) {
+  .ct-filter-toggle { display: grid; }
+  .ct-filters.is-collapsed { display: none; }
+  .feel-pop { right: -46px; width: min(304px, calc(100vw - 28px)); }
+}

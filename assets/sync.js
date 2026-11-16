@@ -359,6 +359,10 @@
     saveCfg();
     setStatus(msg || '凭证已失效，请重新连接', 'warn');
     render();
+    /* 凭证没了，私人账单不能继续留在内存里 —— 刷一下回到空账本 */
+    if (window.QZPrivate && window.QZPrivate.dropIfActive()) {
+      setTimeout(function () { location.reload(); }, 250);
+    }
   }
 
   /* ---------------- 变更订阅 ---------------- */
@@ -521,7 +525,13 @@
         return ghRead().then(function (res) {
           if (!res.ok) throw new Error(res.message || '读取失败');
           if (res.rawUnsupported) throw new Error('state.json 超过 1MB，请换回自建服务器');
-          return align(res.state, res.sha);
+          return Promise.resolve(align(res.state, res.sha)).then(function () {
+            /* 连上的是主人仓库，但启动时还没凭证 —— 刷一次让 boot.js 去取私人数据 */
+            if (window.QZPrivate && window.QZPrivate.needsReload(cfg)) {
+              setStatus('私人数据已就绪，正在重新载入…');
+              setTimeout(function () { location.reload(); }, 400);
+            }
+          });
         });
       });
   }
@@ -612,6 +622,9 @@
     saveCfg();
     setStatus('已断开，本地数据照旧保留');
     render();
+    if (window.QZPrivate && window.QZPrivate.dropIfActive()) {
+      setTimeout(function () { location.reload(); }, 250);
+    }
   }
 
   function download(obj, name) {

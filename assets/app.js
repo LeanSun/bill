@@ -1,33 +1,39 @@
 /* ============================================================
    轻账 · Ledger — 应用逻辑
-   数据：assets/data.js（由 2025/2026 账单.xlsx 抽取并核对）
+   数据：公开版不含账单明细；私人数据由 assets/boot.js 门禁后注入
+         window.BILL_DATA（私有仓库 private-data.json）
    图表：本地 echarts 5.5.1，无网络依赖
    存储：localStorage 保存新增 / 修改 / 删除，不改动源文件
    ============================================================ */
 (function () {
   'use strict';
 
-  /* ---------------- 常量 ---------------- */
-  var SEED = (window.BILL_DATA && Array.isArray(window.BILL_DATA.records)) ? window.BILL_DATA.records : [];
-  /* 原始 xlsx 里的体重与拼音表：体重作为种子值，用户记录覆盖；拼音只服务搜索 */
-  var SEED_WEIGHTS = (window.BILL_DATA && window.BILL_DATA.weights && typeof window.BILL_DATA.weights === 'object')
-    ? window.BILL_DATA.weights : {};
-  var PY_MAP = (window.BILL_DATA && window.BILL_DATA.pinyin && typeof window.BILL_DATA.pinyin === 'object')
-    ? window.BILL_DATA.pinyin : {};
-  var STORE_KEY = 'qingzhang.ledger.v1';
-  var THEME_KEY = 'qingzhang.theme.v1';
-  var CATCOLOR_KEY = 'qingzhang.catcolors.v1';
-  /* 数据里实际出现过的年份，升序。年度分析、对比图、消费日历都从这三个数里取，
-     以后再加账单文件不需要动任何渲染代码 */
-  var YEARS = (function () {
+  /* ---------------- 常量 ----------------
+     SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
+     fetch 完私有仓库才能用。这里先空着，applyDataset() 在 init 前灌进来。 */
+  var SEED = [], SEED_WEIGHTS = {}, PY_MAP = {}, YEARS = [], Y_LAST = 2026;
+  function applyDataset(d) {
+    d = d || {};
+    SEED = Array.isArray(d.records) ? d.records : [];
+    /* 原始 xlsx 里的体重与拼音表：体重作为种子值，用户记录覆盖；拼音只服务搜索 */
+    SEED_WEIGHTS = (d.weights && typeof d.weights === 'object') ? d.weights : {};
+    PY_MAP = (d.pinyin && typeof d.pinyin === 'object') ? d.pinyin : {};
+    /* 数据里实际出现过的年份，升序。年度分析、对比图、消费日历都从这里取，
+       游客版 SEED 为空 → YEARS 为空 → 年份按钮只剩一个「全部」 */
     var m = {};
     SEED.forEach(function (r) {
       var y = Number(String(r.date || '').slice(0, 4));
       if (y > 1900) m[y] = true;
     });
-    return Object.keys(m).map(Number).sort(function (a, b) { return a - b; });
-  })();
-  var Y_LAST = YEARS[YEARS.length - 1] || 2026;
+    YEARS = Object.keys(m).map(Number).sort(function (a, b) { return a - b; });
+    Y_LAST = YEARS[YEARS.length - 1] || 2026;
+    state.calendarYear = Y_LAST;
+    state.calMonth = { year: Y_LAST, month: new Date().getMonth() + 1 };
+  }
+  var STORE_KEY = 'qingzhang.ledger.v1';
+  var THEME_KEY = 'qingzhang.theme.v1';
+  var CATCOLOR_KEY = 'qingzhang.catcolors.v1';
+  var FEEL_KEY = 'qingzhang.paging.w.v1';
   var EXPENSE_CATS = ['餐饮', '日常', '交通', '服饰', '娱乐'];
   var INCOME_CATS = ['收入'];
   var ALL_CATS = EXPENSE_CATS.concat(INCOME_CATS);
@@ -3069,6 +3075,8 @@
     fillCategoryOptions();
   }
   function openModal(record, prefillDate, mode) {
+    /* 手机上记账浮层弹出前先收起筛选区，别让那一排按钮压在表单上 */
+    collapseFiltersOnMobile();
     lastFocused = document.activeElement;
     state.editingId = record ? record.id : null;
     if ($('modalTitle')) $('modalTitle').textContent = record ? '编辑记录' : '记一笔';
@@ -4222,6 +4230,71 @@
     jumpToDetail({ reset: true, label: '已跳转日历' });
   }
 
+  /* ---------------- 手感滑杆 / 手机筛选折叠 ---------------- */
+  /* 弹簧角频率 SOFT_W 允许现场调：往下更绵、往上更跟手。
+     存 localStorage，刷新后还在；改的是同一个var，下一次滚轮立刻生效。 */
+  function loadSoftW() {
+    try {
+      var n = Number(localStorage.getItem(FEEL_KEY));
+      if (isFinite(n) && n >= 6 && n <= 40) SOFT_W = Math.round(n);
+    } catch (e) { /* 无痕模式静默 */ }
+  }
+  function setSoftW(n, persist) {
+    n = Number(n);
+    if (!isFinite(n)) return;
+    n = Math.max(6, Math.min(40, Math.round(n)));
+    SOFT_W = n;
+    var r = $('softWRange'), box = $('softWNum'), out = $('softWVal');
+    if (r) r.value = String(n);
+    if (box && document.activeElement !== box) box.value = String(n);
+    if (out) out.textContent = String(n);
+    if (persist !== false) { try { localStorage.setItem(FEEL_KEY, String(n)); } catch (e) { /* noop */ } }
+  }
+  function bindFeelControl() {
+    var btn = $('feelBtn'), pop = $('feelPop'), r = $('softWRange'),
+      box = $('softWNum'), reset = $('softWReset');
+    setSoftW(SOFT_W, false);
+    if (!btn || !pop) return;
+    function close() { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); btn.classList.remove('is-on'); }
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = pop.hidden;
+      pop.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      btn.classList.toggle('is-on', open);
+    });
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    if (r) r.addEventListener('input', function () { setSoftW(this.value); });
+    if (box) box.addEventListener('change', function () { setSoftW(this.value); });
+    if (reset) reset.addEventListener('click', function () { setSoftW(16); });
+  }
+  function collapseFiltersOnMobile() {
+    var box = $('ctFilters'), btn = $('ctFilterToggle');
+    if (!box || !btn || !window.matchMedia || !window.matchMedia('(max-width: 760px)').matches) return;
+    box.classList.add('is-collapsed');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.classList.remove('is-on');
+  }
+  function bindFilterCollapse() {
+    var box = $('ctFilters'), btn = $('ctFilterToggle');
+    if (!box || !btn) return;
+    var mq = window.matchMedia ? window.matchMedia('(max-width: 760px)') : null;
+    function set(collapsed) {
+      box.classList.toggle('is-collapsed', !!collapsed);
+      btn.setAttribute('aria-expanded', String(!collapsed));
+      btn.classList.toggle('is-on', !collapsed);
+      requestAnimationFrame(resizeAll);
+    }
+    set(!!(mq && mq.matches));
+    btn.addEventListener('click', function () { set(!box.classList.contains('is-collapsed')); });
+    if (mq) {
+      if (mq.addEventListener) mq.addEventListener('change', function (e) { set(e.matches); });
+      else if (mq.addListener) mq.addListener(function (e) { set(e.matches); });
+    }
+  }
+
   /* ---------------- 启动 ---------------- */
   /* 全局悬浮提示：接管原生 title 与动态图表的 data-tip。
      气泡固定在鼠标上方、pointer-events:none，永远不会被光标挡住。 */
@@ -4272,17 +4345,15 @@
      同一份排布；要固化成默认，把保存下来的 JSON 抄进 DEFAULT_LAYOUT 即可。 */
   var LAYOUT_KEY = 'qingzhang.overview.layout.v1';
   var OV_COLS = 12;
-  /* 默认布局：这就是「现在这一版」的总览排列，2026-11-16 定版。
-     顺序 / 跨度都按屏幕上的样子逐格抄下来，改布局版本号（v:3）让任何
-     更早存进浏览器或云端的旧布局直接作废 —— 从此打开就是这一版，
-     换设备、清缓存、换浏览器都是同一张。要再改节奏，就在总览里排好、
-     点「复制布局」，把 JSON 抄回这里，版本号再顶一格。 */
+  /* 默认布局：2026-11-16 按发来的 JSON 定版（v3 原值照抄，版本号顶到 4
+     让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
+     社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 3,
-    order: ['kpi', 'trend', 'donut', 'balance', 'weight', 'calheat', 'stack', 'top', 'salary', 'reimb'],
+    v: 4,
+    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top', 'salary', 'reimb'],
     spans: {
-      kpi: [12, 3], trend: [12, 7], donut: [6, 7], balance: [6, 7], weight: [12, 6],
-      calheat: [12, 8], stack: [12, 7], top: [12, 7], salary: [12, 11], reimb: [12, 6]
+      kpi: [12, 3], calheat: [12, 7], trend: [5, 6], donut: [3, 6], balance: [4, 6],
+      weight: [5, 5], stack: [4, 5], top: [3, 5], salary: [6, 11], reimb: [6, 8]
     }
   };
   var ovGrid = null, ovEditing = false;
@@ -4305,7 +4376,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 3 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 4 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -4321,7 +4392,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 3, order: [], spans: {} };
+    var L = { v: 4, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;
@@ -4690,6 +4761,17 @@
   }
 
   function init() {
+    /* 私人数据门禁：没连到主人仓库就是空账本；连上了先读完私有仓库
+       再启动渲染，否则图表会先按空数据画一遍，再整体重画。 */
+    var ready = (window.BILL_READY && typeof window.BILL_READY.then === 'function')
+      ? window.BILL_READY : Promise.resolve(window.BILL_DATA || {});
+    Promise.resolve(ready).then(function (d) { applyDataset(d); startApp(); },
+      function () { applyDataset({}); startApp(); });
+  }
+  function startApp() {
+    var pv = window.QZPrivate && window.QZPrivate.status && window.QZPrivate.status();
+    if (pv && pv.error) toast('私人数据未载入：' + pv.error + '（当前显示空账本）', 'warn');
+    loadSoftW();
     state.store = loadStore();
     mergeSeedWeights();
     var saved = null;
@@ -4704,6 +4786,8 @@
 
     buildSelectOptions();
     bindEvents();
+    bindFeelControl();
+    bindFilterCollapse();
     bindDatePicker();
     bindHoverTip();
     state.layout = readLayout();
