@@ -578,7 +578,7 @@ html[data-theme="dark"] .sub{color:var(--muted)}
 .topbar .nav-glide{border-radius:9px;background:var(--card);border:1px solid var(--line);box-shadow:0 1px 3px rgba(24,39,75,.12)}
 .topbar-note{font-size:11px;color:var(--muted)}
 .topbar-note .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
-.main{padding-top:18px}
+.main{padding:18px clamp(16px,2.2vw,30px) 28px;max-width:none;margin:0}
 h2{font-size:19px;font-weight:750;letter-spacing:-.02em;color:var(--ink)}
 h3{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
 button{
@@ -912,7 +912,7 @@ function moveNavGlide(animate){
 
 function brandGlyph(x){const k=String(x||'');return ({'魔域':'魔','魔方格':'XMD','GAN':'GAN','梦图':'梦','裕鑫':'裕','永骏':'永','圣手':'圣','foxi':'foxi','奇艺':'奇','凌奥':'凌','小丸号':'丸','百变魔王':'百变','地摊':'摊','杂牌':'◇'})[k]||'◆'}function filterGlyph(id,x){if(id==='cubeTypeFilter')return typeGlyph(x)+' ';if(id==='cubeBrandFilter')return brandGlyph(x)+' ';if(id==='compEventFilter')return eventGlyph(x)+' ';return ''}function typeGlyph(x){const k=String(x||'');return ({'三阶':'▦','二阶':'▦','四阶':'▦','五阶':'▦','六阶':'▦','七阶':'▦','润滑油':'◉','计时器':'◷','补件':'◇','魔表':'◷'})[k]||'◇'}function eventGlyph(x){const k=String(x||'').toLowerCase();return ({'333':'▦','222':'▦','444':'▦','555':'▦','333bf':'◈','333oh':'◉','333fm':'⌁','333mbf':'▤','pyram':'△','minx':'⬡','skewb':'◇','sq1':'◫','clock':'◷','fto':'✳'})[k]||'◇'}function fillSelect(id,vals,all){let s=document.getElementById(id);if(!s)return;let v=s.value;s.innerHTML='<option value="">'+all+'</option>'+vals.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(vals.map(String).includes(v))s.value=v}
 function fillEventSelect(id,vals,all){fillSelect(id,vals,all)}
-function updateFilters(){fillSelect('cubeTypeFilter',unique(getOptions('types').map(typeLabel)),'全部类型');fillSelect('cubeBrandFilter',getOptions('brands'),'全部厂家');fillSelect('cubeYearFilter',unique(db.cubes.map(x=>x.date?x.date.slice(0,4):null)).sort().reverse(),'全部年份');fillSelect('compYearFilter',unique(db.competitions.map(x=>x.date?x.date.slice(0,4):null)).sort().reverse(),'全部年份');fillSelect('compProvinceFilter',unique(db.competitions.map(x=>compPlace(x).province).filter(Boolean)).sort(),'全部省份');fillEventSelect('compEventFilter',unique(db.competitions.flatMap(x=>x.events||[])).sort(),'全部项目')}
+function updateFilters(){fillSelect('cubeTypeFilter',uniqKeep(getOptions('types').map(typeLabel)),'全部类型');fillSelect('cubeBrandFilter',getOptions('brands'),'全部厂家');fillSelect('cubeYearFilter',unique(db.cubes.map(x=>x.date?x.date.slice(0,4):null)).sort().reverse(),'全部年份');fillSelect('compYearFilter',unique(db.competitions.map(x=>x.date?x.date.slice(0,4):null)).sort().reverse(),'全部年份');fillSelect('compProvinceFilter',unique(db.competitions.map(x=>compPlace(x).province).filter(Boolean)).sort(),'全部省份');fillEventSelect('compEventFilter',wcaSort(uniqKeep(db.competitions.flatMap(x=>x.events||[])),'events'),'全部项目')}
 
 function catalogIcon(key,name){const url=db.meta?.catalogIcons?.[key]?.[name];if(url)return `<img src="${esc(url)}" alt="" onerror="this.style.display='none'">`;if(key==='brands'){const k=Object.keys(BRAND_LOGOS||{}).find(k=>k.toLowerCase()===String(name).toLowerCase());if(k)return `<img src="${BRAND_LOGOS[k].src}" alt="" onerror="this.style.display='none'">`;return esc(name||'—')}if(key==='types')return eventIcon(typeLabel(name));return eventIcon(name)}
 function renderCatalogs(){const groups=[['types','typeCatalog'],['brands','brandCatalog'],['events','eventCatalog']];for(const [key,id] of groups){const el=document.getElementById(id);if(!el)continue;el.innerHTML=getOptions(key).map((v,i)=>`<div class="catalog-item" draggable="true" data-catalog-key="${key}" data-catalog-index="${i}" data-catalog-name="${esc(v)}" ondragstart="catalogDragStart(event,'${key}',${i})" ondragover="catalogDragOver(event)" ondrop="catalogDrop(event,'${key}',${i})"><span class="catalog-name"><span class="catalog-mini-icon">${catalogIcon(key,v)}</span><span>${esc(v)}</span></span><span class="actions"><button class="secondary catalog-menu-trigger" aria-label="选项菜单" onclick="openCatalogMenu(event,'${key}',${i})">⋯</button></span></div>`).join('')||'<div class="muted">暂无选项</div>'}}
@@ -1041,7 +1041,29 @@ function openCube(id=null){let x=id?db.cubes.find(z=>z.id===id):{date:new Date()
 const DEFAULT_EVENTS=['333','222','444','555','666','777','333bf','444bf','555bf','333oh','333fm','clock','minx','pyram','skewb','sq1','333mbf','FTO','other','333ai','333clone'];
 const EVENT_ICONS={'333':'event-333','222':'event-222','444':'event-444','555':'event-555','666':'event-666','777':'event-777','333bf':'event-333bf','444bf':'event-444bf','555bf':'event-555bf','333oh':'event-333oh','333fm':'event-333fm','clock':'event-clock','minx':'event-minx','pyram':'event-pyram','skewb':'event-skewb','sq1':'event-sq1','333mbf':'event-333mbf','FTO':'unofficial-fto','fto':'unofficial-fto'};
 function eventIcon(name){const key=String(name||'').trim();const cls=EVENT_ICONS[key]||EVENT_ICONS[key.toLowerCase()]||({'三阶':'event-333','二阶':'event-222','四阶':'event-444','五阶':'event-555','六阶':'event-666','七阶':'event-777','五魔方':'event-minx','金字塔':'event-pyram','斜转':'event-skewb','魔表':'event-clock','SQ1':'event-sq1','sq1':'event-sq1'}[key])||(/3x3|三阶/i.test(key)?'event-333':/fto|八面体/i.test(key)?'unofficial-fto':'');return cls?`<span class="cubing-icon ${cls}" aria-hidden="true"></span>`:'<span class="event-fallback" aria-hidden="true">◇</span>';}
-function addInlineOption(key){const labels={types:'魔方种类',brands:'厂家',events:'比赛项目'};const v=prompt(`新增${labels[key]}：`);if(v===null)return;const name=v.trim();if(!name){toast('名称不能为空');return}const arr=getOptions(key);if(arr.some(x=>String(x).toLowerCase()===name.toLowerCase())){toast('该选项已存在');return}arr.push(name);saveDB();toast(`${labels[key]}已添加`);if(key==='types'||key==='brands'){const el=document.querySelector(`[name="${key==='types'?'type':'brand'}"]`);if(el){if(![...el.options].some(o=>o.value===name))el.add(new Option(name,name));el.value=name;}}else{const box=document.querySelector('#formFields .events');if(box&&!box.querySelector(`input[name="events"][value="${CSS.escape(name)}"]`)){box.insertAdjacentHTML('beforeend',`<div class="event comp-event-edit" data-event="${esc(name)}" onclick="toggleModalEventStatus(event,'${esc(name)}')"><input type="checkbox" name="events" value="${esc(name)}" checked onclick="event.stopPropagation()"><span>${eventIcon(name)}</span><span class="event-name">${esc(name)}</span></div>`);}}}function getOptions(key){db.meta=db.meta||{};db.meta.catalogs=db.meta.catalogs||{};if(!Array.isArray(db.meta.catalogs[key])){db.meta.catalogs[key]=key==='types'?unique([...db.cubes.map(x=>x.type),'三阶','二阶','四阶','五阶','六阶','七阶','润滑油','补件','计时器','垫子','其它']):key==='brands'?unique(db.cubes.map(x=>x.brand).filter(Boolean)):DEFAULT_EVENTS.slice()}if(key==='events'&&!db.meta.catalogs[key].some(v=>String(v).toLowerCase()==='fto'))db.meta.catalogs[key].push('FTO');return db.meta.catalogs[key]} 
+function addInlineOption(key){const labels={types:'魔方种类',brands:'厂家',events:'比赛项目'};const v=prompt(`新增${labels[key]}：`);if(v===null)return;const name=v.trim();if(!name){toast('名称不能为空');return}const arr=getOptions(key);if(arr.some(x=>String(x).toLowerCase()===name.toLowerCase())){toast('该选项已存在');return}arr.push(name);saveDB();toast(`${labels[key]}已添加`);if(key==='types'||key==='brands'){const el=document.querySelector(`[name="${key==='types'?'type':'brand'}"]`);if(el){if(![...el.options].some(o=>o.value===name))el.add(new Option(name,name));el.value=name;}}else{const box=document.querySelector('#formFields .events');if(box&&!box.querySelector(`input[name="events"][value="${CSS.escape(name)}"]`)){box.insertAdjacentHTML('beforeend',`<div class="event comp-event-edit" data-event="${esc(name)}" onclick="toggleModalEventStatus(event,'${esc(name)}')"><input type="checkbox" name="events" value="${esc(name)}" checked onclick="event.stopPropagation()"><span>${eventIcon(name)}</span><span class="event-name">${esc(name)}</span></div>`);}}}/* WCA 官方项目顺序；WCA 之外的（润滑油/补件/FTO/其他…）一律排到后面 */
+const WCA_TYPE_ORDER=['三阶','二阶','四阶','五阶','六阶','七阶','三阶盲拧','单手','魔表','五魔方','金字塔','斜转','SQ1','四阶盲拧','五阶盲拧','多盲','最少步'];
+const WCA_EVENT_ORDER=['333','222','444','555','666','777','333bf','333oh','clock','minx','pyram','skewb','sq1','444bf','555bf','333mbf','333fm'];
+const TYPE_WCA_ALIAS={'3x3':'三阶','3x3x3':'三阶','二阶':'二阶','2x2':'二阶','四阶':'四阶','4x4':'四阶','五阶':'五阶','5x5':'五阶','六阶':'六阶','七阶':'七阶','五魔方':'五魔方','megaminx':'五魔方','金字塔':'金字塔','pyraminx':'金字塔','斜转':'斜转','skewb':'斜转','魔表':'魔表','clock':'魔表','sq1':'SQ1','3x3盲拧':'三阶盲拧','333bf':'三阶盲拧','3x3单手':'单手','333oh':'单手','最少步':'最少步','333fm':'最少步','多盲':'多盲','333mbf':'多盲'};
+function wcaRank(v,key){
+  const raw=String(v||'').trim();
+  if(key==='events'){
+    const k=raw.toLowerCase(),i=WCA_EVENT_ORDER.indexOf(k);
+    return i<0?9999:i;
+  }
+  const name=TYPE_WCA_ALIAS[raw.toLowerCase()]||TYPE_WCA_ALIAS[raw]||raw;
+  const i=WCA_TYPE_ORDER.indexOf(name);
+  return i<0?9999:i;
+}
+function wcaSort(arr,key){
+  return arr.slice().sort((a,b)=>{
+    const ra=wcaRank(a,key),rb=wcaRank(b,key);
+    return ra-rb||String(a).localeCompare(String(b),'zh-CN');
+  });
+}
+function uniqKeep(a){return [...new Set(a.filter(x=>x!==null&&x!==undefined&&String(x).trim()!==''))]}
+function getOptions(key){db.meta=db.meta||{};db.meta.catalogs=db.meta.catalogs||{};
+if(db.meta._wcaSorted!==2){['types','events'].forEach(function(k){if(Array.isArray(db.meta.catalogs[k]))db.meta.catalogs[k]=wcaSort(db.meta.catalogs[k],k)});db.meta._wcaSorted=2}if(!Array.isArray(db.meta.catalogs[key])){db.meta.catalogs[key]=key==='types'?wcaSort(unique([...db.cubes.map(x=>x.type),'三阶','二阶','四阶','五阶','六阶','七阶','润滑油','补件','计时器','垫子','其它']),'types'):key==='brands'?unique(db.cubes.map(x=>x.brand).filter(Boolean)):wcaSort(DEFAULT_EVENTS.slice(),'events')}if(key==='events'&&!db.meta.catalogs[key].some(v=>String(v).toLowerCase()==='fto'))db.meta.catalogs[key].push('FTO');return db.meta.catalogs[key]} 
 function openComp(id=null){let x=id?db.competitions.find(z=>z.id===id):{date:new Date().toISOString().slice(0,10),name:'',price:'',events:[],note:'',wca:false,province:'',city:'',url:''};const place=compPlace(x);x={...x,province:x.province||place.province,city:x.city||place.city,wca:!!x.wca};activeForm={kind:'comp',id,eventStatuses:{...(x.eventStatuses||{})}};document.getElementById('modalTitle').textContent=id?'编辑比赛记录':'新增比赛记录';document.getElementById('modalSub').textContent='勾选复选框表示报名；点击项目卡片空白处切换参加/未参加状态。未参加项目显示浅红色。';document.getElementById('deleteBtn').classList.toggle('hide',!id);document.getElementById('formFields').innerHTML=dateField('比赛日期','date',x.date)+field('比赛名称','name',x.name,'text',null,true,'输入比赛全名')+`<div class="field"><label>WCA 比赛</label><label style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:10px 12px"><input name="wca" type="checkbox" value="yes" ${x.wca?'checked':''} style="width:17px;height:17px"> ${wcaIcon()} <span>标记为 WCA 比赛</span></label></div>`+field('报名费（元）','price',x.price,'number')+field('省份','province',x.province,'text',null,false,'可填写省份或直辖市')+field('城市','city',x.city,'text',null,false,'可填写城市')+field('比赛页面 URL','url',x.url||'','url',null,true,'粘贴粗饼比赛详情页链接；留空时搜索粗饼比赛页面')+`<div class="field wide"><button type="button" class="secondary" onclick="importWcaInfo()">尝试从 WCA 比赛链接读取日期和城市</button></div>`+`<div class="field wide"><div class="event-select-head"><label>报名项目（勾选表示已报名；点击项目卡片非勾选区域切换参加状态）</label><div class="event-select-actions"><button type="button" class="secondary" onclick="setAllModalEvents(true)">全部选择</button><button type="button" class="ghost" onclick="setAllModalEvents(false)">全部取消</button></div></div><div class="events">${getOptions('events').map(e=>{const enrolled=(x.events||[]).includes(e),status=(x.eventStatuses||{})[e]||'attended';return `<div class="event comp-event-edit ${status==='missed'?'status-missed':''}" data-event="${esc(e)}" onclick="toggleModalEventStatus(event,'${esc(e)}')"><input type="checkbox" name="events" value="${esc(e)}" ${enrolled?'checked':''} onclick="event.stopPropagation()" onchange="this.parentElement.classList.toggle('enrolled',this.checked)"> ${eventIcon(e)} <span class="event-name">${esc(e)}</span></div>`}).join('')}</div></div>`;document.getElementById('modalBack').classList.add('open')}
 function toggleModalEventStatus(ev,eventName){if(ev.target&&ev.target.matches('input[type=checkbox]'))return;const card=ev.currentTarget;activeForm.eventStatuses=activeForm.eventStatuses||{};const status=activeForm.eventStatuses[eventName]==='missed'?'attended':'missed';activeForm.eventStatuses[eventName]=status;card.classList.toggle('status-missed',status==='missed')}
 function setAllModalEvents(checked){document.querySelectorAll('#formFields input[name="events"][type=checkbox]').forEach(input=>{input.checked=!!checked;input.dispatchEvent(new Event('change',{bubbles:true}))});toast(checked?'已选择全部比赛项目':'已取消全部比赛项目')}
@@ -1103,6 +1125,8 @@ var navDragging=false;
     if(!drag){raf=0;return}
     cur.x+=(aim.x-cur.x)*.40;
     cur.w+=(aim.w-cur.w)*.30;
+    /* 两端都夹在导航框内，最右一档不许滑出边界 */
+    cur.x=Math.max(0,Math.min(nav.clientWidth-cur.w,cur.x));
     cur.h=aim.h;cur.y=aim.y;
     glideState={x:cur.x,y:cur.y,w:cur.w,h:cur.h};
     glidePaint(glideState);
@@ -1129,7 +1153,7 @@ var navDragging=false;
     rs.forEach(function(r,k){var d=Math.abs(r.c-(e.clientX-drag.navLeft));if(d<best){best=d;target=k}});
     drag.i=target;
     var to=rs[target];
-    aim={x:Math.max(0,e.clientX-drag.navLeft-to.w/2),y:to.y,w:to.w,h:to.h};
+    aim={x:Math.max(0,Math.min(nav.clientWidth-to.w,e.clientX-drag.navLeft-to.w/2)),y:to.y,w:to.w,h:to.h};
     start();
   });
   function end(e){
@@ -1213,6 +1237,42 @@ window.addEventListener('message',function(e){
   n.innerHTML=window.CUBE_GATED
     ? '<b>私人仓库同步</b> · 浏览器缓存 + 私有仓库备份'
     : '<b>演示模式</b> · 未链接私人仓库，显示空账本';
+})();
+
+/* 云同步面板可能是在魔方页打开之后才连上的：storage 事件一到就重判门禁，
+   顺手把私有仓库的魔方数据拉进来，别让右上角一直停在旧的「演示模式」。 */
+(function(){
+  function cfg(){try{return JSON.parse(localStorage.getItem('qingzhang.sync.v3')||'null')}catch(e){return null}}
+  function gate(c){
+    if(!c||c.mode==='http'||!c.token||!(Number(c.exp)*1000>Date.now()))return false;
+    return String(c.owner||'').toLowerCase()==='leansun'&&String(c.repo||'').toLowerCase()==='bill-data';
+  }
+  function paintNote(ok){
+    window.CUBE_GATED=ok;
+    var n=document.getElementById('cubeStoreNote');
+    if(n)n.innerHTML=ok?'<b>私人仓库同步</b> · 浏览器缓存 + 私有仓库备份'
+                          :'<b>演示模式</b> · 未链接私人仓库，显示空账本';
+  }
+  function adopt(){
+    var c=cfg();if(!gate(c)){paintNote(false);return}
+    paintNote(true);
+    if(db&&db._privateOwner==='LeanSun')return;
+    fetch('https://api.github.com/repos/LeanSun/bill-data/contents/cube-data.json?ref=main',{
+      headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+c.token},cache:'no-store'
+    }).then(function(r){return r.ok?r.json():null}).then(function(j){
+      if(!j||!j.content)return;
+      var bin=atob(j.content.replace(/\s+/g,'')),a=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);
+      var p=JSON.parse(new TextDecoder('utf-8').decode(a));
+      if(!p||!p.db||!Array.isArray(p.db.cubes))return;
+      db=p.db;db._privateOwner='LeanSun';db._rev=Number(p.rev)||1;
+      localStorage.setItem('cubeLedger_v1',JSON.stringify(db));
+      localStorage.setItem('cubeLedger_remoteSha_v1',j.sha||'');
+      renderAll();toast('已从私有仓库载入魔方数据');
+    }).catch(function(){});
+  }
+  window.addEventListener('storage',function(e){if(e&&e.key==='qingzhang.sync.v3')adopt()});
+  adopt();
 })();
 </script>
 </body>

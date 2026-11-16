@@ -1789,31 +1789,42 @@
     syncFilterSeg(catBox);
 
     /* 子类：换分类 / 换肤 / 笔数变化才重建；同一分类里换子类只挪滑块 */
-    var names = [], counts = {}, tot = 0, subAmount = 0, scoped = rangeRecords();
+    var names = [], counts = {}, tot = 0, subAmount = 0;
+    /* 收支筛选先生效：金额 chip 跟着「全部 / 支 / 收」走，子项笔数也同一口径 */
+    var typed = rangeRecords().filter(function (r) {
+      return state.filters.type === 'all' || r.type === state.filters.type;
+    });
     if (cat !== 'all') {
-      scoped.forEach(function (r) {
+      typed.forEach(function (r) {
         if (r.category !== cat) return;
         counts[r.sub] = (counts[r.sub] || 0) + 1;
         tot++;
         if (state.filters.sub === 'all' || r.sub === state.filters.sub) subAmount += r.amount;
       });
       names = subCatNames(cat);
+    } else {
+      typed.forEach(function (r) { subAmount += r.amount; });
     }
     /* 右侧金额统计：跟着当前粒度走（年 / 月 / 周 / 日），
        取 rangeRecords() 的区间，和上面子类笔数同一份口径 */
     var sumBox = $('subSum');
     if (sumBox) {
-      sumBox.hidden = !names.length;
-      if (names.length) {
-        var label = ({ year: '年统计', month: '月统计', week: '周统计', day: '日统计' })[state.scale] || '统计';
-        var lab = sumBox.querySelector('span'), val = sumBox.querySelector('b');
-        if (lab) lab.textContent = label;
-        if (val) val.textContent = fmtBig(subAmount);
-      }
+      /* 「全部」没有子项按钮，但 chip 照留 —— 它现在显示当前收支口径的区间总额 */
+      sumBox.hidden = false;
+      var label = ({ year: '年统计', month: '月统计', week: '周统计', day: '日统计' })[state.scale] || '统计';
+      var lab = sumBox.querySelector('span'), val = sumBox.querySelector('b');
+      if (lab) lab.textContent = label;
+      if (val) val.textContent = fmtBig(subAmount);
+      /* 账本口径：收入红、支出绿；全部时不偏向任何一边 */
+      var sumColor = state.filters.type === 'income' ? p.income
+        : state.filters.type === 'expense' ? p.expense
+        : (cat === '收入' ? p.income : '');
+      sumBox.style.setProperty('--sum-color', sumColor);
     }
     var subSig = names.length ? theme + '|' + p.primary + '|' + colSig + '|' + cat + '|' + names.join(',') + '|' +
       names.map(function (n) { return counts[n] || 0; }).join(',') + '|' + tot + '|' +
-      state.filters.sub + '|' + Math.round(subAmount * 100) + '|' + state.scale : '';
+      state.filters.sub + '|' + Math.round(subAmount * 100) + '|' + state.scale + '|' +
+      state.filters.type : 'all|' + Math.round(subAmount * 100) + '|' + state.scale + '|' + state.filters.type;
     if (subBox.dataset.sig !== subSig) {
       var sub = '';
       if (names.length) {
@@ -2681,7 +2692,10 @@
     for (var j = 0; j < navs.length; j++) navs[j].classList.toggle('is-active', navs[j].dataset.view === view);
     /* 日历页要锁一整屏，正文底距归零，否则那 56px 会把日历顶出一截 */
     var main = document.querySelector('.main');
-    if (main) main.classList.toggle('is-calendar', view === 'calendar');
+    if (main) {
+      main.classList.toggle('is-calendar', view === 'calendar');
+      main.classList.toggle('is-cube', view === 'cube');
+    }
     writeRoute(view, false);
     if (view === 'calendar') renderBoard();
     if (view === 'cube') mountCube();

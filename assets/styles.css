@@ -2177,7 +2177,7 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .sub-sum[hidden] { display: none; }
 .sub-sum span { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 .sub-sum b {
-  font-size: 14px; font-weight: 750; letter-spacing: -.02em; color: var(--text);
+  font-size: 14px; font-weight: 750; letter-spacing: -.02em; color: var(--sum-color, var(--text));
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 @media (max-width: 760px) {
@@ -2193,3 +2193,10 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .cube-loading[hidden]{display:none}
 .cube-spin{width:15px;height:15px;border:2px solid var(--border-strong);border-top-color:var(--primary);border-radius:50%;animation:cubeSpin .8s linear infinite}
 @keyframes cubeSpin{to{transform:rotate(360deg)}}
+
+/* 魔方页整屏铺开：父层不再留一圈 padding，iframe 也不要自己的卡片边框 */
+.main.is-cube { padding: 0; }
+.main.is-cube .cube-frame {
+  height: 100dvh; min-height: 0; border: 0; border-radius: 0; box-shadow: none;
+}
+.main.is-cube .cube-loading { inset: 0; border: 0; border-radius: 0; }
