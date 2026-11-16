@@ -562,6 +562,53 @@ html[data-theme="dark"] .sub{color:var(--muted)}
 
 </style>
 <script src="assets/echarts.min.js"></script>
+
+<script>
+/* ---- 魔方数据门禁 + 独立云存储 ----
+   跟账本同一把钥匙（qingzhang.sync.v3），但读写的是私有仓库里另一份文件
+   cube-data.json，localStorage 也只用 cubeLedger_v1，与账本零交叉。 */
+(function(){
+  var KEY='cubeLedger_v1', CFG='qingzhang.sync.v3', SHA='cubeLedger_remoteSha_v1',
+      OWNER='leansun', REPO='bill-data', FILE='cube-data.json', API='https://api.github.com';
+  function cfg(){try{return JSON.parse(localStorage.getItem(CFG)||'null')}catch(e){return null}}
+  function gate(c){
+    if(!c||c.mode==='http'||!c.token||!(Number(c.exp)*1000>Date.now()))return false;
+    return String(c.owner||'').toLowerCase()===OWNER&&String(c.repo||'').toLowerCase()===REPO;
+  }
+  function ownFlag(){
+    try{var x=JSON.parse(localStorage.getItem(KEY)||'null');return !!(x&&x._privateOwner==='LeanSun')}catch(e){return false}
+  }
+  function url(){return API+'/repos/'+OWNER+'/'+REPO+'/contents/'+FILE}
+  function decode(b64){
+    var bin=atob(String(b64||'').replace(/\s+/g,'')),a=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(a);
+  }
+  function flag(k,v){try{sessionStorage.setItem('cube.boot.'+k,v?'1':'')}catch(e){}}
+  function flagged(k){try{return sessionStorage.getItem('cube.boot.'+k)==='1'}catch(e){return false}}
+  var c=cfg();
+  if(!gate(c)){
+    if(ownFlag()&&!flagged('cleared')){flag('cleared',1);localStorage.removeItem(KEY);location.reload()}
+    return;
+  }
+  if(flagged('seeded'))return;
+  flag('seeded',1);
+  fetch(url()+'?ref=main',{headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+c.token},cache:'no-store'})
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+    .then(function(j){
+      var remote=JSON.parse(decode(j.content)),localRev=-1;
+      try{localRev=ownFlag()?(JSON.parse(localStorage.getItem(KEY))._rev||0):-1}catch(e){}
+      if((Number(remote.rev)||0)>=localRev){
+        var db=remote.db||{};
+        db._privateOwner='LeanSun';db._rev=Number(remote.rev)||1;
+        localStorage.setItem(KEY,JSON.stringify(db));
+        localStorage.setItem(SHA,j.sha||'');
+        location.reload();
+      }
+    }).catch(function(){});
+})();
+</script>
+
 </head>
 <body>
 <div class="shell" data-page-node-id="ohQlDUMckz1uPGsq2luCEL">
@@ -757,7 +804,7 @@ html[data-theme="dark"] .sub{color:var(--muted)}
 })();
 
 
-const INITIAL={"cubes":[{"id":"c2","date":"2026-01-16","type":"三阶","brand":"魔域","model":"RS3M 2020","price":17.8,"note":""},{"id":"c3","date":null,"type":"三阶","brand":"魔域","model":"RS3M 2020","price":17.8,"note":""},{"id":"c4","date":null,"type":"三阶","brand":"魔域","model":"RS3M 2020","price":17.8,"note":""},{"id":"c5","date":null,"type":"三阶","brand":"魔域","model":"RS3M 2020","price":17.8,"note":""},{"id":"c6","date":null,"type":"三阶","brand":"魔方格","model":"风三代 焕新版","price":95,"note":""},{"id":"c7","date":null,"type":"润滑油","brand":"foxi","model":"绿盖","price":10.38,"note":""},{"id":"c8","date":null,"type":"润滑油","brand":"foxi","model":"紫盖","price":7.37,"note":""},{"id":"c9","date":null,"type":"润滑油","brand":"foxi","model":"红盖","price":10.87,"note":""},{"id":"c10","date":"2026-04-13","type":"三阶","brand":"魔域","model":"RS3M V5SE","price":81.74,"note":""},{"id":"c16","date":"2025-03-09","type":"三阶","brand":"魔域","model":"RS3M V5","price":70.5,"note":""},{"id":"c17","date":"2025-03-12","type":"三阶","brand":"梦图","model":"天马X3+三磁感","price":65,"note":""},{"id":"c18","date":"2025-03-17","type":"补件","brand":"魔域","model":"RS3M V5角块","price":5,"note":""},{"id":"c19","date":"2025-04-18","type":"三阶","brand":"魔域","model":"RS3M V5","price":15.8,"note":""},{"id":"c20","date":"2025-04-18","type":"三阶","brand":"魔域","model":"RS3M V5","price":15.8,"note":""},{"id":"c21","date":"2025-04-22","type":"五阶","brand":"魔域","model":"傲创V6","price":180,"note":""},{"id":"c22","date":"2025-04-22","type":"魔表","brand":"魔方格","model":"传世","price":100,"note":""},{"id":"c23","date":"2025-04-25","type":"六阶","brand":"魔域","model":"魅龙","price":40,"note":""},{"id":"c24","date":"2025-04-25","type":"七阶","brand":"魔域","model":"魅龙","price":50,"note":""},{"id":"c25","date":"2025-09-15","type":"四阶","brand":"魔域","model":"傲速V7","price":154,"note":""},{"id":"c26","date":"2024-01-01","type":"三阶","brand":"梦图","model":"天马X3三磁感","price":72,"note":""},{"id":"c27","date":null,"type":"补件","brand":"梦图","model":"天马中心盖","price":1,"note":""},{"id":"c28","date":"2024-05-07","type":"四阶","brand":"魔域","model":"傲速WRM","price":150,"note":""},{"id":"c29","date":null,"type":"润滑油","brand":"魔方格","model":"奇艺M油","price":5,"note":""},{"id":"c30","date":"2024-06-02","type":"三阶","brand":"圣手","model":"光彩三阶","price":35,"note":""},{"id":"c31","date":null,"type":"三阶","brand":"魔域","model":"魅龙","price":6.8,"note":""},{"id":"c32","date":"2024-06-07","type":"三阶","brand":"魔方格","model":"勇士w","price":9.7,"note":""},{"id":"c33","date":null,"type":"三阶","brand":"魔方格","model":"钥匙扣","price":9.8,"note":""},{"id":"c34","date":null,"type":"枫叶","brand":"魔方格","model":"霓虹","price":11,"note":""},{"id":"c35","date":null,"type":"三阶","brand":"魔域","model":"威龙WRM V10","price":98,"note":""},{"id":"c36","date":null,"type":133,"brand":"魔方格","model":"指尖陀螺","price":8.3,"note":""},{"id":"c37","date":null,"type":133,"brand":"魔方格","model":"指尖陀螺","price":10.8,"note":""},{"id":"c38","date":null,"type":"三阶","brand":"裕鑫","model":"宝盒魔方","price":40.8,"note":""},{"id":"c39","date":"2024-06-16","type":"三阶","brand":"魔域","model":"RS3M V5","price":76,"note":""},{"id":"c40","date":"2024-08-29","type":"三阶","brand":"魔方格","model":"SC智能三阶","price":60,"note":""},{"id":"c41","date":null,"type":"计时器","brand":"魔方格","model":"智能计时器","price":38.8,"note":""},{"id":"c42","date":"2023-03-15","type":"三阶","brand":"魔方格","model":"XMD风三阶三代","price":99,"note":""},{"id":"c43","date":null,"type":"计时器","brand":"魔方格","model":"奇艺计时器","price":38.8,"note":""},{"id":"c44","date":null,"type":"四阶","brand":"永骏","model":"MGC","price":60,"note":""},{"id":"c45","date":null,"type":"垫子","brand":"魔方格","model":"头号玩家","price":14,"note":""},{"id":"c46","date":null,"type":"补件","brand":"魔方格","model":"风三代中心盖","price":1,"note":""},{"id":"c47","date":"2022-01-14","type":"三阶","brand":"魔方格","model":"XMD风三阶二代","price":74.34,"note":""},{"id":"c48","date":null,"type":"润滑油","brand":"魔方格","model":"M-1水性油","price":2.67,"note":""},{"id":"c49","date":null,"type":"润滑油","brand":"魔方格","model":"XMD差速油","price":8.54,"note":""},{"id":"c50","date":null,"type":"三阶","brand":"魔域","model":"RS3M 2020-磁悬浮","price":30.85,"note":""},{"id":"c51","date":"2022-05-23","type":"三阶","brand":"魔方格","model":"钥匙扣","price":6.34,"note":""},{"id":"c52","date":null,"type":"金字塔","brand":"魔方格","model":"钥匙扣","price":7.34,"note":""},{"id":"c53","date":null,"type":"枫叶","brand":"魔方格","model":"钥匙扣","price":7.34,"note":""},{"id":"c54","date":"2022-10-06","type":"三阶","brand":"魔方格","model":"XMD风三阶三代","price":106.76,"note":""},{"id":"c55","date":null,"type":"三阶","brand":"魔域","model":"威龙WRM 2021","price":66,"note":""},{"id":"c56","date":null,"type":"润滑油","brand":"foxi","model":"绿盖","price":11.5,"note":""},{"id":"c57","date":null,"type":"润滑油","brand":"foxi","model":"黄盖","price":18,"note":""},{"id":"c58","date":"2021-06-17","type":"三阶","brand":"GAN","model":"GAN356i2","price":182.9,"note":""},{"id":"c59","date":"2020-04-30","type":"三阶","brand":"魔域","model":"威龙WRM","price":125.11,"note":""},{"id":"c60","date":null,"type":"五阶","brand":"永骏","model":"MGC","price":60.58,"note":""},{"id":"c61","date":"2020-12-31","type":"三阶","brand":"魔域","model":"威龙WRM","price":126.44,"note":""},{"id":"c62","date":null,"type":"三阶","brand":"魔域","model":"RS3M 2020","price":16.68,"note":""},{"id":"c63","date":"2019-03-06","type":"三阶","brand":"魔域","model":"威龙WR","price":137.06,"note":""},{"id":"c64","date":null,"type":"七阶","brand":"魔方格","model":"烨","price":180.94,"note":""},{"id":"c65","date":"2019-03-16","type":"五阶","brand":"裕鑫","model":"小魔法","price":48.9,"note":""},{"id":"c66","date":null,"type":"SQ1","brand":"裕鑫","model":"小魔法","price":26.1,"note":""},{"id":"c67","date":"2019-05-20","type":"四阶","brand":"魔域","model":"傲速GTS2M","price":151.8,"note":""},{"id":"c68","date":null,"type":"五魔方","brand":"魔方格","model":"星二代LM","price":95.2,"note":""},{"id":"c69","date":"2019-08-07","type":"三阶","brand":"魔域","model":"威龙WRM","price":131.5,"note":""},{"id":"c70","date":"2019-08-24","type":"润滑油","brand":"魔域","model":"2号油","price":1.98,"note":""},{"id":"c71","date":null,"type":"润滑油","brand":"魔方格","model":"m-lube","price":9.95,"note":""},{"id":"c72","date":null,"type":"金字塔","brand":"魔方格","model":"铃","price":38.61,"note":""},{"id":"c73","date":"2019-12-03","type":"四阶","brand":"魔域","model":"傲速WRM","price":152.25,"note":""},{"id":"c74","date":"2018-03-01","type":"补件","brand":"魔方格","model":"Valk3角块","price":5,"note":""},{"id":"c75","date":null,"type":"金字塔","brand":"魔域","model":"魔方教室","price":14.15,"note":""},{"id":"c76","date":null,"type":"SQ1","brand":"魔方格","model":"奇艺","price":28,"note":""},{"id":"c77","date":null,"type":"斜转","brand":"魔方格","model":"奇艺","price":28.3,"note":""},{"id":"c78","date":null,"type":"三阶","brand":"魔方格","model":"Valk3 PowerM","price":126.5,"note":""},{"id":"c79","date":"2018-05-03","type":"二阶","brand":"魔域","model":"威魄","price":39,"note":""},{"id":"c80","date":null,"type":"斜转","brand":"魔方格","model":"启程","price":16,"note":""},{"id":"c81","date":null,"type":"四阶","brand":"魔域","model":"傲速GTSM","price":126,"note":""},{"id":"c82","date":null,"type":"五魔方","brand":"裕鑫","model":"小魔法","price":18,"note":""},{"id":"c83","date":null,"type":"金字塔","brand":"裕鑫","model":"小魔法","price":12,"note":""},{"id":"c84","date":"2018-05-28","type":"三阶","brand":"魔域","model":"威龙GTS2","price":61,"note":""},{"id":"c85","date":"2018-07-09","type":"五阶","brand":"魔方格","model":"无双M","price":80,"note":""},{"id":"c86","date":"2018-07-31","type":"三阶","brand":"魔域","model":"威龙GTS2","price":75,"note":""},{"id":"c87","date":null,"type":"贴纸","brand":"魔域","model":"威龙GTS2","price":10,"note":""},{"id":"c88","date":"2018-08-31","type":"魔表","brand":"凌奥","model":"魔A","price":20,"note":""},{"id":"c89","date":null,"type":"七阶","brand":"魔域","model":"魔方教室","price":43.5,"note":""},{"id":"c90","date":null,"type":"三阶","brand":"GAN","model":"GAN354M","price":146,"note":""},{"id":"c91","date":null,"type":"六阶","brand":"裕鑫","model":"小魔法","price":36,"note":""},{"id":"c92","date":"2018-11-26","type":"二阶","brand":"永骏","model":"MGC","price":34.22,"note":""},{"id":"c93","date":"2017-02-24","type":"三阶","brand":"魔方格","model":"Valk3","price":68.5,"note":""},{"id":"c94","date":"2017-06-23","type":"三阶","brand":"魔域","model":"威龙GTS2M","price":98,"note":""},{"id":"c95","date":null,"type":"补件","brand":"魔方格","model":"Valk3角块","price":8,"note":""},{"id":"c96","date":"2017-10-16","type":"三阶","brand":"永骏","model":"冠龙","price":8.83,"note":""},{"id":"c97","date":null,"type":"三阶","brand":"魔域","model":"双调系统","price":8.75,"note":""},{"id":"c98","date":null,"type":"二阶","brand":"魔域","model":"魔方教室MF2","price":11.42,"note":""},{"id":"c99","date":null,"type":"五阶","brand":"裕鑫","model":"紫麒麟","price":52.63,"note":""},{"id":"c100","date":null,"type":"润滑油","brand":"魔方格","model":"赠品油","price":1.94,"note":""},{"id":"c101","date":null,"type":"润滑油","brand":"GAN","model":"护理油","price":13,"note":""},{"id":"c102","date":null,"type":"三阶","brand":"魔域","model":"魔方教室MF3RS","price":28,"note":""},{"id":"c103","date":"2017-11-05","type":"三阶","brand":"魔域","model":"魔方教室MF3RS","price":24.62,"note":""},{"id":"c104","date":null,"type":"三阶","brand":"魔方格","model":"Valk3 PowerM","price":140.14,"note":""},{"id":"c105","date":"2016-06-10","type":"三阶","brand":"魔域","model":"威龙GTS","price":80,"note":""},{"id":"c106","date":null,"type":"四阶","brand":"魔域","model":"傲速GTS","price":80,"note":""},{"id":"c107","date":null,"type":"鬼魔","brand":"地摊","model":"杂牌","price":80,"note":""},{"id":"c108","date":null,"type":"魔中魔","brand":"杂牌","model":"地球","price":80,"note":""},{"id":"c109","date":"2016-09-17","type":"三阶","brand":"小丸号","model":"钥匙扣","price":23.85,"note":""},{"id":"c110","date":"2016-10-04","type":"三阶","brand":"魔方格","model":"Valk3","price":64.52,"note":""},{"id":"c111","date":null,"type":"计时器","brand":"裕鑫","model":"三代","price":45.48,"note":""},{"id":"c112","date":null,"type":"三阶","brand":"GAN","model":"GAN356Air","price":139,"note":""},{"id":"c113","date":"2016-11-11","type":"三阶","brand":"魔域","model":"魔方教室MF3","price":5.41,"note":""},{"id":"c114","date":null,"type":"二阶","brand":"魔域","model":"唐魄","price":31.64,"note":""},{"id":"c115","date":null,"type":"三阶","brand":"永骏","model":"魅影","price":39.75,"note":""},{"id":"c116","date":"2016-11-15","type":"四阶","brand":"魔方格","model":"无缺","price":44,"note":""},{"id":"c117","date":"2015","type":"三阶","brand":"魔域","model":"速龙","price":25,"note":""},{"id":"c118","date":null,"type":"四阶","brand":"地摊","model":"杂牌","price":30,"note":""},{"id":"c119","date":null,"type":"四阶","brand":"圣手","model":"圣手","price":35,"note":""},{"id":"c120","date":null,"type":"五阶","brand":"地摊","model":"杂牌","price":35,"note":""},{"id":"c121","date":null,"type":"五阶","brand":"圣手","model":"圣手","price":40,"note":""},{"id":"c122","date":null,"type":"斜转","brand":"地摊","model":"杂牌","price":15,"note":""},{"id":"c123","date":null,"type":"钻石","brand":"地摊","model":"杂牌","price":10,"note":""},{"id":"c124","date":null,"type":"镜面","brand":"地摊","model":"杂牌","price":15,"note":""},{"id":"c125","date":null,"type":"五魔方","brand":"地摊","model":"杂牌","price":40,"note":""},{"id":"c126","date":null,"type":"三阶","brand":"百变魔王","model":"百变魔王","price":8,"note":""},{"id":"c127","date":null,"type":"三阶","brand":"百变魔王","model":"百变魔王","price":20,"note":""},{"id":"c128","date":null,"type":"三阶","brand":"魔域","model":"速龙","price":25,"note":""},{"id":"c129","date":"2014","type":"三阶","brand":"百变魔王","model":"百变魔王","price":10,"note":""},{"id":"c130","date":null,"type":"三阶","brand":"百变魔王","model":"百变魔王","price":10,"note":""},{"id":"c131","date":null,"type":"三阶","brand":"地摊","model":"杂牌","price":15,"note":""}],"competitions":[{"id":"m2","date":"2016-12-18","name":"2016黑龙江高校魔方联赛","price":1,"events":["333","222","444","333oh"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","333oh":"attended"}},{"id":"m3","date":"2017-11-18","name":"2017WCA黑龙江高校魔方公开赛","price":55,"events":["333","222","444","333bf","333oh"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","333bf":"attended","333oh":"attended"}},{"id":"m4","date":"2018-06-09","name":"2018WCA哈尔滨魔方公开赛","price":130,"events":["333","222","444","333bf","333oh","333fm","pyram","skewb","sq1"],"note":"","eventStatuses":{"333":"missed","222":"attended","444":"attended","333bf":"attended","333oh":"attended","333fm":"attended","pyram":"attended","skewb":"attended","sq1":"attended"}},{"id":"m5","date":"2018-07-29","name":"2018WCA北京夏季魔方赛","price":160,"events":["333","333oh","pyram","skewb"],"note":"","eventStatuses":{"333":"attended","333oh":"attended","pyram":"attended","skewb":"attended"}},{"id":"m6","date":"2018-08-05","name":"2018WCA塞上江南魔方赛","price":115,"events":["333","222","444","555","333bf","333oh","pyram","skewb"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","555":"attended","333bf":"attended","333oh":"attended","pyram":"attended","skewb":"attended"}},{"id":"m7","date":"2018-12-22","name":"2018WCA牡丹江魔方公开赛","price":170,"events":["333","222","444","333bf","333oh","pyram","skewb"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","333bf":"attended","333oh":"attended","pyram":"attended","skewb":"attended"}},{"id":"m8","date":"2019-08-18","name":"2019WCA塞上江南魔方公开赛","price":145,"events":["333","222","444","333bf","333oh","minx","pyram"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","333bf":"attended","333oh":"attended","minx":"attended","pyram":"attended"}},{"id":"m9","date":"2020-01-01","name":"2020WCA西安新年赛","price":255,"events":["333","222","444"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended"}},{"id":"m10","date":"2021-04-01","name":"2021WCA西安樱花未时赛","price":220,"events":["333","222","555","333bf"],"note":"","eventStatuses":{"333":"attended","222":"attended","555":"attended","333bf":"attended"}},{"id":"m11","date":"2023-06-03","name":"第十五届哈尔滨魔方公开赛","price":40,"events":["333","222","444","333oh"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","333oh":"attended"}},{"id":"m12","date":"2023-12-17","name":"2023WCA沈阳公开赛","price":245,"events":["333","333bf","333mbf"],"note":"","eventStatuses":{"333":"missed","333bf":"missed","333mbf":"missed"}},{"id":"m13","date":"2024-01-28","name":"2024塞上江南魔方冬季趣味赛","price":70,"events":["333","333oh"],"note":"","eventStatuses":{"333":"attended","333oh":"attended"}},{"id":"m14","date":"2024-04-05","name":"2024WCA沈阳春季赛","price":190,"events":["333","333bf"],"note":"","eventStatuses":{"333":"attended","333bf":"attended"}},{"id":"m15","date":"2024-06-01","name":"2024WCA天津魔方公开赛","price":240,"events":["333","444","333bf"],"note":"","eventStatuses":{"333":"attended","444":"attended","333bf":"attended"}},{"id":"m16","date":"2024-06-01","name":"FMC2024","price":50,"events":["333fm"],"note":"","eventStatuses":{"333fm":"attended"}},{"id":"m17","date":"2024-06-29","name":"2024WCA丹东鸭绿江公开赛","price":250,"events":["333","222","333bf","333oh","pyram"],"note":"","eventStatuses":{"333":"attended","222":"attended","333bf":"attended","333oh":"attended","pyram":"attended"}},{"id":"m18","date":"2024-08-24","name":"2024WCA德清夏季长时赛","price":210,"events":["333","444","333oh"],"note":"","eventStatuses":{"333":"attended","444":"attended","333oh":"attended"}},{"id":"m19","date":"2024-08-25","name":"2024年南京市魔方公开赛","price":160,"events":["333","222","333bf","333oh","pyram"],"note":"","eventStatuses":{"333":"attended","222":"attended","333bf":"attended","333oh":"attended","pyram":"attended"}},{"id":"m20","date":"2024-10-03","name":"第一届中国（金坛）魔方公开赛","price":130,"events":["333","444","333bf","333oh"],"note":"","eventStatuses":{"333":"attended","444":"attended","333bf":"attended","333oh":"attended"}},{"id":"m21","date":"2024-10-13","name":"2024交大公开赛暨新生杯","price":50,"events":["333","222","333oh"],"note":"","eventStatuses":{"333":"attended","222":"attended","333oh":"attended"}},{"id":"m22","date":"2024-12-14","name":"2024WCA粗饼最少步联赛","price":80,"events":["333fm"],"note":"","eventStatuses":{"333fm":"attended"}},{"id":"m23","date":"2025-01-25","name":"2025塞上江南冬季魔方赛","price":130,"events":["333","222","444","pyram","333clone"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","pyram":"attended","333clone":"attended"}},{"id":"m24","date":"2025-04-13","name":"2025WCA上海安静赛","price":270,"events":["333bf","333fm","333mbf"],"note":"","eventStatuses":{"333bf":"attended","333fm":"attended","333mbf":"attended"}},{"id":"m25","date":"2025-10-08","name":"“奇艺魔方格杯“上海秋季赛","price":145,"events":["333","222","444","333oh","clock"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","333oh":"attended","clock":"attended"}},{"id":"m26","date":"2025-11-23","name":"20525WCU上海交通大学新生杯","price":150,"events":["333","222","444","333oh","333ai"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","333oh":"attended","333ai":"attended"}},{"id":"m27","date":"2025-12-20","name":"2025WCA粗饼最少步联赛","price":50,"events":["333fm"],"note":"","eventStatuses":{"333fm":"attended"}},{"id":"m28","date":"2025-12-21","name":"2025WCA合肥安静赛","price":120,"events":["333bf"],"note":"","eventStatuses":{"333bf":"attended"}},{"id":"m29","date":"2026-04-10","name":"2026WCA彭城魔方争霸赛","price":420,"events":["333","222","444","555","333bf","333oh"],"note":"","eventStatuses":{"333":"attended","222":"attended","444":"attended","555":"attended","333bf":"attended","333oh":"attended"}},{"id":"m30","date":"2026-04-25","name":"2026德清长时赛","price":275,"events":["444","555","666","333bf"],"note":"","eventStatuses":{"444":"attended","555":"attended","666":"attended","333bf":"attended"}},{"id":"m31","date":"2026-05-10","name":"2026WCA合肥安静赛","price":110,"events":["333bf"],"note":"","eventStatuses":{"333bf":"attended"}},{"id":"m32","date":"2026-06-06","name":"2026WCA上海多于一个魔方赛","price":180,"events":["333fm"],"note":"","eventStatuses":{"333fm":"attended"}},{"id":"m33","date":"2026-07-12","name":"2026WCA南京最少步赛","price":80,"events":["333fm"],"note":"","eventStatuses":{"333fm":"attended"}}],"lubricants":[{"spec":"5KM","color":"蓝色","category":"增粘","tack":3,"slip":0,"lasting":5,"feature":"中粘","oilType":"增粘差速油","feel":"给魔方增加稳定性，让魔方转动中多出稳定性。","use":"给过滑以及需要稳定的魔方添加。磨合后效果更佳。效果持久"},{"spec":"10K","color":"橙色","category":null,"tack":5,"slip":0,"lasting":5,"feature":"高粘","oilType":"增粘差速油","feel":"让魔方提高大幅度稳定性，手感稳重，阻力较强。","use":"给需要高度稳定性的魔方使用。磨合后效果更佳。效果持久"},{"spec":"10KS","color":"紫色","category":null,"tack":1,"slip":2,"lasting":5,"feature":"微粘中带滑","oilType":"粘中带滑差速油","feel":"让魔方提高适当稳定性同时，兼顾滑感。阻力轻微，但手感很顺","use":"给需要轻微稳定且喜欢顺滑的魔方手感使用。磨合后越来越滑。效果持久"},{"spec":"30KS","color":"白色","category":null,"tack":2,"slip":3,"lasting":5,"feature":"低粘中带滑","oilType":"粘中带滑差速油","feel":"粘中带滑差速油","use":"给需要较高稳定且不想太粘感的魔方手感调试。磨合后越滑。效果持久"},{"spec":"5K","color":"黄色","category":null,"tack":3,"slip":2,"lasting":5,"feature":"中粘带滑","oilType":"增稳差速油","feel":"增稳差速油","use":"给需要增稳且不想太粘手感的魔方使用。磨合后效果更佳。效果持久"},{"spec":"LR","color":"黑色","category":"润滑","tack":-1,"slip":1,"lasting":5,"feature":"低粘带滑","oilType":"低滑增滑油","feel":"让魔方增加较合适滑感","use":"给需要增滑的魔方，提升顺滑感。适合用在太粘的魔方上。改善粘感减少粘性。磨合后，效果显现。效果持久"},{"spec":"HF","color":"红色","category":null,"tack":0,"slip":5,"lasting":2,"feature":"高滑油性无残留","oilType":"高滑挥发油（油性）","feel":"大幅度增加滑感，且润滑效果良好。爽滑轻快。","use":"适合用需要高度滑性的魔方手感，使用后挥发干净无残留。效果较短，适合用在短时间内爆发爽快的魔方。"},{"spec":"HC","color":"绿色","category":null,"tack":1,"slip":4,"lasting":5,"feature":"爽滑手感","oilType":"滑中带粘顺滑油","feel":"让魔方大幅度增加滑感，细腻爽滑。可控的滑中带粘，兼顾稳定性但又做到爽滑。手感独特。","use":"适合用在不喜欢太滑但又需要爽滑的魔方手感，效果独特。使用后魔方更舒服滑。效果持久"},{"spec":"【对比】","color":"轴心油","category":null,"tack":0,"slip":6,"lasting":5,"feature":"超滑","oilType":null,"feel":null,"use":null}],"meta":{"source":"魔方统计.xlsx","version":1}};
+const INITIAL = window.CUBE_INITIAL || {cubes:[],competitions:[],lubricants:[],meta:{source:'private repo',version:1}};
 let db=loadDB(),activeForm={kind:null,id:null},cubePage=0,compPage=0;const PAGE_SIZE=10,CUBE_PAGE_SIZE=10;let selectedCubeTypes=[],selectedCubeBrands=[];
 function loadDB(){try{const x=localStorage.getItem('cubeLedger_v1');if(x){const d=JSON.parse(x);if(d.cubes&&d.competitions&&d.lubricants){const legacy=['333bf','333oh','333fm','clock','minx','pyram','skewb','sq1','444bf','555bf','333mbf','other'];d.competitions=d.competitions.map(c=>{const base=INITIAL.competitions.find(i=>i.id===c.id);if(base&&!c.eventStatuses&&JSON.stringify(c.events||[])===JSON.stringify(legacy))return {...c,events:base.events.slice(),eventStatuses:{...base.eventStatuses}};return c});d.competitions=d.competitions.map(c=>({...c,wca:typeof c.wca==='boolean'?c.wca:/WCA/i.test(String(c.name||'')),eventStatuses:c.eventStatuses||Object.fromEntries((c.events||[]).map(e=>[e,'attended']))}));d.meta=d.meta||{};d.meta.catalogIcons=d.meta.catalogIcons||{};return d}}}catch(e){}const d=structuredClone(INITIAL);d.competitions=d.competitions.map(c=>({...c,wca:typeof c.wca==='boolean'?c.wca:/WCA/i.test(String(c.name||'')),eventStatuses:c.eventStatuses||Object.fromEntries((c.events||[]).map(e=>[e,'attended']))}));d.meta=d.meta||{};d.meta.catalogIcons=d.meta.catalogIcons||{};return d}
 function saveDB(){localStorage.setItem('cubeLedger_v1',JSON.stringify(db));renderAll()}
@@ -1001,6 +1048,106 @@ document.getElementById('updateList').addEventListener('keydown',e=>{if((e.key==
 renderAll();
 renderUpdates();
 setTimeout(()=>{document.querySelectorAll('#yearChart,#typeBreakdown,#compYearChart').forEach(el=>{const c=window.echarts&&echarts.getInstanceByDom(el);if(c)c.resize()});if(window._lubeCharts)window._lubeCharts.forEach(c=>c.resize())},120);
+
+
+/* ---- 顶部导航滑块支持鼠标拖动 ---- */
+(function(){
+  var nav=document.getElementById('mainNav');if(!nav)return;
+  var drag=null,dragged=false;
+  function buttons(){return [].slice.call(nav.querySelectorAll('button[data-tab]'))}
+  function box(b){return {x:b.offsetLeft,y:b.offsetTop,w:b.offsetWidth,h:b.offsetHeight,c:b.offsetLeft+b.offsetWidth/2}}
+  function mix(a,b,t){return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,w:a.w+(b.w-a.w)*t,h:a.h+(b.h-a.h)*t}}
+  nav.addEventListener('pointerdown',function(e){
+    if(e.button!==0||e.target.closest('button')===null)return;
+    var from=e.target.closest('button[data-tab]');if(!from)return;
+    if(glideRaf){cancelAnimationFrame(glideRaf);glideRaf=0}
+    drag={from:from,x:e.clientX,rects:buttons().map(box),cur:from};dragged=false;
+    glideLockUntil=Number.MAX_SAFE_INTEGER;
+    try{nav.setPointerCapture(e.pointerId)}catch(err){}
+    e.preventDefault();
+  });
+  nav.addEventListener('pointermove',function(e){
+    if(!drag)return;
+    var dx=e.clientX-drag.x;if(Math.abs(dx)>5)dragged=true;
+    var a=drag.rects.find(function(r){return r.c===box(drag.from).c})||drag.rects[0];
+    var best=null,bd=Infinity;
+    drag.rects.forEach(function(r){var d=Math.abs((a.c+dx)-r.c);if(d<bd){bd=d;best=r}});
+    if(!best)return;
+    var span=best.c-a.c,t=Math.abs(span)<1?1:Math.max(0,Math.min(1,(a.c+dx-a.c)/span));
+    glideState=mix(a,best,t);glidePaint(glideState);
+    drag.cur=buttons().find(function(b){return box(b).c===best.c})||drag.from;
+  });
+  function end(e){
+    if(!drag)return;
+    var target=drag.cur;drag=null;glideLockUntil=0;
+    try{nav.releasePointerCapture(e.pointerId)}catch(err){}
+    if(target)switchTab(target.dataset.tab);else moveNavGlide();
+  }
+  nav.addEventListener('pointerup',end);
+  nav.addEventListener('pointercancel',end);
+  nav.addEventListener('click',function(e){
+    if(dragged){dragged=false;e.stopPropagation();e.preventDefault()}
+  },true);
+})();
+
+/* ---- iframe 里画图表时容器可能还是 0 宽：父页面显形后再重画一次 ---- */
+function cubeReshape(){
+  try{
+    renderAll();
+    document.querySelectorAll('div[id]').forEach(function(el){
+      try{var c=window.echarts&&echarts.getInstanceByDom(el);if(c)c.resize()}catch(err){}
+    });
+    if(window._lubeCharts)window._lubeCharts.forEach(function(c){c.resize()});
+    moveNavGlide(false);
+  }catch(err){}
+}
+window.addEventListener('message',function(e){
+  if(e&&e.data&&e.data.__ledgerCubeVisible){
+    requestAnimationFrame(cubeReshape);
+    setTimeout(cubeReshape,180);
+  }
+});
+
+/* ---- 魔方改动回写私有仓库：只写 cube-data.json，不碰账本 state.json ---- */
+(function(){
+  var KEY='cubeLedger_v1',SHA='cubeLedger_remoteSha_v1',CFG='qingzhang.sync.v3',
+      OWNER='leansun',REPO='bill-data',FILE='cube-data.json',API='https://api.github.com',timer=0;
+  function cfg(){try{return JSON.parse(localStorage.getItem(CFG)||'null')}catch(e){return null}}
+  function gate(c){
+    if(!c||c.mode==='http'||!c.token||!(Number(c.exp)*1000>Date.now()))return false;
+    return String(c.owner||'').toLowerCase()===OWNER&&String(c.repo||'').toLowerCase()===REPO;
+  }
+  function b64(str){
+    var bytes=new TextEncoder().encode(str),bin='';
+    for(var i=0;i<bytes.length;i+=0x8000){bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000))}
+    return btoa(bin);
+  }
+  function push(){
+    var c=cfg();if(!gate(c))return;
+    clearTimeout(timer);
+    timer=setTimeout(function(){
+      var raw=localStorage.getItem(KEY);if(!raw)return;
+      var db=JSON.parse(raw),rev=(Number(db._rev)||1)+1;
+      var plain={};Object.keys(db).forEach(function(k){if(k!=='_privateOwner'&&k!=='_rev')plain[k]=db[k]});
+      var body={message:'cube: 魔方统计自动备份 · rev '+rev,
+        content:b64(JSON.stringify({db:plain,rev:rev,updatedAt:new Date().toISOString()})),
+        branch:'main'};
+      var sha=localStorage.getItem(SHA)||'';if(sha)body.sha=sha;
+      fetch(API+'/repos/'+OWNER+'/'+REPO+'/contents/'+FILE,{
+        method:'PUT',
+        headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+c.token,'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+      }).then(function(r){return r.json()}).then(function(j){
+        if(j&&j.content&&j.content.sha){
+          localStorage.setItem(SHA,j.content.sha);
+          db._rev=rev;localStorage.setItem(KEY,JSON.stringify(db));
+        }
+      }).catch(function(){});
+    },1200);
+  }
+  var original=saveDB;
+  saveDB=function(){original();push()};
+})();
 
 </script>
 </body>

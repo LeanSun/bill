@@ -697,10 +697,17 @@
     state.store.added.forEach(function (r) { if (!del[r.id]) out.push(normalize(ed[r.id] || r)); });
     return out;
   }
+  /* 总览 / KPI / 图表口径：2024-07 之前的支出不参与统计。
+     只挡支出，收入照旧；日历明细仍走 allRecords()，那条线上的老账一笔不少。 */
+  var STATS_FROM = '2024-07-01';
+  function inStatsScope(r) {
+    return !(r.type === 'expense' && String(r.date) < STATS_FROM);
+  }
   function scopeRecords() {
-    if (state.year === 'all') return allRecords();
+    var list = allRecords().filter(inStatsScope);
+    if (state.year === 'all') return list;
     var y = Number(state.year);
-    return allRecords().filter(function (r) { return r.year === y; });
+    return list.filter(function (r) { return r.year === y; });
   }
   function sortedDesc(records) {
     return records.slice().sort(function (a, b) {
@@ -1561,7 +1568,9 @@
   function prevYearTotals() {
     if (state.year === 'all') return null;
     var y = String(Number(state.year) - 1);
-    var list = allRecords().filter(function (r) { return String(r.date).slice(0, 4) === y; });
+    var list = allRecords().filter(function (r) {
+      return String(r.date).slice(0, 4) === y && inStatsScope(r);
+    });
     if (!list.length) return null;
     var t = totalsOf(list);
     var mm = {};
@@ -2546,18 +2555,19 @@
   /* ---------------- 视图 / 分段控件 ---------------- */
   /* 魔方统计是一个独立子应用：iframe 只在第一次进这一页时才加载，
      两边各用各的 localStorage（cubeLedger_v1 / qingzhang.*），互不读写。 */
-  function cubeTheme() {
+  function cubePing() {
     var f = $('cubeFrame');
-    if (f && f.contentWindow) {
-      try { f.contentWindow.postMessage({ __ledgerTheme: state.theme }, '*'); } catch (e) { /* noop */ }
-    }
+    if (!f || !f.contentWindow) return;
+    try {
+      f.contentWindow.postMessage({ __ledgerTheme: state.theme, __ledgerCubeVisible: true }, '*');
+    } catch (e) { /* noop */ }
   }
   function mountCube() {
     var f = $('cubeFrame');
     if (!f) return;
     if (!f.getAttribute('src')) f.setAttribute('src', 'cube.html');
-    f.addEventListener('load', cubeTheme, { once: true });
-    cubeTheme();
+    if (!f.__cubeBound) { f.addEventListener('load', cubePing); f.__cubeBound = true; }
+    cubePing();
   }
   function bindCubeFrame() {
     var b = $('cubeOpenBtn');
@@ -2567,6 +2577,9 @@
   function setView(view) {
     if (!VIEW_META[view]) return;
     if (soft && soft.on) softReset();
+    /* 从有 title 的元素移进 iframe 时父页收不到 mouseout，提示会卡住不消失 */
+    var stuckTip = $('hoverTip');
+    if (stuckTip) stuckTip.hidden = true;
     state.view = view;
     var views = document.querySelectorAll('.view');
     for (var i = 0; i < views.length; i++) views[i].classList.toggle('is-active', views[i].id === 'view-' + view);
@@ -3277,7 +3290,7 @@
        筛选区在日历页，切主题时人可能正停在总览，所以这里直接无条件重排一遍。 */
     renderCatBar(palette());
     refreshAfterColor();
-    cubeTheme();
+    cubePing();
   }
 
   /* 配色自定义的读写口子，条目定义在 CAT_COLOR_DEFS */
