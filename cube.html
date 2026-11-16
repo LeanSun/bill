@@ -864,9 +864,10 @@ function glideEaseX(p){
   return 3*v*v*u*0.35+3*v*u*u*1.25+u*u*u;
 }
 function glideEaseOut(t){return 1-Math.pow(1-t,3)}
-function glideEaseBack(t){var c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)}
+function glideEaseBack(t){var c1=1.05,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)}
 function glidePaint(s){const g=document.getElementById('navGlide');if(!g)return;g.style.width=s.w+'px';g.style.height=s.h+'px';g.style.transform='translate('+s.x+'px,'+s.y+'px)'}
 function moveNavGlide(animate){
+ if(typeof navDragging!=='undefined'&&navDragging)return;
  const nav=document.getElementById('mainNav'),g=document.getElementById('navGlide');
  if(!nav||!g)return;
  const btn=nav.querySelector('button[data-tab].active');
@@ -1085,47 +1086,59 @@ renderUpdates();
 setTimeout(()=>{document.querySelectorAll('#yearChart,#typeBreakdown,#compYearChart').forEach(el=>{const c=window.echarts&&echarts.getInstanceByDom(el);if(c)c.resize()});if(window._lubeCharts)window._lubeCharts.forEach(c=>c.resize())},120);
 
 
-/* ---- 顶部导航滑块支持鼠标拖动：跟账本筛选滑块同一套手感 ---- */
+/* ---- 顶部导航滑块：照搬账本 .seg 的驱动方式 ----
+   目标位置直接来自指针 X（不是按钮中心插值），rAF 每帧补 40% 差距，
+   所以滑块贴着指针走；松手 320ms easeOutBack 吸附到最近页签。 */
+var navDragging=false;
 (function(){
   var nav=document.getElementById('mainNav');if(!nav)return;
-  var drag=null,dragged=false;
+  var drag=null,raf=0,cur=null,aim=null,dragged=false;
   function rects(){
     return [].slice.call(nav.querySelectorAll('button[data-tab]')).map(function(b){
       var x=b.offsetLeft,w=b.offsetWidth;
       return {b:b,x:x,y:b.offsetTop,w:w,h:b.offsetHeight,c:x+w/2};
     });
   }
+  function tick(){
+    if(!drag){raf=0;return}
+    cur.x+=(aim.x-cur.x)*.40;
+    cur.w+=(aim.w-cur.w)*.30;
+    cur.h=aim.h;cur.y=aim.y;
+    glideState={x:cur.x,y:cur.y,w:cur.w,h:cur.h};
+    glidePaint(glideState);
+    if(Math.abs(aim.x-cur.x)>.2||Math.abs(aim.w-cur.w)>.2)raf=requestAnimationFrame(tick);
+    else raf=0;
+  }
+  function start(){if(!raf)raf=requestAnimationFrame(tick)}
   nav.addEventListener('pointerdown',function(e){
     if(e.button!==0)return;
     var btn=e.target.closest('button[data-tab]');if(!btn)return;
+    if(raf){cancelAnimationFrame(raf);raf=0}
     var rs=rects(),i=rs.findIndex(function(r){return r.b===btn});if(i<0)return;
-    if(glideRaf){cancelAnimationFrame(glideRaf);glideRaf=0}
-    drag={x:e.clientX,from:rs[i],rects:rs,i:i,target:i};
-    dragged=false;glideLockUntil=Number.MAX_SAFE_INTEGER;
+    var r=rs[i];
+    cur={x:r.x,y:r.y,w:r.w,h:r.h};aim={x:r.x,y:r.y,w:r.w,h:r.h};
+    drag={navLeft:nav.getBoundingClientRect().left,rects:rs,i:i,startX:e.clientX};
+    dragged=false;navDragging=true;glideLockUntil=Number.MAX_SAFE_INTEGER;
     try{nav.setPointerCapture(e.pointerId)}catch(err){}
     e.preventDefault();
   });
   nav.addEventListener('pointermove',function(e){
     if(!drag)return;
-    var dx=e.clientX-drag.x;
-    if(Math.abs(dx)>5)dragged=true;
-    var from=drag.from,target=drag.i,best=Infinity;
-    drag.rects.forEach(function(r,k){
-      var d=Math.abs(dx-(r.c-from.c));
-      if(d<best){best=d;target=k}
-    });
-    var to=drag.rects[target],span=to.c-from.c;
-    var t=Math.abs(span)<1?0:Math.max(0,Math.min(1,dx/span*.4));
-    glideState={x:from.x+(to.x-from.x)*t,y:from.y+(to.y-from.y)*t,
-                w:from.w+(to.w-from.w)*t,h:from.h+(to.h-from.h)*t};
-    glidePaint(glideState);
-    drag.target=target;
+    if(Math.abs(e.clientX-drag.startX||0)>4)dragged=true;
+    var rs=drag.rects,target=drag.i,best=Infinity;
+    rs.forEach(function(r,k){var d=Math.abs(r.c-(e.clientX-drag.navLeft));if(d<best){best=d;target=k}});
+    drag.i=target;
+    var to=rs[target];
+    aim={x:Math.max(0,e.clientX-drag.navLeft-to.w/2),y:to.y,w:to.w,h:to.h};
+    start();
   });
   function end(e){
     if(!drag)return;
-    var r=drag.rects[drag.target];drag=null;glideLockUntil=0;
+    var target=drag.i,rs=drag.rects;drag=null;navDragging=false;glideLockUntil=0;
+    if(raf){cancelAnimationFrame(raf);raf=0}
     try{nav.releasePointerCapture(e.pointerId)}catch(err){}
-    if(r&&r.b)switchTab(r.b.dataset.tab);else moveNavGlide();
+    var b=rs&&rs[target];
+    switchTab(b&&b.b?b.b.dataset.tab:nav.querySelector('button[data-tab].active').dataset.tab);
   }
   nav.addEventListener('pointerup',end);
   nav.addEventListener('pointercancel',end);
