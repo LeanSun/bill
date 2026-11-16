@@ -4159,8 +4159,9 @@
       softIdle = 0;
       if (!soft.on) return;
       soft.tight = true;                       /* 结算段稍硬一点，收得干净 */
-      /* 走得够远、或者还在往前冲（快速一甩）都算数；只有慢吞吞挪了几步才退回 */
-      soft.aim = (soft.p >= SOFT_COMMIT || soft.v > .8) ? 1 : 0;
+      /* 走得够远、目标本身够一格（慢弹簧下 p 还没跟上）、或者还在往前冲
+         都算数；只有板子轻扫那种一丁点目标才退回 */
+      soft.aim = (soft.aim >= .3 || soft.p >= SOFT_COMMIT || soft.v > .8) ? 1 : 0;
       softGlide();
     }, SOFT_IDLE);
   }
