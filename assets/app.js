@@ -33,7 +33,6 @@
   var STORE_KEY = 'qingzhang.ledger.v1';
   var THEME_KEY = 'qingzhang.theme.v1';
   var CATCOLOR_KEY = 'qingzhang.catcolors.v1';
-  var FEEL_KEY = 'qingzhang.paging.w.v1';
   var EXPENSE_CATS = ['餐饮', '日常', '交通', '服饰', '娱乐'];
   var INCOME_CATS = ['收入'];
   var ALL_CATS = EXPENSE_CATS.concat(INCOME_CATS);
@@ -4231,46 +4230,7 @@
     jumpToDetail({ reset: true, label: '已跳转日历' });
   }
 
-  /* ---------------- 手感滑杆 / 手机筛选折叠 ---------------- */
-  /* 弹簧角频率 SOFT_W 允许现场调：往下更绵、往上更跟手。
-     存 localStorage，刷新后还在；改的是同一个var，下一次滚轮立刻生效。 */
-  function loadSoftW() {
-    try {
-      var n = Number(localStorage.getItem(FEEL_KEY));
-      if (isFinite(n) && n >= 6 && n <= 40) SOFT_W = Math.round(n);
-    } catch (e) { /* 无痕模式静默 */ }
-  }
-  function setSoftW(n, persist) {
-    n = Number(n);
-    if (!isFinite(n)) return;
-    n = Math.max(6, Math.min(40, Math.round(n)));
-    SOFT_W = n;
-    var r = $('softWRange'), box = $('softWNum'), out = $('softWVal');
-    if (r) r.value = String(n);
-    if (box && document.activeElement !== box) box.value = String(n);
-    if (out) out.textContent = String(n);
-    if (persist !== false) { try { localStorage.setItem(FEEL_KEY, String(n)); } catch (e) { /* noop */ } }
-  }
-  function bindFeelControl() {
-    var btn = $('feelBtn'), pop = $('feelPop'), r = $('softWRange'),
-      box = $('softWNum'), reset = $('softWReset');
-    setSoftW(SOFT_W, false);
-    if (!btn || !pop) return;
-    function close() { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); btn.classList.remove('is-on'); }
-    btn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      var open = pop.hidden;
-      pop.hidden = !open;
-      btn.setAttribute('aria-expanded', String(open));
-      btn.classList.toggle('is-on', open);
-    });
-    pop.addEventListener('click', function (e) { e.stopPropagation(); });
-    document.addEventListener('click', close);
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
-    if (r) r.addEventListener('input', function () { setSoftW(this.value); });
-    if (box) box.addEventListener('change', function () { setSoftW(this.value); });
-    if (reset) reset.addEventListener('click', function () { setSoftW(16); });
-  }
+  /* ---------------- 手机筛选折叠 ---------------- */
   function collapseFiltersOnMobile() {
     var box = $('ctFilters'), btn = $('ctFilterToggle');
     if (!box || !btn || !window.matchMedia || !window.matchMedia('(max-width: 760px)').matches) return;
@@ -4772,7 +4732,6 @@
   function startApp() {
     var pv = window.QZPrivate && window.QZPrivate.status && window.QZPrivate.status();
     if (pv && pv.error) toast('私人数据未载入：' + pv.error + '（当前显示空账本）', 'warn');
-    loadSoftW();
     state.store = loadStore();
     mergeSeedWeights();
     var saved = null;
@@ -4787,7 +4746,6 @@
 
     buildSelectOptions();
     bindEvents();
-    bindFeelControl();
     bindFilterCollapse();
     bindDatePicker();
     bindHoverTip();
