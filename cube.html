@@ -560,6 +560,53 @@ html[data-theme="dark"] textarea{background:var(--soft);color:var(--ink);border-
 html[data-theme="dark"] .muted,
 html[data-theme="dark"] .sub{color:var(--muted)}
 
+
+/* ===== 账本同款视觉语言：同样的圆角 / 描边 / 阴影 / 字阶，颜色仍用魔方自己的蓝 ===== */
+.topbar{
+  padding:12px clamp(16px,3vw,42px);background:var(--card);border-bottom:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(24,39,75,.04);
+}
+.topbar .brand strong{font-size:16px;font-weight:750;letter-spacing:-.02em;color:var(--ink)}
+.topbar .brand small{font-size:10px;letter-spacing:.08em;color:var(--muted)}
+.topbar .nav{gap:4px;padding:4px;border-radius:12px;background:var(--soft);border:1px solid var(--line)}
+.topbar .nav button{
+  border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;color:var(--muted);
+  background:transparent;box-shadow:none;
+}
+.topbar .nav button:hover{color:var(--blue);background:transparent;transform:none;filter:none}
+.topbar .nav button.active{color:var(--ink)}
+.topbar .nav-glide{border-radius:9px;background:var(--card);border:1px solid var(--line);box-shadow:0 1px 3px rgba(24,39,75,.12)}
+.topbar-note{font-size:11px;color:var(--muted)}
+.topbar-note .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.main{padding-top:18px}
+h2{font-size:19px;font-weight:750;letter-spacing:-.02em;color:var(--ink)}
+h3{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+button{
+  border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:650;
+  box-shadow:0 1px 2px rgba(24,39,75,.06);transition:background-color .2s,border-color .2s,color .2s,transform .16s;
+}
+button:hover{transform:translateY(-1px);filter:none}
+button.secondary,button.ghost{background:var(--soft);color:var(--text-2);border:1px solid var(--line);box-shadow:none}
+button.secondary:hover,button.ghost:hover{border-color:var(--blue);color:var(--blue)}
+button.danger{background:var(--red);color:#fff;border-color:transparent}
+.card,.panel>div.card{
+  border:1px solid var(--line);border-radius:var(--radius,16px);
+  box-shadow:0 1px 2px rgba(24,39,75,.035),0 10px 30px -18px rgba(24,39,75,.22);
+}
+.stat{border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(24,39,75,.035),0 10px 30px -18px rgba(24,39,75,.22)}
+.bubble{border-radius:10px;background:var(--soft);color:var(--blue)}
+.stat .value{font-size:26px;font-weight:800;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.stat .label,.stat .hint{font-size:11px;color:var(--muted)}
+input,select,textarea{
+  border:1px solid var(--line);border-radius:9px;background:var(--soft);color:var(--ink);
+  padding:8px 10px;font-size:12.5px;outline:none;transition:border-color .2s,box-shadow .2s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue2)}
+th,td{border-bottom:1px solid var(--line);font-size:12.5px;padding:9px 10px}
+th{color:var(--muted);font-size:11px;font-weight:650;letter-spacing:.03em;background:var(--soft)}
+.muted,.small-note{color:var(--muted);font-size:11px}
+.pill,.tag,.badge{border-radius:999px;border:1px solid var(--line);background:var(--soft);color:var(--text-2)}
+html[data-theme="dark"] .topbar-note .dot{background:var(--green)}
 </style>
 <script src="assets/echarts.min.js"></script>
 
@@ -621,7 +668,7 @@ html[data-theme="dark"] .sub{color:var(--muted)}
 <button data-tab="lubricants" data-page-node-id="8KVGxQDgDSgvkeekVlAqNn"><span class="ico" data-page-node-id="25qFpBcwALE1Jv6jopXHvy">◉</span>润滑油指南</button>
 <button data-tab="data" data-page-node-id="1Nn0fsjVt4NN0lvyxx3tDN"><span class="ico" data-page-node-id="eiQVG3vpF9Ks2KtbjQPLLd">⚙</span>数据与备份</button><button data-tab="updates" data-page-node-id="FFUyp6aKnvvti1NhK2fZar"><span class="ico" data-page-node-id="n4pCxYHzCiodKNDxXc4AAA">↻</span>更新日志</button>
 </nav>
-<div class="topbar-note" data-page-node-id="CZNCv7RiojrVXULfIJUKQw"><span class="dot" data-page-node-id="hVXyxgXtELOEcve9kibKyJ"></span><span data-page-node-id="naB1vsiw9yWxk4tuPaJCT9"><b data-page-node-id="mYyvqf7EDHLvKjXLgqfDOG">本地优先</b> · 数据存在当前浏览器</span></div>
+<div class="topbar-note" data-page-node-id="CZNCv7RiojrVXULfIJUKQw"><span class="dot" data-page-node-id="hVXyxgXtELOEcve9kibKyJ"></span><span id="cubeStoreNote" data-page-node-id="naB1vsiw9yWxk4tuPaJCT9"><b data-page-node-id="mYyvqf7EDHLvKjXLgqfDOG">私人仓库同步</b> · 浏览器缓存 + 私有仓库备份</span></div>
 </header>
 <main class="main" data-page-node-id="ir0rM1YHTzplsudBJxAYkY">
 <section class="panel active" id="cubes" data-page-node-id="361kbzNOiNMnuVGDUYI3rx"><div class="cube-dashboard" data-page-node-id="7yEJk93kvrBatClgDAHN1x">
@@ -1146,6 +1193,14 @@ window.addEventListener('message',function(e){
   saveDB=function(){original();push()};
 })();
 
+
+/* 顶栏存储说明跟着门禁走：真实情况是"浏览器缓存 + 私有仓库为源"，不是只存本地 */
+(function(){
+  var n=document.getElementById('cubeStoreNote');if(!n)return;
+  n.innerHTML=window.CUBE_GATED
+    ? '<b>私人仓库同步</b> · 浏览器缓存 + 私有仓库备份'
+    : '<b>演示模式</b> · 未链接私人仓库，显示空账本';
+})();
 </script>
 </body>
 </html>

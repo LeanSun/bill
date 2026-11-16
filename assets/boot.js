@@ -74,6 +74,41 @@
     });
   }
 
+  /* 魔方数据搭同一趟车：主账本已经拿着 token 要读私有仓库了，
+     顺手把 cube-data.json 也取回来塞进它自己的 localStorage 键。
+     等 iframe 起来时数据已经落地，不用再 fetch + reload 一次。 */
+  function fetchCube(c) {
+    var enc = function (x) { return encodeURIComponent(String(x)); };
+    var url = 'https://api.github.com/repos/' + enc(c.owner) + '/' + enc(c.repo) +
+      '/contents/cube-data.json?ref=' + enc(c.branch || 'main');
+    return fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Authorization': 'Bearer ' + c.token
+      },
+      cache: 'no-store'
+    }).then(function (r) {
+      if (!r.ok) throw new Error('cube HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      var d = JSON.parse(decodeBase64(j.content));
+      if (!d || !d.db || !Array.isArray(d.db.cubes)) return;
+      var rev = Number(d.rev) || 1;
+      try {
+        var raw = localStorage.getItem('cubeLedger_v1');
+        var cur = raw ? JSON.parse(raw) : null;
+        if (cur && cur._privateOwner === 'LeanSun' && rev <= (Number(cur._rev) || 0)) return;
+        var db = d.db;
+        db._privateOwner = 'LeanSun';
+        db._rev = rev;
+        localStorage.setItem('cubeLedger_v1', JSON.stringify(db));
+        localStorage.setItem('cubeLedger_remoteSha_v1', j.sha || '');
+      } catch (e) { /* 无痕模式静默 */ }
+    });
+  }
+
   function settle(d, err) {
     var data = d || EMPTY;
     window.BILL_DATA = data;
@@ -84,8 +119,13 @@
   }
 
   var cfg = readCfg();
+  /* 魔方 iframe 等这个标记再挂载，保证它启动那一刻本地数据已经落地 */
+  window.__cubeDataReady = !gate(cfg);
   window.BILL_READY = new Promise(function (resolve) {
     if (!gate(cfg)) { resolve(settle(null, '')); return; }
+    /* 魔方那份只有 20KB，和账本并行取，但不让它拖住账本启动 */
+    fetchCube(cfg).catch(function () { /* 取不到就留给子页自己取 */ })
+      .then(function () { window.__cubeDataReady = true; });
     fetchPrivate(cfg).then(
       function (d) { resolve(settle(d, '')); },
       function (e) { resolve(settle(null, e && e.message || '读取私有数据失败')); }

@@ -1789,17 +1789,31 @@
     syncFilterSeg(catBox);
 
     /* 子类：换分类 / 换肤 / 笔数变化才重建；同一分类里换子类只挪滑块 */
-    var names = [], counts = {}, tot = 0;
+    var names = [], counts = {}, tot = 0, subAmount = 0, scoped = rangeRecords();
     if (cat !== 'all') {
-      rangeRecords().forEach(function (r) {
+      scoped.forEach(function (r) {
         if (r.category !== cat) return;
         counts[r.sub] = (counts[r.sub] || 0) + 1;
         tot++;
+        if (state.filters.sub === 'all' || r.sub === state.filters.sub) subAmount += r.amount;
       });
       names = subCatNames(cat);
     }
+    /* 右侧金额统计：跟着当前粒度走（年 / 月 / 周 / 日），
+       取 rangeRecords() 的区间，和上面子类笔数同一份口径 */
+    var sumBox = $('subSum');
+    if (sumBox) {
+      sumBox.hidden = !names.length;
+      if (names.length) {
+        var label = ({ year: '年统计', month: '月统计', week: '周统计', day: '日统计' })[state.scale] || '统计';
+        var lab = sumBox.querySelector('span'), val = sumBox.querySelector('b');
+        if (lab) lab.textContent = label;
+        if (val) val.textContent = fmtBig(subAmount);
+      }
+    }
     var subSig = names.length ? theme + '|' + p.primary + '|' + colSig + '|' + cat + '|' + names.join(',') + '|' +
-      names.map(function (n) { return counts[n] || 0; }).join(',') + '|' + tot : '';
+      names.map(function (n) { return counts[n] || 0; }).join(',') + '|' + tot + '|' +
+      state.filters.sub + '|' + Math.round(subAmount * 100) + '|' + state.scale : '';
     if (subBox.dataset.sig !== subSig) {
       var sub = '';
       if (names.length) {
@@ -2627,7 +2641,8 @@
   /* 魔方统计是一个独立子应用：iframe 只在第一次进这一页时才加载，
      两边各用各的 localStorage（cubeLedger_v1 / qingzhang.*），互不读写。 */
   function cubePing() {
-    var f = $('cubeFrame');
+    var f = $('cubeFrame'), veil = $('cubeLoading');
+    if (veil) veil.hidden = true;
     if (!f || !f.contentWindow) return;
     try {
       f.contentWindow.postMessage({ __ledgerTheme: state.theme, __ledgerCubeVisible: true }, '*');
@@ -2636,6 +2651,8 @@
   function mountCube() {
     var f = $('cubeFrame');
     if (!f) return;
+    /* 私人仓库还在取魔方数据时先不挂 iframe —— 免得先画一屏空白再刷新 */
+    if (window.__cubeDataReady === false) { setTimeout(mountCube, 120); return; }
     if (!f.getAttribute('src')) f.setAttribute('src', 'cube.html');
     if (!f.__cubeBound) { f.addEventListener('load', cubePing); f.__cubeBound = true; }
     cubePing();
@@ -4878,6 +4895,8 @@
     setView(initialRoute);
 
     if (!hasEcharts) toast('ECharts 未加载，图表不可用', 'warn');
+    /* 魔方页在后台先热起来：点导航时不再等 iframe 加载 + 图表首绘 */
+    setTimeout(mountCube, 700);
     requestAnimationFrame(function () {
       setTimeout(function () {
         var veil = $('bootVeil');
