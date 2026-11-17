@@ -2334,3 +2334,40 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
   height: calc(100dvh - var(--main-pt)) !important;
   min-height: 0 !important;
 }
+
+/* v1.0.32：跨天跳转的滑入 + 今日标记改成静态光晕和圆点 */
+.cal-jump-next { animation: calJumpNext .52s cubic-bezier(.22,1,.36,1) both; }
+.cal-jump-prev { animation: calJumpPrev .52s cubic-bezier(.22,1,.36,1) both; }
+@keyframes calJumpNext {
+  from { opacity: .28; transform: translateX(26px) scale(.986); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes calJumpPrev {
+  from { opacity: .28; transform: translateX(-26px) scale(.986); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cal-jump-next, .cal-jump-prev { animation: none !important; }
+}
+.cal-cell.is-today::after,
+.wk-col.is-today::after,
+.ym-day.is-today::after {
+  animation: none !important;
+  opacity: .72 !important;
+  background: radial-gradient(120% 130% at 50% 0%, rgba(var(--neon), .22), transparent 68%) !important;
+}
+.cal-cell.is-today .cal-daynum { position: relative; }
+.cal-cell.is-today .cal-daynum::after {
+  content: ""; position: absolute; left: 50%; bottom: -5px;
+  width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
+  background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+.view.is-active .card,
+.view.is-active .lubcard,
+.view.is-active .cb-panel { animation: rise .58s var(--ease) backwards; }
+.view.is-active > *:nth-child(2) .card,
+.view.is-active > *:nth-child(2) .lubcard,
+.view.is-active > *:nth-child(2) .cb-panel { animation-delay: 55ms; }
+.view.is-active > *:nth-child(3) .card,
+.view.is-active > *:nth-child(3) .lubcard,
+.view.is-active > *:nth-child(3) .cb-panel { animation-delay: 110ms; }

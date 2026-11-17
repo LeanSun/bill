@@ -821,8 +821,22 @@
     return new Date(state.calMonth.year, state.calMonth.month - 1, 1);
   }
   function setAnchor(d) {
+    var prev = anchorDate().getTime(), next = d.getTime();
     state.anchorDate = dateKey(d);
     state.calMonth = { year: d.getFullYear(), month: d.getMonth() + 1 };
+    /* 跨月 / 跨年跳转不是硬切：给重绘后的网格补一段短促的滑入。
+       相邻日的 soft 动画已经够顺，这里只处理「两天不相邻」的跳。 */
+    if (Math.abs(next - prev) > 20 * 86400000) {
+      var dir = next > prev ? 'next' : 'prev';
+      setTimeout(function () {
+        var el = $('calGrid') || $('calWeekGrid') || $('calDayBoard') || $('calYearBoard');
+        if (!el) return;
+        el.classList.remove('cal-jump-next', 'cal-jump-prev');
+        void el.offsetWidth;
+        el.classList.add('cal-jump-' + dir);
+        setTimeout(function () { el.classList.remove('cal-jump-next', 'cal-jump-prev'); }, 560);
+      }, 0);
+    }
   }
   function rangeBounds() {
     var d = anchorDate();
@@ -1551,7 +1565,7 @@
         });
       });
     }
-    ['cubeYearChart', 'cubeTypeChart'].forEach(function (id) {
+    ['cubeYearChart', 'cubeTypeChart', 'cmChart_model', 'cmChart_brand', 'cmChart_cubeprice', 'cmChart_compyear', 'cmChart_compprov', 'cmChart_compprice'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) { try { _chartRO.observe(el); } catch (e) {} }
     });
@@ -1593,6 +1607,8 @@
   /* v1.0.27：魔方子页原来的六张统计卡搬进账本总览。
      数据只读 cubeLedger_v1，和账本 store 不交叉；ECharts 没加载时照样画，
      所以放在 hasEcharts 判断之前。 */
+  /* v1.0.32：六张统计卡从进度条换成真图表。
+     数据仍只读 cubeLedger_v1；点图元沿用原来的 jumpCube 筛选路径。 */
   function renderCubeMiniLists(d) {
     var cubes = (d && d.cubes) || [], comps = (d && d.competitions) || [];
     var tally = function (list, pick) {
@@ -1610,33 +1626,85 @@
         o.n++; if (!countOnly) o.sum += Number(x.price) || 0;
       });
       return Object.keys(m).map(function (k) { return { k: k, n: m[k].n, sum: m[k].sum }; })
-        .sort(function (a, b) { return b.k.localeCompare(a.k); });
+        .sort(function (a, b) { return a.k.localeCompare(b.k); });
     };
-    var paint = function (kind, rows, value, label, tab, key) {
-      var host = document.querySelector('[data-cube-list="' + kind + '"]');
-      if (!host) return;
-      if (!rows.length) { host.innerHTML = '<div class="cm-empty">暂无数据</div>'; return; }
-      var max = Math.max.apply(null, [1].concat(rows.map(function (r) { return value(r); })));
-      host.innerHTML = rows.map(function (r) {
-        var w = (value(r) / max * 100).toFixed(1);
-        return '<button type="button" class="cm-row" data-cube-jump="' + tab + '" data-cube-key="' + key + '" data-v="' + esc(r.k) + '">' +
-          '<span class="cm-name">' + esc(r.k) + '</span>' +
-          '<span class="cm-track"><i style="width:' + w + '%"></i></span>' +
-          '<b class="cm-val">' + esc(label(r)) + '</b></button>';
-      }).join('');
+    var specs = [
+      { kind: 'model', rows: tally(cubes, function (x) { return x.model || '未命名型号'; }), type: 'pie', unit: '条', tab: 'cubes', key: 'q', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
+      { kind: 'brand', rows: tally(cubes, function (x) { return x.brand || '未分类'; }), type: 'pie', unit: '条', tab: 'cubes', key: 'brand', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
+      { kind: 'cubeprice', rows: byYear(cubes, false), type: 'line', unit: '元', tab: 'cubes', key: 'year', val: function (r) { return r.sum; }, label: function (r) { return cubeMoney(r.sum); } },
+      { kind: 'compyear', rows: byYear(comps, true), type: 'bar', unit: '场', tab: 'competitions', key: 'year', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 场'; } },
+      { kind: 'compprov', rows: tally(comps, function (x) { return x.province || '未填写'; }), type: 'pie', unit: '场', tab: 'competitions', key: 'province', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 场'; } },
+      { kind: 'compprice', rows: byYear(comps, false), type: 'line', unit: '元', tab: 'competitions', key: 'year', val: function (r) { return r.sum; }, label: function (r) { return cubeMoney(r.sum); } }
+    ];
+    var fallback = function (sp) {
+      var host = document.querySelector('[data-cube-list="' + sp.kind + '"]'); if (!host) return;
+      var max = Math.max.apply(null, [1].concat(sp.rows.map(sp.val)));
+      host.innerHTML = sp.rows.length ? sp.rows.map(function (r) {
+        return '<button type="button" class="cm-row" data-cube-jump="' + sp.tab + '" data-cube-key="' + sp.key + '" data-v="' + esc(r.k) + '">' +
+          '<span class="cm-name">' + esc(r.k) + '</span><span class="cm-track"><i style="width:' + (sp.val(r) / max * 100).toFixed(1) + '%"></i></span>' +
+          '<b class="cm-val">' + esc(sp.label(r)) + '</b></button>';
+      }).join('') : '<div class="cm-empty">暂无数据</div>';
     };
-    paint('model', tally(cubes, function (x) { return x.model || '未命名型号'; }),
-      function (r) { return r.n; }, function (r) { return String(r.n) + ' 条'; }, 'cubes', 'q');
-    paint('brand', tally(cubes, function (x) { return x.brand || '未分类'; }),
-      function (r) { return r.n; }, function (r) { return String(r.n) + ' 条'; }, 'cubes', 'brand');
-    paint('cubeprice', byYear(cubes, false), function (r) { return r.sum; },
-      function (r) { return cubeMoney(r.sum); }, 'cubes', 'year');
-    paint('compyear', byYear(comps, true), function (r) { return r.n; },
-      function (r) { return String(r.n) + ' 场'; }, 'competitions', 'year');
-    paint('compprov', tally(comps, function (x) { return x.province || '未填写'; }),
-      function (r) { return r.n; }, function (r) { return String(r.n) + ' 场'; }, 'competitions', 'province');
-    paint('compprice', byYear(comps, false), function (r) { return r.sum; },
-      function (r) { return cubeMoney(r.sum); }, 'competitions', 'year');
+    if (!hasEcharts) { specs.forEach(fallback); return; }
+    var p = palette();
+    var pieColors = [p.primary, p.sky, p.violet, p.expense, p.amber, p.income, p.primary2, p.text2];
+    specs.forEach(function (sp) {
+      var host = document.querySelector('[data-cube-list="' + sp.kind + '"]'); if (!host) return;
+      host.id = 'cmChart_' + sp.kind;
+      host.className = 'cm-list cm-chart';
+      if (!sp.rows.length) { host.innerHTML = '<div class="cm-empty">暂无数据</div>'; return; }
+      var data = sp.rows.map(function (r) { return { name: r.k, value: sp.val(r) }; });
+      var total = data.reduce(function (a, x) { return a + x.value; }, 0);
+      var base = {
+        animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+        animationEasing: 'cubicOut',
+        color: pieColors,
+        tooltip: tooltipCommon(p, {
+          trigger: sp.type === 'pie' ? 'item' : 'axis',
+          formatter: function (a) {
+            if (sp.type === 'pie') return a.name + '<br><b>' + (sp.kind.indexOf('price') >= 0 ? cubeMoney(a.value) : a.value + ' ' + sp.unit) + '</b> · ' + a.percent + '%';
+            var v = Array.isArray(a) ? a[0] : a;
+            return v.name + '<br><b>' + (sp.kind.indexOf('price') >= 0 ? cubeMoney(v.value) : v.value + ' ' + sp.unit) + '</b>';
+          }
+        })
+      };
+      var opt;
+      if (sp.type === 'pie') {
+        opt = Object.assign({}, base, {
+          graphic: [
+            { type: 'text', left: 'center', top: '44%', silent: true, style: { text: String(total), fill: p.text, fontSize: 18, fontWeight: 800, textAlign: 'center', fontFamily: p.font } },
+            { type: 'text', left: 'center', top: '63%', silent: true, style: { text: '合计 ' + sp.unit, fill: p.muted, fontSize: 10, textAlign: 'center', fontFamily: p.font } }
+          ],
+          series: [{
+            type: 'pie', radius: ['43%', '68%'], center: ['50%', '56%'],
+            avoidLabelOverlap: true, minAngle: 4,
+            itemStyle: { borderColor: p.surface, borderWidth: 2, borderRadius: 5 },
+            label: { show: false }, labelLine: { show: false },
+            emphasis: { scale: true, scaleSize: 6, label: { show: true, fontSize: 11, fontWeight: 700, color: p.text, formatter: '{b}\n{d}%' } },
+            data: data
+          }]
+        });
+      } else {
+        var gradient = window.echarts ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: p.primary }, { offset: 1, color: 'rgba(74,108,247,.06)' }
+        ]) : p.primary;
+        opt = Object.assign({}, base, {
+          grid: { left: 8, right: 12, top: 16, bottom: 20, containLabel: true },
+          xAxis: { type: 'category', data: data.map(function (x) { return x.name; }), boundaryGap: sp.type === 'bar', axisTick: { show: false }, axisLine: { lineStyle: { color: p.border } }, axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font } },
+          yAxis: { type: 'value', splitLine: { lineStyle: { color: p.border } }, axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: function (v) { return sp.kind.indexOf('price') >= 0 ? cubeMoneyShort(v) : v; } } },
+          series: sp.type === 'bar'
+            ? [{ type: 'bar', barMaxWidth: 26, data: data.map(function (x) { return { value: x.value, itemStyle: { color: p.primary, borderRadius: [6, 6, 0, 0] } }; }) }]
+            : [{ type: 'line', smooth: true, symbol: 'circle', symbolSize: 7, data: data.map(function (x) { return x.value; }), lineStyle: { width: 2.6, color: p.primary }, itemStyle: { color: p.primary, borderColor: p.surface, borderWidth: 2 }, areaStyle: { color: gradient } }]
+        });
+      }
+      var chart = cubePaint(host, opt);
+      if (!chart) return;
+      chart.off('click');
+      chart.on('click', function (params) {
+        var name = params && params.name; if (!name) return;
+        var filter = { tab: sp.tab }; filter[sp.key] = String(name); jumpCube(filter);
+      });
+    });
   }
   function renderCubeOverview() {
     var d = cubeData();
