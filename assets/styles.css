@@ -2395,3 +2395,33 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 }
 #overview .cube-mini-card { padding: 16px !important; }
 #overview .cube-mini-card .card-head { padding: 2px 4px 10px !important; }
+
+/* ================= v1.0.34：今日呼吸灯 / 统计卡标题留白修正 ================= */
+
+/* ---- 1. 今日提示：取消渐变光晕与小圆点，改成整格底色柔和呼吸 ---- */
+.cal-cell.is-today::after,
+.wk-col.is-today::after,
+.ym-day.is-today::after{
+  content:""!important;position:absolute!important;inset:0!important;z-index:0!important;
+  border-radius:inherit!important;pointer-events:none!important;
+  background:color-mix(in srgb, var(--primary) 26%, transparent)!important;
+  opacity:.5!important;animation:todayBreathe 3.4s ease-in-out infinite!important;
+  will-change:opacity;
+}
+/* 小圆点彻底移除（v1.0.33 的 ::before 与 cal-daynum 的 ::after） */
+.cal-cell.is-today::before,
+.wk-col.is-today::before,
+.ym-day.is-today::before,
+.cal-cell.is-today .cal-daynum::after{display:none!important;content:none!important}
+@keyframes todayBreathe{0%,100%{opacity:.12}50%{opacity:.72}}
+@media (prefers-reduced-motion: reduce){
+  .cal-cell.is-today::after,.wk-col.is-today::after,.ym-day.is-today::after{animation:none!important;opacity:.4!important}
+}
+/* 让格内内容浮在呼吸底色之上；数字徽标去掉外发光 */
+.cal-cell.is-today>*,.wk-col.is-today>*,.ym-day.is-today>*{position:relative;z-index:1}
+.cal-cell.is-today .cal-daynum{box-shadow:none!important}
+.ym-day.is-today{background:var(--primary)!important;color:#fff!important;font-weight:700}
+
+/* ---- 2. 六张统计卡标题留白：上一版选择器写成 #overview，真实 id 是 #view-overview ---- */
+#view-overview .cube-mini-card{padding:19px 20px 16px!important}
+#view-overview .cube-mini-card .card-head{padding:0!important;margin-bottom:6px}
