@@ -2306,3 +2306,24 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 }
 .modal-backdrop.is-closing { animation: fadeOut .24s var(--ease) both; pointer-events: none; }
 .modal-backdrop.is-closing .modal { animation: modalOut .24s var(--ease) both; }
+
+/* ================= v1.0.28 · 侧栏滑行高亮 ================= */
+.sidebar .nav { position: relative; }
+.side-nav-glide {
+  position: absolute; left: 0; top: 0; z-index: 0;
+  width: 0; height: 0; opacity: 0; pointer-events: none;
+  border-radius: var(--radius-sm); background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform .42s cubic-bezier(.22, 1.32, .36, 1),
+    width .42s cubic-bezier(.22, 1.32, .36, 1),
+    height .42s cubic-bezier(.22, 1.32, .36, 1),
+    opacity .18s ease;
+}
+.nav-item, .nav-group { position: relative; z-index: 1; }
+.nav-item, .nav-item.is-active, .nav-item:hover {
+  background: transparent !important;
+  transform: none !important;
+}
+.nav-ind { display: none !important; }

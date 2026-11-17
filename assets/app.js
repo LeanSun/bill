@@ -2874,6 +2874,39 @@
     });
   }
 
+
+  /* v1.0.28：侧栏高亮是一块会走的底色，不是每项各自的背景。
+     快速连点时先从 computed transform 读出当前位置冻住，再奔向新目标，
+     所以不会闪回起点；缓动尾段带一点回弹。文字和图标始终不参与位移。 */
+  var sideGlideState = null;
+  function moveSideGlide(animate) {
+    var nav = document.querySelector('.sidebar .nav'), g = document.getElementById('sideNavGlide');
+    if (!nav || !g) return;
+    var btn = nav.querySelector('.nav-item.is-active');
+    if (!btn) { g.style.opacity = '0'; return; }
+    var to = { x: btn.offsetLeft, y: btn.offsetTop, w: btn.offsetWidth, h: btn.offsetHeight };
+    g.style.opacity = '1';
+    if (!animate || !sideGlideState) {
+      g.style.transform = 'translate3d(' + to.x + 'px,' + to.y + 'px,0)';
+      g.style.width = to.w + 'px'; g.style.height = to.h + 'px';
+      sideGlideState = to; return;
+    }
+    var cs = getComputedStyle(g), curX = to.x, curY = to.y;
+    var curW = sideGlideState.w, curH = sideGlideState.h;
+    try {
+      var m = cs.transform.match(/matrix\(([^)]+)\)/);
+      if (m) { var v = m[1].split(',').map(Number); curX = v[4]; curY = v[5]; }
+      curW = parseFloat(cs.width) || curW; curH = parseFloat(cs.height) || curH;
+    } catch (e) { /* noop */ }
+    g.style.transition = 'none';
+    g.style.width = curW + 'px'; g.style.height = curH + 'px';
+    g.style.transform = 'translate3d(' + curX + 'px,' + curY + 'px,0)';
+    void g.offsetWidth;
+    g.style.transition = '';
+    g.style.width = to.w + 'px'; g.style.height = to.h + 'px';
+    g.style.transform = 'translate3d(' + to.x + 'px,' + to.y + 'px,0)';
+    sideGlideState = to;
+  }
   function setView(view, cubeTab) {
     if (!VIEW_META[view]) return;
     if (soft && soft.on) softReset();
@@ -2891,6 +2924,7 @@
         : (item.dataset.view === view && !isCube);
       item.classList.toggle('is-active', on);
     }
+    moveSideGlide(!!sideGlideState);
     /* 日历页要锁一整屏，正文底距归零，否则那 56px 会把日历顶出一截 */
     var main = document.querySelector('.main');
     if (main) main.classList.toggle('is-calendar', view === 'calendar');
@@ -3902,6 +3936,7 @@
   }
 
   function bindEvents() {
+    window.addEventListener('resize', function () { moveSideGlide(false); });
     var navs = document.querySelectorAll('.nav-item');
     for (var i = 0; i < navs.length; i++) {
       navs[i].addEventListener('click', function () {
