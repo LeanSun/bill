@@ -1,0 +1,215 @@
+/* ============================================================
+   UI Select v2 — 自绘下拉的样式（账本 index.html / 魔方 cube.html 共用）
+   ------------------------------------------------------------
+   两页的主题令牌不同名：
+     账本  --primary --border --surface --surface-2 --text --muted
+     魔方  --blue    --line   --card    --soft       --ink  --muted
+   这里统一按「账本优先、魔方兜底」取：var(--primary, var(--blue, #4f6ef7))。
+   两页任何一边改色，下拉跟着走，不用再抄一份。
+   ============================================================ */
+
+/* ---------- 1. 原生 select：留值、留提交，视觉全撤 ---------- */
+select.ui-native-select {
+  position: absolute !important;
+  width: 1px !important; height: 1px !important;
+  opacity: 0 !important; pointer-events: none !important;
+  left: -9999px !important; top: auto !important;
+  margin: 0 !important; padding: 0 !important; border: 0 !important;
+}
+
+/* ---------- 2. trigger：一个长得像输入框的 div ---------- */
+.ui-sel-trigger {
+  --ui-primary: var(--primary, var(--blue, #4f6ef7));
+  --ui-line: var(--border, var(--line, #e8edf4));
+  --ui-surface: var(--surface, var(--card, #fff));
+  --ui-surface2: var(--surface-2, var(--soft, #f1f4f9));
+  --ui-ink: var(--text, var(--ink, #182230));
+  --ui-muted: var(--muted, #758195);
+
+  position: relative;
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; min-width: 0; height: 36px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--ui-line); border-radius: 9px;
+  background: var(--ui-surface); color: var(--ui-ink);
+  font-size: 12.5px; font-weight: 650; line-height: 1;
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+.ui-sel-trigger:hover {
+  border-color: color-mix(in srgb, var(--ui-primary) 58%, var(--ui-line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 9%, transparent);
+}
+.ui-sel-trigger.is-open,
+.ui-sel-trigger:focus-visible {
+  outline: none;
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 14%, transparent);
+}
+.ui-sel-trigger.is-disabled { opacity: .5; cursor: not-allowed; }
+
+/* trigger 内部那个「输入框」：无边框、透明底、继承字号 */
+.ui-sel-trigger .ui-sel-input {
+  flex: 1 1 0; min-width: 0; width: auto; height: 100%;
+  margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: transparent; color: inherit;
+  font: inherit; font-weight: inherit; line-height: inherit;
+  letter-spacing: inherit; outline: none; box-shadow: none;
+  cursor: pointer; text-overflow: ellipsis;
+}
+.ui-sel-trigger.is-open .ui-sel-input { cursor: text; }
+.ui-sel-trigger .ui-sel-input::placeholder {
+  color: var(--ui-muted); opacity: .8; font-weight: 550;
+}
+.ui-sel-trigger.is-placeholder .ui-sel-input { color: var(--ui-muted); font-weight: 550; }
+
+.ui-sel-caret {
+  width: 15px; height: 15px; flex: 0 0 15px;
+  color: var(--ui-muted);
+  transition: transform .18s ease, color .18s ease;
+}
+.ui-sel-trigger.is-open .ui-sel-caret { transform: rotate(180deg); color: var(--ui-primary); }
+
+/* ---------- 3. 面板 ---------- */
+.ui-sel-panel {
+  --ui-primary: var(--primary, var(--blue, #4f6ef7));
+  --ui-line: var(--border, var(--line, #e8edf4));
+  --ui-surface: var(--surface, var(--card, #fff));
+  --ui-surface2: var(--surface-2, var(--soft, #f1f4f9));
+  --ui-ink: var(--text, var(--ink, #182230));
+  --ui-muted: var(--muted, #758195);
+
+  position: fixed; z-index: 1200;
+  display: flex; flex-direction: column;
+  min-width: 150px;
+  max-width: min(360px, calc(100vw - 20px));
+  max-height: min(340px, 70vh);
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  box-shadow: 0 18px 48px rgba(24, 39, 75, .18), 0 2px 8px rgba(24, 39, 75, .06);
+  animation: uiSelIn .16s cubic-bezier(.22, 1, .36, 1) both;
+  overscroll-behavior: contain;
+}
+@keyframes uiSelIn {
+  /* 只动位移与缩放：透明度不进关键帧，动画被打断时面板也不会变成半透明 */
+  from { transform: translateY(-4px) scale(.98); }
+  to { transform: none; }
+}
+
+.ui-sel-options {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+/* 关键：不允许被 flex 压扁。v1 少了 flex:0 0 auto，
+   35 个省份在 340px 高的面板里被压成 16px 一行，文字互相叠住。 */
+.ui-sel-option {
+  flex: 0 0 auto;
+  display: flex; align-items: center;
+  width: 100%; min-height: 34px;
+  padding: 7px 10px;
+  border: 0; border-radius: 8px;
+  background: transparent; color: var(--ui-ink);
+  font-size: 12.5px; font-weight: 600; line-height: 1.4;
+  text-align: left; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  box-shadow: none; transform: none;
+  transition: background-color .12s ease, color .12s ease;
+}
+.ui-sel-option:hover,
+.ui-sel-option.is-active {
+  background: var(--ui-surface2);
+  transform: none; filter: none;
+}
+.ui-sel-option.is-selected {
+  background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+  color: var(--ui-primary); font-weight: 750;
+}
+.ui-sel-option.is-selected.is-active {
+  background: color-mix(in srgb, var(--ui-primary) 20%, transparent);
+}
+.ui-sel-empty {
+  padding: 16px 10px; text-align: center;
+  color: var(--ui-muted); font-size: 12px;
+}
+
+/* ---------- 4. 三张表的筛选行（魔方子页） ---------- */
+#cubes .cb-head .fx-row .ui-sel-trigger,
+#competitions .cb-head .fx-row .ui-sel-trigger,
+#lubricants .fx-bar .fx-row .ui-sel-trigger {
+  height: 36px !important; min-height: 36px !important;
+  border: 1px solid var(--ui-line) !important; border-radius: 9px !important;
+  background: var(--ui-surface) !important;
+  box-shadow: 0 1px 3px rgba(24, 39, 75, .06) !important;
+  font-size: 12.5px !important; font-weight: 650 !important;
+  padding: 0 10px 0 12px !important;
+  flex: 0 1 auto;
+}
+
+/* 翻页页码：58×28、数字加大 */
+#cubes .cb-head .fx-row .fx-pager .ui-sel-trigger,
+#competitions .cb-head .fx-row .fx-pager .ui-sel-trigger,
+.fx-pager .ui-sel-trigger {
+  width: 58px !important; min-width: 58px !important; max-width: 58px !important;
+  height: 28px !important; min-height: 28px !important;
+  padding: 0 4px !important;
+  border: 0 !important; background: transparent !important; box-shadow: none !important;
+  font-size: 15px !important; font-weight: 800 !important;
+  font-variant-numeric: tabular-nums;
+  justify-content: center !important; text-align: center !important;
+  gap: 2px;
+}
+#cubes .cb-head .fx-row .fx-pager .ui-sel-trigger .ui-sel-input,
+#competitions .cb-head .fx-row .fx-pager .ui-sel-trigger .ui-sel-input,
+.fx-pager .ui-sel-trigger .ui-sel-input {
+  flex: 0 1 auto; text-align: center; text-overflow: clip;
+}
+.fx-pager .ui-sel-trigger .ui-sel-caret { width: 13px; height: 13px; flex-basis: 13px; }
+
+/* ---------- 5. 弹窗表单里的下拉：跟同排的 input 一样高一样宽 ---------- */
+.field .ui-sel-trigger,
+.ef-field .ui-sel-trigger {
+  width: 100%;
+  height: auto; min-height: 42px;   /* 与 .field input 同高（13px 字号 + 10px 内距） */
+  padding: 0 10px 0 12px;
+  border-radius: 9px;
+  border-color: var(--ui-line);
+  background: var(--ui-surface2);
+  font-size: 13px; font-weight: 600;
+}
+.field .ui-sel-trigger:hover {
+  background: var(--ui-surface);
+  border-color: color-mix(in srgb, var(--ui-primary) 55%, var(--ui-line));
+}
+.field .ui-sel-trigger.is-open,
+.field .ui-sel-trigger:focus-visible {
+  background: var(--ui-surface);
+}
+/* 天页右侧那个紧凑的「＋ 记一笔」小表单：select 只有 32px / 11.5px */
+.ds-quick .ui-sel-trigger {
+  width: 100%; height: 32px; min-height: 32px;
+  padding: 0 6px 0 8px; gap: 4px;
+  border-radius: 8px; border-color: var(--ui-line);
+  background: var(--ui-surface2);
+  font-size: 11.5px; font-weight: 600;
+}
+.ds-quick .ui-sel-trigger .ui-sel-caret { width: 12px; height: 12px; flex-basis: 12px; }
+.ds-quick .ui-sel-trigger.is-open,
+.ds-quick .ui-sel-trigger:focus-visible {
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 3px var(--primary-soft, color-mix(in srgb, var(--ui-primary) 14%, transparent));
+}
+/* 魔方子页的字段一律更高一档（那边 input 是 46px / 15px，底色纯白而不是 --surface-2） */
+html[data-density="cube"] .field .ui-sel-trigger {
+  min-height: 49px;                 /* 魔方表单 input 是 15px 字号 + 12px 内距 = 49 */
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--ui-surface);
+  font-size: 15px;
+  font-weight: 600;
+}
+html[data-density="cube"] .field .ui-sel-caret { width: 16px; height: 16px; flex-basis: 16px; }

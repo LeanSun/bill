@@ -1013,6 +1013,10 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 .modal-sm p { margin: 0 0 22px; font-size: 12.5px; color: var(--muted); }
 .confirm-icon { width: 48px; height: 48px; margin: 0 auto; border-radius: 15px; display: grid; place-items: center; color: var(--danger); background: var(--danger-soft); }
 .confirm-icon svg { width: 24px; height: 24px; }
+/* v1.0.36：删除确认必须压在「记一笔 / 编辑记录」弹窗之上。
+   两者共用 .modal-backdrop（z-index:100），确认框在 DOM 里更靠前，抽签输给它。
+   这里单独抬到 320；遮罩也不再虚化，避免和底层弹窗的 blur 叠成一片糊。 */
+#confirmBackdrop { z-index: 320 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 
 /* 支出 / 收入：一条轨道 + 一块滑过去的指示片。
    滑块底色随方向在绿/红之间切，和日历顶栏的筛选滑块同一套手感 */
@@ -2420,7 +2424,9 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 /* 让格内内容浮在呼吸底色之上；数字徽标去掉外发光 */
 .cal-cell.is-today>*,.wk-col.is-today>*,.ym-day.is-today>*{position:relative;z-index:1}
 .cal-cell.is-today .cal-daynum{box-shadow:none!important}
-.ym-day.is-today{background:var(--primary)!important;color:#fff!important;font-weight:700}
+/* v1.0.36：年视图的今天是块实心蓝、月/周视图却在呼吸，三种视图对不上。
+   这里撤掉 !important 实心底，交给同一套呼吸动画，只把文字调成主色调。 */
+.ym-day.is-today{background:transparent;color:color-mix(in srgb,var(--primary) 68%,var(--text));font-weight:800}
 
 /* ---- 2. 六张统计卡标题留白：上一版选择器写成 #overview，真实 id 是 #view-overview ---- */
 #view-overview .cube-mini-card{padding:19px 20px 16px!important}
@@ -2433,20 +2439,23 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .cal-cell.is-today::after,
 .wk-col.is-today::after,
 .ym-day.is-today::after{display:none!important;content:none!important}
+/* v1.0.36：2.6s 一轮太快，像心跳报警，不像呼吸。放到 5.2s，
+   振幅同时收一档（46% -> 34%），并换成对称的 sine 缓动，
+   起伏在两端停得住，中间过得顺。 */
 .cal-cell.is-today,
 .wk-col.is-today,
 .ym-day.is-today{
-  animation:todayCellBreath 2.6s ease-in-out infinite!important;
+  animation:todayCellBreath 5.2s cubic-bezier(.45,.02,.55,.98) infinite!important;
   will-change:background-color,box-shadow;
 }
 @keyframes todayCellBreath{
   0%,100%{
-    background-color:color-mix(in srgb, var(--primary) 12%, var(--surface));
+    background-color:color-mix(in srgb, var(--primary) 11%, var(--surface));
     box-shadow:inset 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
   }
   50%{
-    background-color:color-mix(in srgb, var(--primary) 46%, var(--surface));
-    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 42%, transparent);
+    background-color:color-mix(in srgb, var(--primary) 34%, var(--surface));
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 30%, transparent);
   }
 }
 html[data-theme="dark"] .cal-cell.is-today,
@@ -2456,12 +2465,12 @@ html[data-theme="dark"] .ym-day.is-today{
 }
 @keyframes todayCellBreathDark{
   0%,100%{
-    background-color:color-mix(in srgb, var(--primary) 16%, var(--surface));
+    background-color:color-mix(in srgb, var(--primary) 15%, var(--surface));
     box-shadow:inset 0 0 0 0 transparent;
   }
   50%{
-    background-color:color-mix(in srgb, var(--primary) 52%, var(--surface));
-    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 58%, transparent);
+    background-color:color-mix(in srgb, var(--primary) 42%, var(--surface));
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 46%, transparent);
   }
 }
 @media (prefers-reduced-motion: reduce){
