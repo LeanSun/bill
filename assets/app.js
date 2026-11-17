@@ -4182,6 +4182,22 @@
     /* 工具条里不再重复放一个"记一笔"：顶栏那个一直都在，
        在日历页时把它的默认日期接到当前视图上 */
     if ($('addBtn')) $('addBtn').addEventListener('click', function () {
+      /* v1.0.35：站在魔方工作台里时，「记一笔」跟着当前子页走：
+         魔方统计 -> 新增购买记录；比赛记录 -> 新增比赛；其余 -> 原来的记一笔。 */
+      if (state.view === 'cube') {
+        var f = $('cubeFrame');
+        var tab = 'cubes';
+        try {
+          var d = f && f.contentWindow && f.contentWindow.document;
+          var active = d && d.querySelector('.panel.active');
+          if (active) tab = active.id;
+        } catch (e) { /* 跨域/未加载就按魔方统计处理 */ }
+        if (tab === 'cubes' || tab === 'competitions') {
+          var sent = false;
+          try { sent = !!(f && f.contentWindow && (f.contentWindow.postMessage({ __cubeAdd: tab }, '*'), true)); } catch (e) {}
+          if (sent) return;
+        }
+      }
       openModal(null, state.view === 'calendar' ? defaultAddDate() : '');
     });
     if ($('calTitle')) $('calTitle').addEventListener('click', function (e) {

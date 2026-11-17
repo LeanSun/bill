@@ -964,7 +964,7 @@ html[data-theme="dark"] .cal-item:hover {
 /* 色深与字色由 JS 按金额算好后 inline 写入，逐格精确、无兼容尾巴 */
 .ym-day.has { font-weight: 600; }
 /* 年视图的今日小格：直接铺满主色，不画 1.5px 的圈 */
-.ym-day.is-today { background: var(--primary) !important; color: #fff !important; font-weight: 700; }
+.ym-day.is-today { color: var(--primary) !important; font-weight: 800; }
 
 .cal-board { position: relative; }
 .board-empty { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; pointer-events: none; padding: 18px; }
@@ -2425,3 +2425,52 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 /* ---- 2. 六张统计卡标题留白：上一版选择器写成 #overview，真实 id 是 #view-overview ---- */
 #view-overview .cube-mini-card{padding:19px 20px 16px!important}
 #view-overview .cube-mini-card .card-head{padding:0!important;margin-bottom:6px}
+
+/* ================= v1.0.35：今日呼吸灯——改成整格底色直接呼吸，肉眼可见 =================
+   旧做法在 ::after 上叠一层 26% 主色、opacity .12~.72，透过本就带色的格子几乎看不出。
+   现在直接动画格子自身 background-color（浅 -> 饱和 -> 浅），配一圈同步的柔光描边，
+   月 / 周 / 年三视图同款；格子内容靠 z-index 浮在底色之上。 */
+.cal-cell.is-today::after,
+.wk-col.is-today::after,
+.ym-day.is-today::after{display:none!important;content:none!important}
+.cal-cell.is-today,
+.wk-col.is-today,
+.ym-day.is-today{
+  animation:todayCellBreath 2.6s ease-in-out infinite!important;
+  will-change:background-color,box-shadow;
+}
+@keyframes todayCellBreath{
+  0%,100%{
+    background-color:color-mix(in srgb, var(--primary) 12%, var(--surface));
+    box-shadow:inset 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+  50%{
+    background-color:color-mix(in srgb, var(--primary) 46%, var(--surface));
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 42%, transparent);
+  }
+}
+html[data-theme="dark"] .cal-cell.is-today,
+html[data-theme="dark"] .wk-col.is-today,
+html[data-theme="dark"] .ym-day.is-today{
+  animation-name:todayCellBreathDark!important;
+}
+@keyframes todayCellBreathDark{
+  0%,100%{
+    background-color:color-mix(in srgb, var(--primary) 16%, var(--surface));
+    box-shadow:inset 0 0 0 0 transparent;
+  }
+  50%{
+    background-color:color-mix(in srgb, var(--primary) 52%, var(--surface));
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 58%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce){
+  .cal-cell.is-today,.wk-col.is-today,.ym-day.is-today{
+    animation:none!important;
+    background-color:color-mix(in srgb, var(--primary) 32%, var(--surface))!important;
+  }
+}
+
+/* 自绘下拉框在账本弹窗表单里的尺寸（与 .field select 一致） */
+.field .ui-sel-trigger,
+.ef-field .ui-sel-trigger{width:100%}

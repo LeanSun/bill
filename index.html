@@ -626,7 +626,183 @@
 <div class="hover-tip" id="hoverTip" hidden data-page-node-id="EHiQ9FUqob4KNwXd57JLKc"></div>
 <script src="assets/echarts.min.js"></script>
 <script src="assets/boot.js"></script>
+<script>
+/* ============================================================
+   UI Select — 自定义下拉框（桌面/移动通用）
+   原生 <select> 的弹出层归操作系统画，改不了样式；这里保留原生
+   元素做值与表单提交，用一套自绘的 trigger + panel 盖在上面。
+   · 点 trigger 开关 panel；点选项写回 select 并派发 change/input
+   · 支持搜索框（选项 ≥ 8 条自动开启，或 data-ui-search 强制）
+   · 支持联动：data-ui-cascade="province|city"，省变则重刷市列表，
+     选市则自动回填所属省，杜绝「江苏省 / 哈尔滨市」这种错配
+   · 用 MutationObserver 兜住动态重建的 select（筛选、表单、翻页）
+   ============================================================ */
+const PROVINCE_CITY_MAP={
+  '北京市':['北京'],'上海市':['上海'],'天津市':['天津'],'重庆市':['重庆'],
+  '广东省':['广州','深圳'],'浙江省':['杭州','宁波'],'江苏省':['南京','苏州'],
+  '四川省':['成都'],'湖北省':['武汉'],'陕西省':['西安'],'山东省':['济南','青岛'],
+  '安徽省':['合肥'],'贵州省':['贵阳'],'云南省':['昆明'],'湖南省':['长沙'],
+  '河南省':['郑州'],'福建省':['福州','厦门'],'辽宁省':['沈阳','大连'],
+  '江西省':['南昌'],'广西壮族自治区':['南宁'],'海南省':['海口'],'甘肃省':['兰州'],
+  '宁夏回族自治区':['银川'],'新疆维吾尔自治区':['乌鲁木齐'],'西藏自治区':['拉萨'],
+  '内蒙古自治区':['呼和浩特'],'香港特别行政区':['香港'],'澳门特别行政区':['澳门'],
+  '台湾省':['台北'],'吉林省':['长春'],'黑龙江省':['哈尔滨'],'河北省':['石家庄'],'山西省':['太原']
+};
+const CITY_PROVINCE_MAP=(function(){const m={};Object.keys(PROVINCE_CITY_MAP).forEach(function(p){PROVINCE_CITY_MAP[p].forEach(function(c){m[c]=p})});return m})();
+
+window.UISelect=(function(){
+  let openSel=null,openPanel=null,openTrigger=null;
+  const esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+  function labelText(sel){
+    const o=sel.options[sel.selectedIndex];
+    return o?o.textContent:(sel.getAttribute('data-placeholder')||'请选择');
+  }
+  function decorate(sel){
+    if(sel.dataset.uiDecorated==='1')return;
+    sel.dataset.uiDecorated='1';
+    sel.classList.add('ui-native-select');
+    const t=document.createElement('button');
+    t.type='button';t.className='ui-sel-trigger';
+    t.setAttribute('aria-haspopup','listbox');
+    t.setAttribute('aria-expanded','false');
+    t.innerHTML='<span class="ui-sel-label"></span><svg class="ui-sel-caret" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    sel.parentNode.insertBefore(t,sel.nextSibling);
+    sync(sel);
+  }
+  function sync(sel){
+    if(sel.dataset.uiDecorated!=='1')return;
+    const t=sel.nextElementSibling;
+    if(!t||!t.classList.contains('ui-sel-trigger'))return;
+    const lab=t.querySelector('.ui-sel-label');
+    if(lab)lab.textContent=labelText(sel);
+    t.disabled=!!sel.disabled;
+    t.classList.toggle('is-placeholder',!sel.value);
+  }
+  function syncAll(){
+    document.querySelectorAll('select.ui-native-select').forEach(sync);
+  }
+  function close(){
+    if(openPanel){openPanel.remove();openPanel=null}
+    if(openTrigger){openTrigger.setAttribute('aria-expanded','false');openTrigger.classList.remove('is-open');openTrigger=null}
+    openSel=null;
+  }
+  function open(sel,trigger){
+    close();
+    openSel=sel;openTrigger=trigger;
+    trigger.setAttribute('aria-expanded','true');trigger.classList.add('is-open');
+    const panel=document.createElement('div');
+    panel.className='ui-sel-panel';panel.setAttribute('role','listbox');
+    const needSearch=sel.hasAttribute('data-ui-search')||sel.options.length>=8;
+    if(needSearch){
+      const inp=document.createElement('input');
+      inp.type='text';inp.className='ui-sel-search';inp.placeholder='搜索…';inp.setAttribute('aria-label','搜索选项');
+      panel.appendChild(inp);
+    }
+    const list=document.createElement('div');list.className='ui-sel-options';panel.appendChild(list);
+    function paint(q){
+      q=String(q||'').trim().toLowerCase();
+      list.innerHTML='';
+      let arr=[].slice.call(sel.options);
+      if(q)arr=arr.filter(function(o){return o.textContent.toLowerCase().indexOf(q)>=0});
+      if(!arr.length){list.innerHTML='<div class="ui-sel-empty">没有匹配项</div>';return}
+      arr.forEach(function(o){
+        const b=document.createElement('button');
+        b.type='button';b.className='ui-sel-option'+(o.selected?' is-selected':'');
+        b.setAttribute('role','option');b.setAttribute('aria-selected',o.selected?'true':'false');
+        b.textContent=o.textContent;
+        b.addEventListener('click',function(){
+          sel.value=o.value;
+          sel.dispatchEvent(new Event('input',{bubbles:true}));
+          sel.dispatchEvent(new Event('change',{bubbles:true}));
+          sync(sel);close();
+          try{trigger.focus()}catch(e){}
+        });
+        list.appendChild(b);
+      });
+    }
+    paint('');
+    const search=panel.querySelector('.ui-sel-search');
+    if(search)search.addEventListener('input',function(){paint(search.value)});
+    document.body.appendChild(panel);openPanel=panel;
+    const r=trigger.getBoundingClientRect();
+    panel.style.minWidth=Math.max(r.width,150)+'px';
+    let left=r.left,top=r.bottom+6;
+    const pw=panel.offsetWidth,ph=panel.offsetHeight;
+    if(left+pw>window.innerWidth-10)left=window.innerWidth-pw-10;
+    if(left<10)left=10;
+    if(top+ph>window.innerHeight-10)top=Math.max(10,r.top-ph-6);
+    panel.style.left=left+'px';panel.style.top=top+'px';
+    if(search)setTimeout(function(){try{search.focus()}catch(e){}},0);
+  }
+  /* 联动：省 -> 刷市；市 -> 回填省 */
+  /* 省->市：按省重刷城市列表；市->省：按城市反填所属省。
+     forceProv 用于「选市回填」时直接指定省份，绕开 select.value 的读写时序。 */
+  function refreshCities(root,prov,keep){
+    const city=root.querySelector('select[data-ui-cascade="city"]');
+    if(!city)return null;
+    const cities=prov?(PROVINCE_CITY_MAP[prov]||[]):Object.keys(CITY_PROVINCE_MAP);
+    city.innerHTML='<option value="">请选择城市</option>'+cities.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>'}).join('');
+    if(keep&&cities.indexOf(keep)>=0)city.value=keep;else city.value='';
+    city.disabled=false;
+    sync(city);return city;
+  }
+  function cascadeChanged(sel,forceProv){
+    const kind=sel.getAttribute('data-ui-cascade');
+    if(!kind)return;
+    const root=sel.closest('form')||sel.closest('.field')?.parentElement||document;
+    if(kind==='province'){
+      refreshCities(root,forceProv!==undefined?forceProv:sel.value,sel.nextElementSibling&&sel.closest('form')?(sel.closest('form').querySelector('select[data-ui-cascade="city"]')||{}).value:'');
+    }else if(kind==='city'){
+      const city=sel.value;
+      const prov=CITY_PROVINCE_MAP[city];
+      const ps=root.querySelector('select[data-ui-cascade="province"]');
+      if(!ps||!prov)return;
+      if(ps.value!==prov){
+        refreshCities(root,prov,city);           /* 先把城市列表收窄到该省并保住已选城市 */
+        ps.value=prov;                            /* 再回填省份 */
+        sync(ps);
+      }
+    }
+  }
+  function init(){
+    document.querySelectorAll('select').forEach(decorate);
+    document.addEventListener('click',function(e){
+      const t=e.target&&e.target.closest?e.target.closest('.ui-sel-trigger'):null;
+      if(t){
+        e.preventDefault();e.stopPropagation();
+        const sel=t.previousElementSibling;
+        if(sel&&sel.tagName==='SELECT'&&!sel.disabled){
+          if(openTrigger===t)close();else open(sel,t);
+        }
+        return;
+      }
+      if(openPanel&&!e.target.closest('.ui-sel-panel'))close();
+    },true);
+    document.addEventListener('change',function(e){
+      if(e.target&&e.target.tagName==='SELECT'){cascadeChanged(e.target);sync(e.target)}
+    },true);
+    document.addEventListener('input',function(e){
+      if(e.target&&e.target.tagName==='SELECT')sync(e.target);
+    },true);
+    window.addEventListener('resize',close);
+    const mo=new MutationObserver(function(){
+      mo.disconnect();
+      try{
+        document.querySelectorAll('select:not([data-ui-decorated="1"])').forEach(decorate);
+        syncAll();
+      }catch(e){}
+      finally{ setTimeout(function(){mo.observe(document.documentElement,{childList:true,subtree:true})},0); }
+    });
+    mo.observe(document.documentElement,{childList:true,subtree:true});
+    /* 联动初值：编辑已有记录时按省份刷一次市列表 */
+    document.querySelectorAll('select[data-ui-cascade="province"]').forEach(function(s){if(s.value)cascadeChanged(s)});
+  }
+  return {init:init,syncAll:syncAll,close:close,refresh:function(){document.querySelectorAll('select:not([data-ui-decorated="1"])').forEach(decorate);syncAll()}};
+})();
+
+</script>
 <script src="assets/app.js"></script>
+<script>window.addEventListener("load",function(){try{UISelect.init()}catch(e){}});</script>
 <script src="assets/sync.js"></script>
 </body>
 </html>
