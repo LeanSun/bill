@@ -2371,3 +2371,27 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .view.is-active > *:nth-child(3) .card,
 .view.is-active > *:nth-child(3) .lubcard,
 .view.is-active > *:nth-child(3) .cb-panel { animation-delay: 110ms; }
+
+/* v1.0.33：箭头连点逐次翻页 + 今日标记跨月/周/年统一 */
+.cal-step-next { animation: calStepNext .34s cubic-bezier(.22,1,.36,1) both; }
+.cal-step-prev { animation: calStepPrev .34s cubic-bezier(.22,1,.36,1) both; }
+@keyframes calStepNext {
+  from { opacity: .45; transform: translateX(16px) scale(.992); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes calStepPrev {
+  from { opacity: .45; transform: translateX(-16px) scale(.992); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cal-step-next, .cal-step-prev { animation: none !important; }
+}
+.wk-col.is-today, .ym-day.is-today { position: relative; }
+.wk-col.is-today::before, .ym-day.is-today::before {
+  content: ""; position: absolute; left: 50%; bottom: 5px;
+  width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
+  background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+  pointer-events: none; z-index: 2;
+}
+#overview .cube-mini-card { padding: 16px !important; }
+#overview .cube-mini-card .card-head { padding: 2px 4px 10px !important; }

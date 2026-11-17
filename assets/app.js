@@ -3517,6 +3517,42 @@
     }
     fillCategoryOptions();
   }
+  /* v1.0.33：记一笔草稿。点空白关闭保留，Esc 明确丢弃。 */
+  var ENTRY_DRAFT_KEY = 'qingzhang.entryDraft.v1';
+  function readEntryDraft() {
+    try { return JSON.parse(localStorage.getItem(ENTRY_DRAFT_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function writeEntryDraft(d) { try { localStorage.setItem(ENTRY_DRAFT_KEY, JSON.stringify(d)); } catch (e) {} }
+  function clearEntryDraft() { try { localStorage.removeItem(ENTRY_DRAFT_KEY); } catch (e) {} }
+  function collectEntryDraft() {
+    return {
+      type: state.entryType,
+      amount: $('fAmount') ? $('fAmount').value : '',
+      date: $('fDate') ? $('fDate').value : '',
+      note: $('fNote') ? $('fNote').value : '',
+      category: $('fCategory') ? $('fCategory').value : '',
+      sub: $('fSub') ? $('fSub').value : ''
+    };
+  }
+  function saveEntryDraft() { if (!state.editingId) writeEntryDraft(collectEntryDraft()); }
+  function bindEntryDraft() {
+    var form = $('entryForm'); if (!form) return;
+    form.oninput = saveEntryDraft; form.onchange = saveEntryDraft;
+  }
+  function applyEntryDraft(d) {
+    if (!d) return;
+    if (d.type && d.type !== state.entryType) setEntryType(d.type);
+    if ($('fAmount')) $('fAmount').value = d.amount || '';
+    setDateValue(d.date || todayStr());
+    if ($('fNote')) $('fNote').value = d.note || '';
+    if ($('fCategory')) {
+      var found = false;
+      for (var i = 0; i < $('fCategory').options.length; i++) if ($('fCategory').options[i].value === d.category) found = true;
+      if (!found && d.category) $('fCategory').add(new Option(d.category, d.category));
+      $('fCategory').value = d.category || $('fCategory').value;
+    }
+    fillSubOptions(d.sub || '');
+  }
   function openModal(record, prefillDate, mode) {
     /* 手机上记账浮层弹出前先收起筛选区，别让那一排按钮压在表单上 */
     collapseFiltersOnMobile();
@@ -3550,6 +3586,8 @@
     /* 只有显式存过子类的记录才回填选择；旧账留「自动识别」并实时显示推断结果 */
     fillSubOptions(record && record.subExplicit ? record.sub : '');
     if ($('formError')) { $('formError').hidden = true; $('formError').textContent = ''; }
+    if (!record) applyEntryDraft(readEntryDraft());
+    bindEntryDraft();
     var back = $('modalBackdrop');
     if (back) { clearTimeout(modalCloseTimer); back.classList.remove('is-closing'); back.hidden = false; }
     setTimeout(function () {
@@ -3558,7 +3596,8 @@
     }, 120);
   }
   var modalCloseTimer = 0;
-  function closeModal() {
+  function closeModal(reason) {
+    if (reason === 'esc' && !state.editingId) clearEntryDraft();
     var back = $('modalBackdrop');
     closeDp();
     document.body.classList.remove('modal-cell');
@@ -4113,7 +4152,7 @@
         if (dp.open) { closeDp(); return; }
         if (cmpOpen) { closeCmp(); return; }
         if (!$('confirmBackdrop').hidden) { closeConfirm(); return; }
-        closeModal();
+        closeModal('esc');
         return;
       }
       /* ← → 翻页：年 / 月 / 周 / 天 四种粒度都走 softStep，
@@ -4633,24 +4672,17 @@
   }
 
   /* 箭头 / ← →：定时曲线推到 1，比滚轮更「有主见」，但不硬切 */
+  /* v1.0.33：一次点击就是一次真实翻页。旧 ghost 动画在连点时被 cancel，
+     第二次只重启动画却不推进月份；现在先同步推进，再给新网格补一段短滑入。 */
   function softStep(dir) {
     closeCmp();
-    if (!softStart(dir)) { shiftCalStep(dir); return; }
-    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
-    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
-    var t0 = 0, el = soft.el, dur = 430;
-    softLast = 0;
-    softRaf = requestAnimationFrame(function step(ts) {
-      softRaf = 0;
-      if (!soft.on || soft.el !== el) return;
-      if (!t0) t0 = ts;
-      var k = Math.min(1, (ts - t0) / dur);
-      var e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
-      soft.p = e;
-      softPaint(soft.p);
-      if (k < 1) { softRaf = requestAnimationFrame(step); return; }
-      softSettle();
-    });
+    shiftCalStep(dir);
+    var el = softTarget(); if (!el) return;
+    var cls = dir > 0 ? 'cal-step-next' : 'cal-step-prev';
+    el.classList.remove('cal-step-next', 'cal-step-prev');
+    void el.offsetWidth;
+    el.classList.add(cls);
+    setTimeout(function () { el.classList.remove(cls); }, 380);
   }
 
   function bindWheelPaging() {
