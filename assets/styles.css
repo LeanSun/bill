@@ -2156,11 +2156,10 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 #view-cube { position: relative; }
 .cube-frame {
   display: block; width: 100%; height: calc(100dvh - var(--main-pt) - 56px); min-height: 520px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--surface); box-shadow: var(--shadow-card);
+  border: 0; border-radius: 0; background: transparent; box-shadow: none;
 }
 @media (max-width: 760px) {
-  .cube-frame { height: calc(100dvh - 78px); min-height: 460px; border-radius: 12px; }
+  .cube-frame { height: calc(100dvh - 78px); min-height: 460px; border-radius: 0; }
 }
 
 /* ---------- 总览里的魔方板块：数据只读 cubeLedger_v1，不进账本 ----------
