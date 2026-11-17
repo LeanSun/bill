@@ -2327,3 +2327,10 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
   transform: none !important;
 }
 .nav-ind { display: none !important; }
+
+/* v1.0.31：魔方视图占满 main，不留 56px 底缝 */
+.main:has(#view-cube.is-active) { padding-bottom: 0 !important; }
+.cube-frame {
+  height: calc(100dvh - var(--main-pt)) !important;
+  min-height: 0 !important;
+}
