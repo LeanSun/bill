@@ -173,6 +173,7 @@
     newId: '',
     newUntil: 0,
     donutYear: 'all',
+    weightYear: 'all',
     store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     catColors: {},
     layout: null
@@ -938,6 +939,12 @@
       borderColor: p.border,
       borderWidth: 1,
       padding: [10, 13],
+      /* v1.0.41：所有图表 tooltip 统一浮在光标上方，居中且不遮住数据点 */
+      position: function (pt, params, dom, rect, size) {
+        var w = size.contentSize[0], h = size.contentSize[1];
+        return [Math.min(Math.max(pt[0] - w / 2, 6), Math.max(6, size.viewSize[0] - w - 6)),
+                Math.max(6, pt[1] - h - 16)];
+      },
       textStyle: { color: p.text, fontSize: 12, fontFamily: p.font },
       extraCssText: 'border-radius:10px;box-shadow:0 14px 38px -14px rgba(20,32,62,.4);'
     }, extra || {});
@@ -1226,9 +1233,28 @@
      与账目共用同一份 localStorage / 云同步快照。 */
   function renderWeight(p) {
     var w = state.store.weights || {};
-    var keys = Object.keys(w).filter(function (k) {
+    var allKeys = Object.keys(w).filter(function (k) {
       return /^\d{4}-\d{2}-\d{2}$/.test(k) && isFinite(Number(w[k]));
     }).sort();
+    var wy = $('weightYear');
+    if (wy) {
+      var yrs = [];
+      allKeys.forEach(function (k) { var y = Number(k.slice(0, 4)); if (yrs.indexOf(y) < 0) yrs.push(y); });
+      yrs.sort(function (a, b) { return b - a; });
+      var wsig = 'all,' + yrs.join(',');
+      if (wy.dataset.sig !== wsig) {
+        wy.dataset.sig = wsig;
+        wy.innerHTML = '<span class="seg-ind" aria-hidden="true"></span>' +
+          ['all'].concat(yrs).map(function (y) {
+            return '<button type="button" data-wy="' + y + '" class="' + (String(state.weightYear) === String(y) ? 'is-active' : '') + '">' +
+              (y === 'all' ? '全部' : y) + '</button>';
+          }).join('');
+        setSegActive(wy, 'data-wy', state.weightYear);
+      }
+    }
+    var keys = allKeys.filter(function (k) {
+      return state.weightYear === 'all' || k.slice(0, 4) === String(state.weightYear);
+    });
     var vals = keys.map(function (k) { return Number(w[k]); });
     var ts = keys.map(function (k) { return new Date(k + 'T00:00:00').getTime(); });
     /* 隔了 45 天以上的两笔之间插一个空点，把线断开。
@@ -1320,17 +1346,16 @@
     var sig = state.donutYear + '|' + years.join(',');
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
-    box.innerHTML = ['all'].concat(years).map(function (y) {
-      return '<button type="button" data-dy="' + y + '" class="' + (String(state.donutYear) === String(y) ? 'is-active' : '') + '">' +
-        (y === 'all' ? '全部' : y) + '</button>';
-    }).join('');
+    box.innerHTML = '<span class="seg-ind" aria-hidden="true"></span>' +
+      ['all'].concat(years).map(function (y) {
+        return '<button type="button" data-dy="' + y + '" class="' + (String(state.donutYear) === String(y) ? 'is-active' : '') + '">' +
+          (y === 'all' ? '全部' : y) + '</button>';
+      }).join('');
+    setSegActive(box, 'data-dy', state.donutYear);
   }
   function bindDonutYear() {
-    var box = $('donutYear'); if (!box) return;
-    box.addEventListener('click', function (e) {
-      var b = e.target.closest ? e.target.closest('button[data-dy]') : null;
-      if (!b) return;
-      state.donutYear = b.dataset.dy;
+    bindSeg($('donutYear'), 'data-dy', function (v) {
+      state.donutYear = v;
       renderCharts('overview', 'instant');
     });
   }
@@ -2253,19 +2278,20 @@
       var showRecent = (cat === 'all');
       strip.hidden = !showRecent;
       if (showRecent) {
-        var recs = sortedDesc(allRecords()).slice(0, 5);
+        var recs = sortedDesc(allRecords()).slice(0, 10);
         var rsig = recs.map(function (r) {
           return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type, catColor(p, r.category)].join('|');
         }).join('~');
         if (rlist.dataset.sig !== rsig) {
           rlist.dataset.sig = rsig;
-          rlist.innerHTML = recs.length ? recs.map(function (r) {
+          rlist.innerHTML = recs.length ? recs.map(function (r, ri) {
             var inc = r.type === 'income';
+            var newDay = ri > 0 && recs[ri - 1].date !== r.date;
             var note = String(r.note || r.sub || r.category || '').trim();
             /* 133×36 两行装：上行备注，下行「日期 · 金额」。备注因此不用被
                金额和日期挤成一团省略号，五颗并排也是齐的。 */
             var c = catColor(p, r.category);
-            return '<button type="button" class="rs-item" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
+            return '<button type="button" class="rs-item' + (newDay ? ' is-newday' : '') + '" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
               esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '')) + '">' +
               '<i class="rs-dot"></i>' +
               '<span class="rs-body">' +
@@ -2700,6 +2726,7 @@
       if (r.type === 'income') mInc += r.amount; else mExp += r.amount;
     });
     var mNow = round(mInc - mExp);
+    var mNowPct = mInc > 0 ? Math.max(0, Math.min(100, mExp / mInc * 100)) : 0;
     var mLeft = monthBudget - mtd, yLeft = round(yInc - yExp);
     var mLeftPct = monthBudget > 0 ? Math.max(0, Math.min(100, mtd / monthBudget * 100)) : 0;
     /* 年结余的进度条按"花掉收入的比例"显示，越低越省 */
@@ -2832,6 +2859,8 @@
       '<div class="ir-note">已花 ' + fmtYuan(mtd) + ' · 近 6 月月均 ' + fmtYuan(monthBudget) + '</div>' +
       '<div class="ir-line is-now"><span>本月剩余</span><b class="' + (mNow < 0 ? 'is-over' : '') + '">' +
       (mNow < 0 ? '超支 ' + fmtYuan(-mNow) : fmtYuan(mNow)) + '</b></div>' +
+      '<div class="ir-bar is-now" data-tip="' + esc('本月已花 ' + fmtYuan(mExp) + ' / 本月收 ' + fmtYuan(mInc)) +
+      '"><i style="width:' + mNowPct.toFixed(1) + '%"></i></div>' +
       '<div class="ir-note">本月收 ' + fmtYuan(mInc) + ' · 支 ' + fmtYuan(mExp) + '</div>' +
       '<div class="ir-line is-year"><span>今年结余</span><b class="' + (yLeft < 0 ? 'is-over' : '') + '">' +
       (yLeft < 0 ? '超支 ' + fmtYuan(-yLeft) : fmtYuan(yLeft)) + '</b></div>' +
@@ -2898,8 +2927,14 @@
       }
       return rk(a) - rk(b);
     });
+    /* v1.0.41：同一分类里按「记下的先后」排 —— 先记的在左，后记的接在后面。
+       记录里没有独立时间字段，用 allRecords() 的原始下标当序号就够准：
+       SEED 先入、本地新增按 added 数组顺序追加，正是写入顺序。 */
+    var seqMap = {};
+    allRecords().forEach(function (r, i) { if (seqMap[r.id] === undefined) seqMap[r.id] = i; });
     var catRowsHTML = order.map(function (g) {
       var gr = groups[g];
+      gr.rows = gr.rows.slice().sort(function (a, b) { return (seqMap[a.id] || 0) - (seqMap[b.id] || 0); });
       var col = g === '收入' ? p.income : catColor(p, g);
       var ink = catInk(p, col);
       var chips = gr.rows.map(function (r) { return itemHTML(p, r); }).join('');
@@ -3274,26 +3309,42 @@
     window.addEventListener('popstate', sync);
   }
 
+  /* v1.0.41：分段控件改成「按住拖过去就能选」，滑块跟手；
+     按钮每次现取，后来才填进来的年份条也能直接用。 */
   function bindSeg(el, attr, handler) {
     if (!el) return;
-    var btns = Array.prototype.slice.call(el.querySelectorAll('button[' + attr + ']'));
-    /* 滑块的位置和宽度都从按钮数量算，段数不再写死在 CSS 里 */
-    function sync() {
-      var idx = 0;
-      btns.forEach(function (b, i) { if (b.classList.contains('is-active')) idx = i; });
+    var last = null;
+    function btns() { return [].slice.call(el.querySelectorAll('button[' + attr + ']')); }
+    function apply(b, fire) {
+      if (!b || b.parentNode !== el) return;
+      var v = b.getAttribute(attr);
+      btns().forEach(function (x) { x.classList.toggle('is-active', x === b); });
+      var idx = btns().indexOf(b);
       el.dataset.active = String(idx);
-      el.style.setProperty('--seg-n', String(btns.length || 1));
+      el.style.setProperty('--seg-n', String(btns().length || 1));
       el.style.setProperty('--seg-i', String(idx));
-      resetSegInd(el);
+      if (fire && v !== last) { last = v; handler(v); }
     }
+    var active = el.querySelector('button.' + 'is-active[' + attr + ']');
+    if (active) last = active.getAttribute(attr);
     el.addEventListener('click', function (e) {
-      var b = e.target.closest('button[' + attr + ']');
-      if (!b) return;
-      btns.forEach(function (x) { x.classList.toggle('is-active', x === b); });
-      sync();
-      handler(b.getAttribute(attr));
+      var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
+      apply(b, true);
     });
-    sync();
+    el.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
+      if (!b) return;
+      el.dataset.segDrag = '1';
+      apply(b, true);
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (el.dataset.segDrag !== '1') return;
+      var t = document.elementFromPoint(e.clientX, e.clientY);
+      var b = t && t.closest ? t.closest('button[' + attr + ']') : null;
+      if (b) apply(b, true);
+    });
+    document.addEventListener('pointerup', function () { el.dataset.segDrag = '0'; });
+    document.addEventListener('pointercancel', function () { el.dataset.segDrag = '0'; });
   }
   function setSegActive(el, attr, value) {
     if (!el) return;
@@ -3322,7 +3373,7 @@
     if (!stack) return;
     opts = opts || {};
     var el = document.createElement('div');
-    el.className = 'toast' + (kind ? ' ' + kind : '') + (opts.center ? ' is-center' : '');
+    el.className = 'toast' + (kind ? ' ' + kind : '') + (opts.center ? ' is-center' : '') + (opts.low ? ' is-low' : '');
     /* 正中那颗带一个勾：一眼是「成了」，不是「有事」。其余提示还是小圆点。 */
     var mark = opts.center
       ? '<i class="t-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none">' +
@@ -3985,8 +4036,22 @@
     state.store.deleted = back.deleted;
     saveStore();
     renderAll();
-    toast('已恢复', 'info');
+    highlightRestored(back);
+    toast('已恢复', 'success', { low: true });
     if (undoStack.length) paintUndo(); else hideUndo();
+  }
+
+  /* 撤销恢复：把刚写回来的那几笔重新亮一下，方向和删除相反（从内往外亮） */
+  function highlightRestored(back) {
+    var ids = {};
+    (back.added || []).forEach(function (r) { ids[r.id] = true; });
+    Object.keys(back.edited || {}).forEach(function (id) { ids[id] = true; });
+    var rows = document.querySelectorAll('.cal-item[data-id]');
+    for (var i = 0; i < rows.length; i++) {
+      if (!ids[rows[i].getAttribute('data-id')]) continue;
+      rows[i].classList.add('is-restored');
+      (function (el) { setTimeout(function () { el.classList.remove('is-restored'); }, 1800); })(rows[i]);
+    }
   }
 
   /* ---------------- 粒子湮灭：删掉的那一行被左风向右吹散 ----------------
@@ -3999,7 +4064,8 @@
           尺寸也分了大中小三档，密而不糊。
        3) 节奏 —— 时长 900~1460ms（以前 520~800），起步缓、中途加速、末端收尾，
           消散范围随之变大，眼睛来得及跟着看完。 */
-  function dissolveNode(node) {
+  function dissolveNode(node, wait) {
+    wait = wait || 0;   /* v1.0.41：弹窗先退场，粒子晚 0.3—0.5s 再起飞 */
     if (!node || !node.getBoundingClientRect) return false;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
     var r = node.getBoundingClientRect();
@@ -4016,6 +4082,7 @@
 
     var layer = document.createElement('div');
     layer.className = 'dissolve-layer';
+    if (wait) layer.style.animationDelay = wait + 'ms';
     layer.style.left = r.left + 'px';
     layer.style.top = r.top + 'px';
     layer.style.width = r.width + 'px';
@@ -4056,13 +4123,13 @@
         { transform: 'translate3d(' + dx.toFixed(1) + 'px,' + (dy - 6).toFixed(1) + 'px,0) scale(.05)', opacity: 0, offset: 1 }
       ], {
         duration: dur,
-        delay: Math.random() * 170,
+        delay: wait + Math.random() * 170,
         easing: 'cubic-bezier(.42,.06,.48,.94)',
         fill: 'forwards'
       });
     }
     document.body.appendChild(layer);
-    setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 1760);
+    setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 1760 + wait);
     return true;
   }
 
@@ -4075,7 +4142,7 @@
     /* 先抓 DOM 再动数据：renderAll 一跑，那一行就没了，粒子得从它还活着的位置起飞 */
     var node = document.querySelector('.cal-item[data-id="' + id + '"]') ||
       document.querySelector('[data-id="' + id + '"]');
-    dissolveNode(node);
+    dissolveNode(node, 380);
 
     if (state.store.deleted.indexOf(id) === -1) state.store.deleted.push(id);
     state.store.added = state.store.added.filter(function (r) { return r.id !== id; });
@@ -4128,20 +4195,32 @@
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('is-active', bs[i].dataset.cat === state.filters.category);
   }
 
-  var themeFadeTimer = 0;
+  /* v1.0.41：整页当作一张图换肤 —— 先拉一层目标底色的幕布，
+     最不透明那一刻一次性换 token，再淡出。不会一块一块轮流变色。 */
+  function themeCurtain(swap) {
+    var c = $('themeCurtain');
+    if (!c) { c = document.createElement('div'); c.id = 'themeCurtain'; document.body.appendChild(c); }
+    c.className = 'theme-curtain';
+    var target = document.documentElement.getAttribute('data-theme') === 'dark' ? '#f5f7fa' : '#0d121c';
+    c.style.background = target;
+    c.hidden = false;
+    c.style.opacity = '0';
+    requestAnimationFrame(function () { c.style.transition = 'opacity .18s ease'; c.style.opacity = '1'; });
+    setTimeout(function () {
+      swap();
+      c.style.opacity = '0';
+      setTimeout(function () { c.hidden = true; }, 200);
+    }, 190);
+  }
   function applyTheme(t, deferCharts) {
     state.theme = t;
-    /* v1.0.40：换肤时临时挂一个过渡类，让底色 / 卡面 / 边框一起柔和过渡；
-       520ms 后摘掉，不干扰平时的 hover 动画和图表 instant 重绘。 */
-    var root = document.documentElement;
-    root.classList.add('theme-fading');
-    root.setAttribute('data-theme', t);
-    clearTimeout(themeFadeTimer);
-    themeFadeTimer = setTimeout(function () { root.classList.remove('theme-fading'); }, 520);
     try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* noop */ }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
-    if (!deferCharts) renderCharts(state.view, 'instant');
+    themeCurtain(function () {
+      document.documentElement.setAttribute('data-theme', t);
+      if (!deferCharts) renderCharts(state.view, 'instant');
+    });
   }
 
   /* 换肤：光晕已取消。只做一次 token + 图表配色的同步替换，
@@ -4572,6 +4651,10 @@
     backdropDismiss($('confirmBackdrop'), closeConfirm);
     if ($('undoBtn')) $('undoBtn').addEventListener('click', doUndo);
     bindDonutYear();
+    bindSeg($('weightYear'), 'data-wy', function (v) {
+      state.weightYear = v;
+      renderCharts('overview', 'instant');
+    });
     /* v1.0.40：魔方子页在 iframe 里开弹窗时，父页这一层也跟着糊起来 */
     window.addEventListener('message', function (e) {
       var d = e && e.data; if (!d || !d.__cubeModal) return;
@@ -5028,10 +5111,19 @@
   function softSettle() {
     if (!soft.on) return;
     var el = soft.el, dir = soft.dir, next = soft.queue || 0;
+    var ax = soft.axis;
     if (el) { el.style.transition = 'none'; }
     headApply(soft.head);
     wheelLock = Date.now() + 46;   /* 只挡同一个 notch 的重入，不掐后续滚轮 */
     softReset();
+    /* 交割后一记很轻的曲线回弹：先越过 4px 再收回来，收在 cubic-bezier 上 */
+    if (el && el.animate) {
+      var d = (dir > 0 ? -1 : 1) * 4;
+      var frames = ax === 'x'
+        ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(' + d + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }]
+        : [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(0,' + d + 'px,0)' }, { transform: 'translate3d(0,0,0)' }];
+      el.animate(frames, { duration: 340, easing: 'cubic-bezier(.22,1,.36,1)' });
+    }
     /* 快速连滚时多出来的一格：交割完立刻接上下一页，中间不留空档 */
     if (next > 0 && softStart(dir)) { soft.aim = 1; soft.tight = true; softGlide(); }
   }
@@ -5101,8 +5193,11 @@
     /* 这一页已经排满了，再来一格就记在账上，交割后紧接着翻 —— 连滚不丢手感 */
     if (soft.on && soft.aim >= 1) { soft.queue = Math.min(1, soft.queue + 1); return; }
     if (!softStart(dir)) { shiftCalStep(dir); return; }
-    if (soft.aim < 1) soft.aim = Math.min(1, soft.aim + mag / SOFT_SPAN);
-    softGlide();
+    /* v1.0.41：滚轮起手直接把位置推到手指 / 滚轮对应的地方，
+       弹簧只负责停手后的收尾 —— 不再有「滚了半页却卡住不动」的迟滞。 */
+    soft.p = Math.min(1, soft.p + mag / SOFT_SPAN);
+    soft.aim = soft.p;
+    softPaint(soft.p);
     if (softIdle) clearTimeout(softIdle);
     softIdle = setTimeout(function () {
       softIdle = 0;

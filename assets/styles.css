@@ -2918,5 +2918,89 @@ html.theme-fading *::after {
   backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
   opacity: 0; transition: opacity .22s ease;
 }
-.cube-global-veil.is-on { opacity: 1; }
+.cube-global-veil.is-on { opacity: 1; pointer-events: auto; }
+/* v1.0.41：与账本「记一笔」同一张蒙层的底色 / 模糊半径 */
+.cube-global-veil {
+  background: rgba(17, 26, 45, .42);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+}
 #view-cube.is-active .cube-frame { position: relative; z-index: 90; }
+
+
+/* ==================================================================
+   v1.0.41
+   ------------------------------------------------------------------
+   1. 内发光高亮 / 恢复高亮；2. 低位恢复 toast；3. 最近 10 条跨天间距；
+   4. 胶囊边框统一；5. 整页换肤幕布；6. 年度滑块；7. 弹窗按钮改版。
+   ================================================================== */
+
+/* ---- 2. 撤销恢复：从内往外亮一下 -------------------------------- */
+@keyframes restoredIn {
+  0%   { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--c, var(--expense)) 72%, transparent), inset 0 0 22px 8px color-mix(in srgb, var(--c, var(--expense)) 40%, transparent); }
+  100% { box-shadow: inset 0 0 0 0 transparent, inset 0 0 0 0 transparent; }
+}
+.cal-item.is-restored { animation: restoredIn 1.75s cubic-bezier(.2,.8,.3,1) both; z-index: 2; }
+
+/* ---- 3. 高亮改内发光，不再往外扩 -------------------------------- */
+@keyframes newRowRing {
+  0%   { box-shadow: inset 0 0 0 0 transparent, inset 0 0 0 0 transparent; }
+  18%  { box-shadow: inset 0 0 0 2px var(--ring-c), inset 0 0 15px 3px color-mix(in srgb, var(--ring-c) 55%, transparent); }
+  70%  { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ring-c) 58%, transparent), inset 0 0 11px 2px color-mix(in srgb, var(--ring-c) 28%, transparent); }
+  100% { box-shadow: inset 0 0 0 0 transparent, inset 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cal-item.is-new { box-shadow: inset 0 0 0 2px var(--ring-c); }
+}
+
+/* ---- 4. 低位恢复提示：和撤销条同一条中轴 ------------------------ */
+.toast.is-low {
+  left: 50%; right: auto; bottom: 84px; top: auto;
+  transform: translateX(-50%); align-self: center;
+  box-shadow: 0 18px 44px -18px rgba(20, 32, 62, .45), var(--shadow-sm);
+}
+
+/* ---- 5. 最近记录：跨天多留一道缝 -------------------------------- */
+.rs-item.is-newday { margin-left: 8px; }
+
+/* ---- 6. 日历项目胶囊：与最近记录同一条边框语法 ------------------ */
+.cal-item {
+  border-color: color-mix(in srgb, var(--c, var(--primary)) 34%, var(--border)) !important;
+}
+.ym-day.has { border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border)); }
+
+/* ---- 7. 换肤幕布：整体一次换，不逐块轮流 ------------------------ */
+.theme-curtain {
+  position: fixed; inset: 0; z-index: 500; pointer-events: none;
+  opacity: 0; transition: opacity .18s ease;
+}
+
+/* ---- 8. 本月结余比例条 ------------------------------------------ */
+.ir-bar.is-now i { background: linear-gradient(90deg, var(--expense), var(--primary)); }
+
+/* ---- 9. 年份滑块：仿消费日历的 seg 外观 ------------------------- */
+.donut-years.seg, .weight-years.seg { padding: 3px; min-width: 0; }
+.donut-years.seg button, .weight-years.seg button {
+  padding: 5px 8px; border: 0; background: transparent;
+  font-size: 10.5px; font-weight: 700; white-space: nowrap;
+}
+.donut-years.seg button.is-active, .weight-years.seg button.is-active { color: var(--text); }
+
+/* ---- 10. 回到今天：给底色 -------------------------------------- */
+.ct-today {
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border)) !important;
+}
+
+/* ---- 11. 当日侧栏年月字号 -------------------------------------- */
+.ds-ym { font-size: 14px !important; font-weight: 750 !important; }
+
+/* ---- 12. 账本弹窗：取消 / 保存（加宽） / 删除 -------------------- */
+.modal-foot {
+  display: grid !important;
+  grid-template-columns: 1fr minmax(150px, 1.5fr) 1fr;
+  align-items: center;
+}
+.modal-foot #modalCancel { justify-self: start; }
+.modal-foot #modalSave { justify-self: stretch; width: 100%; min-width: 150px; }
+.modal-foot #modalDelete { justify-self: end; }
