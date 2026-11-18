@@ -168,6 +168,10 @@
     editingId: null,
     entryType: 'expense',
     pendingDeleteId: null,
+    /* v1.0.39：刚存下的那笔。记完账最想知道「它在哪儿」，
+       这里留 id + 一个到期时间戳，条目渲染时据此打上 is-new。 */
+    newId: '',
+    newUntil: 0,
     store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     catColors: {},
     layout: null
@@ -1639,6 +1643,73 @@
       }]
     };
   }
+  /* v1.0.39 · 折线语法
+     同样的坐标轴、同样的字号与 tooltip 卡，只把「柱子」换成「线 + 面积」。
+     年度购买趋势本来就该看走势（今年比去年多花多少），柱子只回答「哪年高」，
+     线还能回答「涨得多急」。点、线、面积三件套，点可以点着跳年。 */
+  function yearLine(p, rows, opt) {
+    opt = opt || {};
+    var accent = opt.accent || p.primary;
+    var fmt = opt.fmt || function (v) { return v; };
+    var axisFmt = opt.axisFmt || fmtAxis;
+    var inst = RENDER_MODE === 'instant';
+    var dense = rows.length > 9;
+    var vals = rows.map(function (r) { return Number(r.value) || 0; });
+    var maxV = Math.max.apply(null, vals.concat([1]));
+    return {
+      backgroundColor: 'transparent',
+      animation: !inst,
+      animationDuration: inst ? 0 : 760,
+      animationDurationUpdate: inst ? 0 : 420,
+      animationEasing: 'cubicOut',
+      textStyle: { fontFamily: p.font },
+      grid: { left: 2, right: 16, top: 30, bottom: 2, containLabel: true },
+      tooltip: tooltipCommon(p, {
+        trigger: 'axis',
+        axisPointer: { type: 'line', lineStyle: { color: withAlpha(accent, .42), width: 1, type: 'dashed' } },
+        formatter: function (a) {
+          var v = a[0]; if (!v) return '';
+          return '<span style="color:' + p.muted + ';font-size:11px">' + v.axisValue + '</span>' +
+            '<div style="margin-top:3px"><b style="font-size:13px">' + fmt(v.value) + '</b>' +
+            '<span style="margin-left:8px;color:' + p.muted + ';font-size:11px">占峰值 ' +
+            (v.value / maxV * 100).toFixed(0) + '%</span></div>';
+        }
+      }),
+      xAxis: {
+        type: 'category', data: rows.map(function (r) { return r.name; }), boundaryGap: false,
+        axisTick: { show: false }, axisLine: { show: false },
+        axisLabel: {
+          color: p.muted, fontSize: 10.5, fontWeight: 600, fontFamily: p.font,
+          margin: 10, hideOverlap: true, rotate: dense ? 38 : 0
+        }
+      },
+      yAxis: {
+        type: 'value', splitNumber: 3,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: axisFmt },
+        splitLine: { lineStyle: { color: withAlpha(p.text, .08), type: 'dashed' } }
+      },
+      series: [{
+        type: 'line', smooth: .38, symbol: 'circle', symbolSize: 7.5,
+        showSymbol: true, connectNulls: true,
+        lineStyle: { width: 2.6, color: accent, shadowBlur: 10, shadowColor: withAlpha(accent, .26) },
+        itemStyle: { color: accent, borderColor: p.surface, borderWidth: 2 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: withAlpha(accent, .26) },
+            { offset: 1, color: withAlpha(accent, 0) }
+          ])
+        },
+        label: {
+          show: !dense, position: 'top', distance: 7,
+          color: p.text2, fontSize: 10.5, fontWeight: 800, fontFamily: p.font,
+          formatter: function (a) { return fmt(a.value); }
+        },
+        emphasis: { scale: 1.5, itemStyle: { shadowBlur: 12, shadowColor: withAlpha(accent, .4) } },
+        data: vals
+      }]
+    };
+  }
   /* 魔方一组蓝、比赛一组青绿：两族数据在页面上本来就分色，图里继续分 */
   function cubeAccent(p) { return p.primary; }
   function compAccent(p) { return p.expense; }
@@ -1815,6 +1886,20 @@
     set('cubeComp', String(comps.length));
     set('cubeFee', cubeMoney(compSpend));
 
+    /* 四条小比例条：两两成对，读的是「这一项在同类里的占比」——
+       收藏 vs 参赛比数量，魔方支出 vs 报名费比金额。
+       不做没分母的假进度条，条子背后永远有一个说得清的分母。 */
+    var bar = function (id, v) {
+      var el = $(id);
+      if (el) el.style.width = Math.max(2, Math.min(100, isFinite(v) ? v : 0)).toFixed(1) + '%';
+    };
+    var cntAll = cubes.length + comps.length;
+    var cashAll = spend + compSpend;
+    bar('csgBarCount', cntAll ? cubes.length / cntAll * 100 : 0);
+    bar('csgBarComp', cntAll ? comps.length / cntAll * 100 : 0);
+    bar('csgBarSpend', cashAll ? spend / cashAll * 100 : 0);
+    bar('csgBarFee', cashAll ? compSpend / cashAll * 100 : 0);
+
     /* 四格并在一条里：每一格都是一扇门，点进去就是筛好的魔方页 */
     var cells = document.querySelectorAll('[data-cube-filter]');
     for (var ci = 0; ci < cells.length; ci++) {
@@ -1835,22 +1920,24 @@
     if (!hasEcharts) return;
     var p = palette();
 
-    /* 年度购买支出：年份竖条。跟型号 / 省份那几张共用 yearBar 一套尺寸，
-       卡片长宽怎么拖都不变形；点一根柱子就跳去那一年。 */
+    /* 年度购买支出：v1.0.39 改成折线。
+       柱状只能比高低，走势要靠脑补；折线把斜率直接给出来，
+       哪一年开始加码、哪一年收手，一眼就看得见。 */
     var years = {};
     cubes.forEach(function (x) {
       var y = String(x.date || '').slice(0, 4);
       if (/^\d{4}$/.test(y)) years[y] = (years[y] || 0) + (Number(x.price) || 0);
     });
     var yk = Object.keys(years).sort();
-    var yearChart = cubePaint($('cubeYearChart'), yearBar(p, yk.map(function (y) {
-      return { name: y, value: round(years[y]) };
-    }), {
-      accent: cubeAccent(p),
-      fmt: cubeMoneyShort,
-      axisFmt: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; },
-      barWidth: yk.length > 8 ? 18 : 30
-    }));
+    var yearChart = cubePaint($('cubeYearChart'), yk.length
+      ? yearLine(p, yk.map(function (y) {
+          return { name: y, value: round(years[y]) };
+        }), {
+          accent: cubeAccent(p),
+          fmt: cubeMoneyShort,
+          axisFmt: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; }
+        })
+      : yearBar(p, [], {}));
     if (yearChart) {
       yearChart.off('click');
       yearChart.on('click', function (a) { jumpCube({ tab: 'cubes', year: String(a.name) }); });
@@ -2315,7 +2402,9 @@
     var sign = r.type === 'income' ? '+' : '−';
     var label = r.note || r.sub;
     var tip = label + ' · ' + r.sub + ' · ' + fmtYuan(r.amount);
+    var isNew = r.id && r.id === state.newId && Date.now() < state.newUntil;
     return '<button type="button" class="cal-item' + (r.type === 'income' ? ' is-inc' : '') +
+      (isNew ? ' is-new' : '') +
       '" data-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + ink + '" title="' + esc(tip) + '">' +
       '<span class="ci-name"><i></i><span>' + esc(label) + '</span></span>' +
       (opts && opts.noAmount ? '' : '<b>' + sign + fmtChip(r.amount) + '</b>') + '</button>';
@@ -3025,6 +3114,8 @@
     if (b) b.addEventListener('click', function () { window.open('cube.html', '_blank', 'noopener'); });
     var g = $('cubeGotoBtn');
     if (g) g.addEventListener('click', function () { setView('cube'); });
+    var mini = $('cubeGotoMini');
+    if (mini) mini.addEventListener('click', function () { jumpCube({ tab: 'cubes' }); });
     /* 魔方子页在另一个 localStorage 键里写数据，storage 事件同步刷新总览卡 */
     window.addEventListener('storage', function (e) {
       if (e && e.key === 'cubeLedger_v1') renderCubeOverview();
@@ -3725,6 +3816,33 @@
     if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
     lastFocused = null;
   }
+  /* 记完之后「哪一笔是刚记的」必须一眼看见。
+     分三步：先给记录打上 is-new 的身份证（重绘也不会丢），
+     再确认那一行真的在当前视图里（不在就先把日历挪过去），
+     最后把那一行滚到眼前。4.2 秒后自动摘牌，不留下永久高亮。 */
+  function focusNewRecord(rec) {
+    var sel = '.cal-item[data-id="' + rec.id + '"]';
+    var el = document.querySelector(sel);
+    if (!el) {
+      var b = rangeBounds();
+      var out = !(rec.date >= dateKey(b.from) && rec.date <= dateKey(b.to));
+      if (out || state.scale === 'year') {
+        var d = new Date(rec.date + 'T00:00:00');
+        if (state.scale === 'year') { state.scale = 'month'; setSegActive($('scaleSeg'), 'data-scale', 'month'); }
+        setAnchor(d);
+        renderBoard();
+        renderCharts('calendar');
+        el = document.querySelector(sel);
+      }
+    }
+    if (!el) return;
+    el.classList.add('is-new');
+    try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    setTimeout(function () {
+      if (el.classList.contains('is-new')) el.classList.remove('is-new');
+    }, 4300);
+  }
+
   /* 弹窗与天页内嵌表单共用的落库入口：校验、组装、存增量层、重绘。
      返回空串表示成功，否则返回可直接展示的错误文案。 */
   function commitEntry(v) {
@@ -3747,6 +3865,9 @@
       toast('已更新「' + rec.note + '」', 'info');
     } else {
       state.store.added.push(rec);
+      /* 刚记的这笔带上身份证：接下来 4 秒内，它那一行会闪一下、亮一框 */
+      state.newId = rec.id;
+      state.newUntil = Date.now() + 4200;
       /* 正中那颗大字气泡，副标题把这一笔自己交代清楚：
          备注 · 分类/子类 · 日期 —— 存完抬头看一眼就知道记对了没有 */
       toast('已记下 ' + fmtYuan(rec.amount), 'success', {
@@ -3758,6 +3879,11 @@
     }
     saveStore();
     renderAll();
+    if (!v.editingId) focusNewRecord(rec);
+    else {
+      var edited = document.querySelector('.cal-item[data-id="' + rec.id + '"]');
+      if (edited) { edited.classList.add('is-new'); setTimeout(function () { edited.classList.remove('is-new'); }, 3200); }
+    }
     return '';
   }
   function submitEntry(e) {
@@ -3838,10 +3964,16 @@
     toast('已恢复', 'info');
   }
 
-  /* ---------------- 粒子湮灭：删掉的那一行被吹散 ----------------
+  /* ---------------- 粒子湮灭：删掉的那一行被左风向右吹散 ----------------
      行一消失，账就已经从数据里没了；留在屏幕上的是它的「灰」。
-     取那一行的位置铺一层固定层，撒几十粒小方块，往上带一点风，
-     边飞边缩小、边淡出；底下再压一层白闪，像被抹掉的一瞬间。 */
+     v1.0.39 改了三件事：
+       1) 风向 —— 以前是从中线向四周炸开（像爆），现在统一从左往右吹（像风）。
+          每颗粒子起点往左偏一点，落点右移 70~320px，纵向按行高的 1.3 倍散开，
+          末段再往上飘 20px，读起来就是「被一阵风带走」。
+       2) 密度 —— 粒子数按面积算，从 30~72 提到 64~170；
+          尺寸也分了大中小三档，密而不糊。
+       3) 节奏 —— 时长 900~1460ms（以前 520~800），起步缓、中途加速、末端收尾，
+          消散范围随之变大，眼睛来得及跟着看完。 */
   function dissolveNode(node) {
     if (!node || !node.getBoundingClientRect) return false;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
@@ -3853,7 +3985,7 @@
     var cs = getComputedStyle(node);
     var nodeBg = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? cs.backgroundColor : p.surface2;
     var accent = (cs.getPropertyValue('--c') || '').trim() || p.primary;
-    var palette4 = [accent, accent, p.primary, nodeBg, '#ffffff'];
+    var tints = [accent, accent, accent, p.primary, nodeBg, '#ffffff'];
 
     var layer = document.createElement('div');
     layer.className = 'dissolve-layer';
@@ -3866,33 +3998,44 @@
     flash.className = 'dissolve-flash';
     layer.appendChild(flash);
 
-    var count = Math.max(30, Math.min(72, Math.round(r.width * r.height / 240)));
+    var area = r.width * r.height;
+    var count = Math.max(64, Math.min(170, Math.round(area / 420)));
+    var spreadY = r.height * 1.3 + 96;      /* 纵向散开范围：比行高再多一截 */
+
     for (var i = 0; i < count; i++) {
       var dot = document.createElement('b');
-      var size = 2 + Math.random() * 4.4;
+      /* 三档粒径：细沙 / 碎屑 / 小块，混着撒才不像筛子 */
+      var tier = Math.random();
+      var size = tier < .55 ? 1.8 + Math.random() * 2.2 : (tier < .88 ? 4 + Math.random() * 2.6 : 6.4 + Math.random() * 3.2);
       var x = Math.random() * r.width;
       var y = Math.random() * r.height;
       dot.style.cssText = 'left:' + x.toFixed(1) + 'px;top:' + y.toFixed(1) + 'px;' +
         'width:' + size.toFixed(1) + 'px;height:' + size.toFixed(1) + 'px;' +
-        'background:' + palette4[i % palette4.length] + ';' +
-        'border-radius:' + (Math.random() < .5 ? '50%' : '1.5px') + ';';
+        'background:' + tints[(Math.random() * tints.length) | 0] + ';' +
+        'border-radius:' + (Math.random() < .45 ? '50%' : '1.5px') + ';';
       layer.appendChild(dot);
-      var dx = (x - r.width / 2) * 1.5 + (Math.random() - .5) * 46;
-      var dy = -(18 + Math.random() * 74) + (y - r.height / 2) * .5;
       if (!dot.animate) { dot.style.opacity = '0'; continue; }
+
+      /* 左 -> 右：起点再往左拽 4~14px（像被风先把灰压过去一点），
+         落点全部在右侧；越靠右的粒子被吹得越远（风道效应） */
+      var lane = x / Math.max(1, r.width);
+      var dx = 70 + Math.random() * 150 + lane * (r.width * .55 + 90);
+      var dy = (Math.random() - .5) * spreadY - 10 - Math.random() * 26;
+      var dur = 900 + Math.random() * 560;
       dot.animate([
-        { transform: 'translate3d(0,0,0) scale(1)', opacity: .95 },
-        { transform: 'translate3d(' + (dx * .55).toFixed(1) + 'px,' + (dy * .6).toFixed(1) + 'px,0) scale(.8)', opacity: .7, offset: .55 },
-        { transform: 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(.1)', opacity: 0 }
+        { transform: 'translate3d(-' + (4 + Math.random() * 10).toFixed(1) + 'px,0,0) scale(1)', opacity: .96, offset: 0 },
+        { transform: 'translate3d(' + (dx * .38).toFixed(1) + 'px,' + (dy * .42).toFixed(1) + 'px,0) scale(.82)', opacity: .78, offset: .42 },
+        { transform: 'translate3d(' + (dx * .86).toFixed(1) + 'px,' + (dy * .9).toFixed(1) + 'px,0) scale(.34)', opacity: .34, offset: .82 },
+        { transform: 'translate3d(' + dx.toFixed(1) + 'px,' + (dy - 6).toFixed(1) + 'px,0) scale(.05)', opacity: 0, offset: 1 }
       ], {
-        duration: 520 + Math.random() * 280,
-        delay: Math.random() * 90,
-        easing: 'cubic-bezier(.18,.72,.28,1)',
+        duration: dur,
+        delay: Math.random() * 170,
+        easing: 'cubic-bezier(.42,.06,.48,.94)',
         fill: 'forwards'
       });
     }
     document.body.appendChild(layer);
-    setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 980);
+    setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 1760);
     return true;
   }
 

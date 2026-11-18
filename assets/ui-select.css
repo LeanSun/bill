@@ -58,6 +58,13 @@ select.ui-native-select {
   cursor: pointer; text-overflow: ellipsis;
 }
 .ui-sel-trigger.is-open .ui-sel-input { cursor: text; }
+/* v1.0.39 · 只有 data-ui-search 的下拉才有输入态。
+   其余下拉里那枚 input 只是「一行字」：不接收指针、不接收选中，
+   点它等于点 trigger 本身 —— 于是「再点一下收回」在任何位置都成立。 */
+.ui-sel-trigger:not(.is-search) .ui-sel-input {
+  pointer-events: none; user-select: none; -webkit-user-select: none;
+}
+.ui-sel-trigger:not(.is-search) .ui-sel-input { cursor: pointer; }
 .ui-sel-trigger .ui-sel-input::placeholder {
   color: var(--ui-muted); opacity: .8; font-weight: 550;
 }

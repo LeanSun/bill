@@ -223,26 +223,44 @@
             <div class="chart chart-lg" id="chartTop" data-page-node-id="u7mkeTEDOkx5oLJHoQCa6N"></div>
           </article>
 
-          <article class="card cube-stat-list" style="--i:7" data-oid="cubestats">
-            <div class="csl-row" data-cube-filter="count" role="button" tabindex="0" title="点击查看全部魔方记录">
-              <span class="csl-lab">收藏 / 购买</span>
-              <b class="csl-val" id="cubeCnt">0</b>
-              <span class="csl-unit">件</span>
+          <article class="card cube-stat-grid" style="--i:7" data-oid="cubestats">
+            <div class="card-head csg-head">
+              <div><h3>魔方 / 比赛</h3><p>四格总数，点一格进对应列表</p></div>
+              <button type="button" class="csg-more" id="cubeGotoMini">全部记录 ↗</button>
             </div>
-            <div class="csl-row" data-cube-filter="spend" role="button" tabindex="0" title="点击查看魔方购买支出">
-              <span class="csl-lab">魔方相关支出</span>
-              <b class="csl-val" id="cubeSpend">¥0.00</b>
-              <span class="csl-unit">累计</span>
-            </div>
-            <div class="csl-row" data-cube-filter="comp" role="button" tabindex="0" title="点击查看比赛记录">
-              <span class="csl-lab">参赛次数</span>
-              <b class="csl-val" id="cubeComp">0</b>
-              <span class="csl-unit">场</span>
-            </div>
-            <div class="csl-row" data-cube-filter="fee" role="button" tabindex="0" title="点击查看比赛报名费">
-              <span class="csl-lab">比赛报名费</span>
-              <b class="csl-val" id="cubeFee">¥0.00</b>
-              <span class="csl-unit">累计</span>
+            <div class="csg-grid">
+              <div class="csg-tile" data-tone="cube" data-cube-filter="count" role="button" tabindex="0" title="点击查看全部魔方记录">
+                <span class="csg-top">
+                  <i class="csg-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20.5 7v10L12 21.2 3.5 17V7z"/><path d="M3.5 7 12 11.4 20.5 7"/><path d="M12 11.4v9.8"/></svg></i>
+                  <span class="csg-lab">收藏 / 购买</span>
+                </span>
+                <span class="csg-num"><b id="cubeCnt">0</b><i>件</i></span>
+                <i class="csg-bar"><u id="csgBarCount" style="width:0%"></u></i>
+              </div>
+              <div class="csg-tile" data-tone="cube" data-cube-filter="spend" role="button" tabindex="0" title="点击查看魔方购买支出">
+                <span class="csg-top">
+                  <i class="csg-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5h17v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 11h17"/><path d="M16 15.4h2.4"/></svg></i>
+                  <span class="csg-lab">魔方相关支出</span>
+                </span>
+                <span class="csg-num"><b id="cubeSpend">¥0.00</b><i>累计</i></span>
+                <i class="csg-bar"><u id="csgBarSpend" style="width:0%"></u></i>
+              </div>
+              <div class="csg-tile" data-tone="comp" data-cube-filter="comp" role="button" tabindex="0" title="点击查看比赛记录">
+                <span class="csg-top">
+                  <i class="csg-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3.5h9v5.2a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 5H4.6v1.6a3.2 3.2 0 0 0 3 3.2"/><path d="M16.5 5h2.9v1.6a3.2 3.2 0 0 1-3 3.2"/><path d="M10.4 17.6h3.2M12 13.2v4.4"/><path d="M8.4 20.5h7.2"/></svg></i>
+                  <span class="csg-lab">参赛次数</span>
+                </span>
+                <span class="csg-num"><b id="cubeComp">0</b><i>场</i></span>
+                <i class="csg-bar"><u id="csgBarComp" style="width:0%"></u></i>
+              </div>
+              <div class="csg-tile" data-tone="comp" data-cube-filter="fee" role="button" tabindex="0" title="点击查看比赛报名费">
+                <span class="csg-top">
+                  <i class="csg-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 8.4A2 2 0 0 1 5.2 6.4h13.6a2 2 0 0 1 2 2v1.3a2.2 2.2 0 0 0 0 4.6v1.3a2 2 0 0 1-2 2H5.2a2 2 0 0 1-2-2v-1.3a2.2 2.2 0 0 0 0-4.6z"/><path d="M14.6 6.4v11.2" stroke-dasharray="2 2.4"/></svg></i>
+                  <span class="csg-lab">比赛报名费</span>
+                </span>
+                <span class="csg-num"><b id="cubeFee">¥0.00</b><i>累计</i></span>
+                <i class="csg-bar"><u id="csgBarFee" style="width:0%"></u></i>
+              </div>
             </div>
           </article>
 

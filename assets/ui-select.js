@@ -74,6 +74,31 @@
       openInput = null, openList = null, openItems = [], activeIdx = -1,
       uidSeq = 0;
 
+  /* ---------------- 搜索是「申请制」，默认不给 ----------------
+     以前 trigger 里那枚 input 一开就变可编辑：点开任意一个下拉，
+     键盘焦点落进搜索框，输一个字就整表过滤。分类、子类、年份、页码
+     这些三五项的短列表根本不需要——手指点一下就选完了，多一个可用
+     输入态只带来两个毛病：面板里打字会把「当前值」顶掉，
+     点第二下时又因为焦点在输入框里、闭不上。
+     现在只有显式写了 data-ui-search 的元素才开搜索（比赛的省 / 市），
+     其余全部退化成「点一下开、再点一下收」的纯按钮行为。 */
+  function isSearch(sel) {
+    return !!(sel && sel.hasAttribute && sel.hasAttribute('data-ui-search'));
+  }
+  /* 首字母跳转：不给搜索框，也不让键盘白按 —— 按 s 跳到第一条 s 开头的 */
+  function jumpToLetter(ch) {
+    if (!openItems.length) return;
+    ch = String(ch || '').toLowerCase();
+    for (var i = 0; i < openItems.length; i++) {
+      var t = String(openItems[i].el.textContent || '').toLowerCase();
+      if (t.indexOf(ch) === 0) { setActive(i); return; }
+    }
+    for (var j = 0; j < openItems.length; j++) {
+      var u = String(openItems[j].el.textContent || '').toLowerCase();
+      if (u.indexOf(ch) >= 0) { setActive(j); return; }
+    }
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -91,17 +116,29 @@
   /* ---------------- 装饰：select 后面插一个 trigger ---------------- */
   function decorate(sel) {
     if (!sel || sel.dataset.uiDecorated === '1') return;
+    /* v1.0.39：藏起来的 select 不装饰。
+       第二行的类型 / 项目格把原来的下拉留作「值容器」，用 hidden 收起来；
+       以前这里照样给它插 trigger —— 那枚 trigger 不受 hidden 约束，
+       于是在筛选栏底下又长出一条空白的「全部项目」。 */
+    if (sel.hidden || sel.getAttribute('aria-hidden') === 'true') {
+      sel.dataset.uiDecorated = '1';
+      sel.dataset.uiHiddenSkip = '1';
+      return;
+    }
     sel.dataset.uiDecorated = '1';
     sel.classList.add('ui-native-select');
     if (!sel.id) sel.id = 'uiSel' + (++uidSeq);
     var t = document.createElement('div');
-    t.className = 'ui-sel-trigger';
+    var search = sel.hasAttribute('data-ui-search');
+    t.className = 'ui-sel-trigger' + (search ? ' is-search' : '');
+    t.dataset.search = search ? '1' : '0';
     t.tabIndex = 0;
     t.setAttribute('role', 'combobox');
     t.setAttribute('aria-haspopup', 'listbox');
     t.setAttribute('aria-expanded', 'false');
     t.innerHTML =
-      '<input class="ui-sel-input" type="text" readonly autocomplete="off" spellcheck="false" aria-autocomplete="list">' +
+      '<input class="ui-sel-input" type="text" readonly' + (search ? '' : ' tabindex="-1"') +
+      ' autocomplete="off" spellcheck="false" aria-autocomplete="list">' +
       '<svg class="ui-sel-caret" viewBox="0 0 20 20" aria-hidden="true">' +
       '<path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     sel.parentNode.insertBefore(t, sel.nextSibling);
@@ -272,10 +309,18 @@
     document.body.appendChild(panel);
     openPanel = panel; openList = list;
     trigger.setAttribute('aria-controls', panel.id);
+    var searchable = isSearch(sel);
     if (openInput) {
-      openInput.readOnly = false;
-      openInput.value = '';
-      openInput.placeholder = labelText(sel);
+      if (searchable) {
+        openInput.readOnly = false;
+        openInput.value = '';
+        openInput.placeholder = labelText(sel);
+      } else {
+        /* 不可搜索：那枚 input 只是一行字，永远只读、不抢焦点 */
+        openInput.readOnly = true;
+        openInput.value = labelText(sel);
+        openInput.placeholder = '';
+      }
     }
     paint('');
     place();
@@ -283,14 +328,15 @@
        开面板那一刻量的坐标会偏，所以下一帧和动画结束后各再对一次。 */
     if (window.requestAnimationFrame) requestAnimationFrame(place);
     setTimeout(place, 200);
-    if (openInput) setTimeout(function () { try { openInput.focus(); } catch (e) {} }, 0);
+    if (searchable && openInput) setTimeout(function () { try { openInput.focus(); } catch (e) {} }, 0);
   }
 
   /* ---------------- 键盘 ---------------- */
   function bindTrigger(sel, t) {
     var inp = t.querySelector('.ui-sel-input');
-    /* 打字即过滤：点开之后 trigger 就是一个输入框，没有第二个搜索框 */
-    if (inp) {
+    /* 打字即过滤只给 data-ui-search 的下拉：点开之后 trigger 就是搜索框，
+       没有第二个搜索框。其余下拉的输入框全程只读，这些监听干脆不挂。 */
+    if (inp && isSearch(sel)) {
       inp.addEventListener('input', function () {
         if (openTrigger !== t || !openPanel) return;
         paint(inp.value);
@@ -312,6 +358,8 @@
         if (k === 'ArrowUp') { e.preventDefault(); setActive(activeIdx < 0 ? openItems.length - 1 : activeIdx - 1); return; }
         if (k === 'PageDown') { e.preventDefault(); setActive(activeIdx < 0 ? 5 : activeIdx + 6); return; }
         if (k === 'PageUp') { e.preventDefault(); setActive(activeIdx < 0 ? 0 : activeIdx - 6); return; }
+        if (k === 'Home') { e.preventDefault(); setActive(0); return; }
+        if (k === 'End') { e.preventDefault(); setActive(openItems.length - 1); return; }
         if (k === 'Enter') {
           e.preventDefault();
           if (activeIdx >= 0) commit(activeIdx);
@@ -320,6 +368,11 @@
           return;
         }
         if (k === 'Tab') { close(); return; }
+        if (!isSearch(sel) && k && k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          jumpToLetter(k);
+          return;
+        }
         return; /* 其余按键交给输入框：打字即过滤 */
       }
       if (e.target !== t && e.target !== t.querySelector('.ui-sel-input')) return;
@@ -334,7 +387,11 @@
         var ch = e.key;
         open(sel, t);
         setTimeout(function () {
-          if (openInput) { openInput.value = ch; paint(ch); setActive(0); }
+          if (isSearch(sel)) {
+            if (openInput) { openInput.value = ch; paint(ch); setActive(0); }
+          } else {
+            jumpToLetter(ch);
+          }
         }, 0);
       }
     });
@@ -440,14 +497,18 @@
       if (t) {
         var sel = t.previousElementSibling;
         if (!sel || sel.tagName !== 'SELECT' || sel.disabled) return;
-        /* 面板已经开着：点箭头收起；点输入框只挪光标，别收 */
+        /* 面板已经开着：再点一下就是「收回」。
+           可搜索的下拉要分两个落点——点箭头收，点输入框只挪光标；
+           其余下拉没有输入态，点哪儿都收。 */
         if (openTrigger === t) {
-          if (e.target && e.target.closest && e.target.closest('.ui-sel-caret')) {
-            e.preventDefault(); e.stopPropagation(); close(); return;
-          }
-          if (e.target && e.target.classList && e.target.classList.contains('ui-sel-input')) {
-            e.preventDefault(); e.stopPropagation();
-            return;
+          if (isSearch(sel)) {
+            if (e.target && e.target.closest && e.target.closest('.ui-sel-caret')) {
+              e.preventDefault(); e.stopPropagation(); close(); return;
+            }
+            if (e.target && e.target.classList && e.target.classList.contains('ui-sel-input')) {
+              e.preventDefault(); e.stopPropagation();
+              return;
+            }
           }
           e.preventDefault(); e.stopPropagation(); close(); return;
         }

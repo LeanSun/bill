@@ -2660,3 +2660,182 @@ html[data-theme="dark"] .ym-day.is-today{
   from { opacity: .58; transform: scale(1); }
   to { opacity: 0; transform: scale(1.07); }
 }
+
+/* ==================================================================
+   v1.0.39
+   ------------------------------------------------------------------
+   1. 周视图「今天」那一列多出一行：病根是 .is-today>*{position:relative}
+      把绝对定位的加号按钮也拽回了文档流，于是那一列比别的列高一行。
+   2. 新记录高亮：记完账 4 秒内，那一行自己亮给你看。
+   3. 总览魔方四格：从「四行朗读」换成 2×2 的统计砖。
+   4. 粒子湮灭改成左风右吹（参数在 JS，这里只补一层柔光）。
+   ================================================================== */
+
+/* ---- 1. 周视图：今天的加号归位 ------------------------------------
+   v1.0.34 为了让格内文字浮在呼吸底色之上，写了一条
+   `.wk-col.is-today>*{position:relative;z-index:1}`。
+   它的权重 (0,2,0) 压过 `.cal-add` 的 (0,1,0)，把右下角那颗
+   `position:absolute` 的加号变成了普通流内元素 —— 于是今日列的
+   .wk-foot 后面多摆了一颗 28px 的方块，整列比邻居高出一行。
+   现在改写成「除了 .cal-add 以外」：列内文字照样浮起，加号回到
+   右下角，七列等高。 */
+.cal-cell.is-today > *:not(.cal-add),
+.wk-col.is-today > *:not(.cal-add),
+.ym-day.is-today > *:not(.cal-add) { position: relative; z-index: 1; }
+.cal-cell.is-today .cal-add,
+.wk-col.is-today .cal-add,
+.ym-day.is-today .cal-add {
+  position: absolute !important;
+  z-index: 4 !important;
+}
+/* 加号永远不参与周的汇总条排版：右侧那段 34px 的留白已经把它让开了 */
+.wk-col .wk-foot { margin-right: 34px; }
+
+/* ---- 2. 新记录：一道光扫过去 + 一圈描边呼吸 ----------------------
+   记完之后最想知道「哪一笔是刚记的」。不靠一直闪（烦），
+   也不靠变色（会和分类色打架），而是：
+   先一道从左边射进来的高光扫过整行，随后描边亮起、自动褪掉。 */
+.cal-item.is-new {
+  position: relative;                 /* ::after 的高光要贴着这一行，不外溢 */
+  animation: newRowSweep 1.05s cubic-bezier(.3,.7,.4,1) both,
+             newRowRing 2.9s cubic-bezier(.4,0,.3,1) both;
+  z-index: 2;
+}
+.cal-item.is-new::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(100deg,
+    transparent 12%,
+    color-mix(in srgb, var(--primary) 42%, transparent) 46%,
+    transparent 78%);
+  background-size: 260% 100%;
+  animation: newRowGlint 1.15s cubic-bezier(.25,.7,.35,1) both;
+  mix-blend-mode: multiply;
+}
+html[data-theme="dark"] .cal-item.is-new::after { mix-blend-mode: screen; opacity: .55; }
+@keyframes newRowGlint {
+  from { background-position: 160% 0; opacity: 0; }
+  22%  { opacity: 1; }
+  to   { background-position: -60% 0; opacity: 0; }
+}
+@keyframes newRowSweep {
+  0%   { transform: translateX(-7px); }
+  55%  { transform: translateX(2px); }
+  100% { transform: none; }
+}
+@keyframes newRowRing {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 62%, transparent); }
+  18%  { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--primary) 62%, transparent); }
+  70%  { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--primary) 30%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cal-item.is-new { animation: none; box-shadow: inset 0 0 0 2px var(--primary); }
+  .cal-item.is-new::after { display: none; }
+}
+
+/* ---- 3. 总览：魔方 / 比赛 四格 -----------------------------------
+   原来四条「标签左、数字右」的朗读行，信息是齐的，样子是平的：
+   四个 16.5px 的数字被标签牵着走，看不出哪一格更重要，也没有
+   「点得进去」的暗示。现在换成 2×2 的砖：一枚图标、一句标签、
+   一个大数字，底下一根有分母的比例条 —— 一眼分得清是数量还是钱。 */
+.cube-stat-grid {
+  padding: 19px 20px 16px; min-width: 0;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.csg-head { align-items: center; margin-bottom: 0; }
+.csg-head h3 { font-size: 14.5px; }
+/* 副标题在这一格里是废话（四格自己会说话）：去掉它，把高度让给砖块 */
+.csg-head p { display: none; }
+.csg-more {
+  flex: 0 0 auto; height: 26px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-2);
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+  transition: color .16s ease, border-color .16s ease, background .16s ease;
+}
+.csg-more:hover { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 46%, var(--border)); background: var(--primary-soft); }
+.csg-grid {
+  display: grid; gap: 10px;
+  /* auto-fit 而不是写死 2 列：这张卡在总览里是整行宽（1100px+），
+     四格并排刚好一行；被拖窄了会自动落成 2×2，再窄就 1 列。
+     写死 2 列会逼出第二行，而卡高由排布系统定死，第二行会被裁掉。 */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  flex: 1 1 auto; min-height: 0;
+}
+.csg-tile {
+  --tone: var(--primary);
+  position: relative; min-width: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 9px 12px 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(168deg,
+    color-mix(in srgb, var(--tone) 7%, var(--surface)) 0%,
+    var(--surface) 62%);
+  cursor: pointer; text-align: left;
+  transition: transform .2s var(--ease), border-color .2s ease, box-shadow .2s ease;
+}
+/* 比赛用琥珀：账本里的红绿是「收入 / 支出」的语义色，
+   拿来标「参赛」会被读成钱。奖杯色不占这两条车道。 */
+.csg-tile[data-tone="comp"] { --tone: var(--amber); }
+.csg-tile:hover {
+  transform: translateY(-1.5px);
+  border-color: color-mix(in srgb, var(--tone) 40%, var(--border));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.csg-tile:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--tone) 60%, transparent);
+  outline-offset: 2px;
+}
+.csg-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.csg-ico {
+  flex: 0 0 18px; width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border-radius: 7px;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.csg-ico svg { width: 12px; height: 12px; }
+.csg-lab {
+  min-width: 0; font-size: 11px; font-weight: 650; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.csg-num { display: flex; align-items: baseline; gap: 5px; min-width: 0; line-height: 1.1; }
+.csg-num b {
+  font-size: 20px; font-weight: 800; letter-spacing: -.035em; line-height: 1.1;
+  color: var(--text); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.csg-num i { font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--muted); flex: 0 0 auto; }
+.csg-bar {
+  display: block; height: 3px; border-radius: 3px; overflow: hidden; margin-top: auto;
+  background: color-mix(in srgb, var(--tone) 12%, var(--border));
+}
+.csg-bar u {
+  display: block; height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--tone) 62%, transparent),
+    var(--tone));
+  transition: width .5s cubic-bezier(.22,1,.36,1);
+}
+@media (max-width: 900px) {
+  .csg-num b { font-size: 18.5px; }
+  .cube-stat-grid { padding: 16px 16px 14px; }
+}
+
+/* ---- 4. 粒子湮灭：左风吹过之后的一层余晖 ------------------------
+   粒子本身的方向、数量、时长都在 app.js 里算（那里能按行盒取面积），
+   这里只给图层加一点点方向性——整层向左轻移 2px 再归位，
+   感官上「风从左边来」这件事就有了起点。 */
+.dissolve-layer {
+  animation: dissolveGust 1.6s cubic-bezier(.3,.1,.4,1) both;
+  will-change: transform;
+}
+@keyframes dissolveGust {
+  from { transform: translateX(-3px); }
+  to   { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dissolve-layer { animation: none; }
+}
