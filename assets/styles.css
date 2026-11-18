@@ -2483,3 +2483,47 @@ html[data-theme="dark"] .ym-day.is-today{
 /* 自绘下拉框在账本弹窗表单里的尺寸（与 .field select 一致） */
 .field .ui-sel-trigger,
 .ef-field .ui-sel-trigger{width:100%}
+
+/* ================= v1.0.37 · 最近记录条 =================
+   「全部」分类时，子类那一行本来是整条空白。现在放最近 5 笔：
+   一眼看得见刚记的账，点一下直接跳到那一天。
+   选了具体分类就整条收起，让位给子类按钮。 */
+.recent-strip {
+  display: flex; align-items: center; gap: 9px;
+  flex: 1 1 auto; min-width: 0; height: 100%;
+}
+.recent-strip[hidden] { display: none; }
+.rs-lab {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+  color: var(--muted); padding-left: 4px; white-space: nowrap;
+}
+.rs-list {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0; height: 100%; padding: 2px 1px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.rs-list::-webkit-scrollbar { display: none; }
+.rs-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex: 0 0 auto; height: 30px; padding: 0 9px 0 8px;
+  border: 1px solid var(--border-strong, var(--border)); border-radius: 9px;
+  background: var(--surface); color: var(--text);
+  box-shadow: 0 1px 2px rgba(24, 39, 75, .05);
+  font-size: 11.5px; font-weight: 650; white-space: nowrap;
+  transition: border-color .16s, background-color .16s, box-shadow .16s;
+}
+.rs-item:hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+  box-shadow: 0 3px 10px -4px color-mix(in srgb, var(--primary) 45%, transparent);
+  transform: none;
+}
+.rs-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--c, var(--primary)); }
+.rs-day { font-weight: 800; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.rs-note { max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
+.rs-amt { font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rs-amt.is-exp { color: var(--expense); }
+.rs-amt.is-inc { color: var(--income); }
+.rs-none { font-size: 11.5px; color: var(--muted); padding-left: 2px; }
+
+/* 三张统计卡的图表区：给一个稳定的高度，方块图 / 条形图都不会塌 */
+.cm-list.cm-chart { height: 150px; flex: 0 0 150px; min-height: 150px; overflow: hidden; }

@@ -201,6 +201,14 @@
     return '¥' + (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   function fmtBig(n) { return '¥' + Math.round(Number(n) || 0).toLocaleString('zh-CN'); }
+
+  /* 最近记录条里的金额：三位数以内保留一位小数，别把 20.8 四舍五入成 21；
+     上千才走整数 + 千位分隔，窄条里也放得下 */
+  function fmtTiny(n) {
+    var v = Number(n) || 0;
+    if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('zh-CN');
+    return String(Math.round(v * 10) / 10);
+  }
   /* 占比文案：小于 10% 留一位小数，其余取整，避免 40.04% 这种噪音 */
   function pctText(v) {
     var x = Number(v) || 0;
@@ -1629,11 +1637,11 @@
         .sort(function (a, b) { return a.k.localeCompare(b.k); });
     };
     var specs = [
-      { kind: 'model', rows: tally(cubes, function (x) { return x.model || '未命名型号'; }), type: 'pie', unit: '条', tab: 'cubes', key: 'q', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
-      { kind: 'brand', rows: tally(cubes, function (x) { return x.brand || '未分类'; }), type: 'pie', unit: '条', tab: 'cubes', key: 'brand', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
+      { kind: 'model', rows: tally(cubes, function (x) { return x.model || '未命名型号'; }), type: 'treemap', unit: '条', tab: 'cubes', key: 'q', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
+      { kind: 'brand', rows: tally(cubes, function (x) { return x.brand || '未分类'; }), type: 'barh', unit: '条', tab: 'cubes', key: 'brand', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
       { kind: 'cubeprice', rows: byYear(cubes, false), type: 'line', unit: '元', tab: 'cubes', key: 'year', val: function (r) { return r.sum; }, label: function (r) { return cubeMoney(r.sum); } },
       { kind: 'compyear', rows: byYear(comps, true), type: 'bar', unit: '场', tab: 'competitions', key: 'year', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 场'; } },
-      { kind: 'compprov', rows: tally(comps, function (x) { return x.province || '未填写'; }), type: 'pie', unit: '场', tab: 'competitions', key: 'province', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 场'; } },
+      { kind: 'compprov', rows: tally(comps, function (x) { return x.province || '未填写'; }), type: 'barh', unit: '场', tab: 'competitions', key: 'province', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 场'; } },
       { kind: 'compprice', rows: byYear(comps, false), type: 'line', unit: '元', tab: 'competitions', key: 'year', val: function (r) { return r.sum; }, label: function (r) { return cubeMoney(r.sum); } }
     ];
     var fallback = function (sp) {
@@ -1660,9 +1668,11 @@
         animationEasing: 'cubicOut',
         color: pieColors,
         tooltip: tooltipCommon(p, {
-          trigger: sp.type === 'pie' ? 'item' : 'axis',
+          trigger: (sp.type === 'pie' || sp.type === 'treemap') ? 'item' : 'axis',
           formatter: function (a) {
             if (sp.type === 'pie') return a.name + '<br><b>' + (sp.kind.indexOf('price') >= 0 ? cubeMoney(a.value) : a.value + ' ' + sp.unit) + '</b> · ' + a.percent + '%';
+            if (sp.type === 'treemap') return a.name + '<br><b>' + a.value + ' ' + sp.unit + '</b>';
+            if (sp.type === 'barh') { var tot = data.reduce(function (q, x) { return q + x.value; }, 0) || 1; return a.name + '<br><b>' + a.value + ' ' + sp.unit + '</b> · ' + (a.value / tot * 100).toFixed(1) + '%'; }
             var v = Array.isArray(a) ? a[0] : a;
             return v.name + '<br><b>' + (sp.kind.indexOf('price') >= 0 ? cubeMoney(v.value) : v.value + ' ' + sp.unit) + '</b>';
           }
@@ -1682,6 +1692,59 @@
             label: { show: false }, labelLine: { show: false },
             emphasis: { scale: true, scaleSize: 6, label: { show: true, fontSize: 11, fontWeight: 700, color: p.text, formatter: '{b}\n{d}%' } },
             data: data
+          }]
+        });
+      } else if (sp.type === 'treemap') {
+        /* 型号是一个个具体的名字，长短不一、量级差得远。
+           饼图切不出可读的标签，方块图能一眼看出「哪几个型号占大头」。 */
+        var tColors = [p.primary, p.sky, p.violet, p.amber, p.expense, p.income, p.primary2, p.text2];
+        opt = Object.assign({}, base, {
+          series: [{
+            type: 'treemap', roam: false, nodeClick: false,
+            breadcrumb: { show: false },
+            left: 0, right: 0, top: 0, bottom: 0,
+            itemStyle: { borderColor: p.surface, borderWidth: 2, gapWidth: 2, borderRadius: 6 },
+            label: {
+              show: true, color: '#fff', fontSize: 10.5, fontWeight: 700,
+              lineHeight: 13, overflow: 'truncate',
+              formatter: function (a) { return a.name + '\n' + a.value + ' ' + sp.unit; }
+            },
+            data: data.map(function (x, i) {
+              return { name: x.name, value: x.value, itemStyle: { color: tColors[i % tColors.length] } };
+            })
+          }]
+        });
+      } else if (sp.type === 'barh') {
+        /* 分布类数据：类别名长（黑龙江省 / 某某旗舰店），量级差距大。
+           横向条形把名字放左侧一行一个，长短直接读，比扇形角度准。 */
+        var maxV = Math.max.apply(null, data.map(function (x) { return x.value; }).concat([1]));
+        opt = Object.assign({}, base, {
+          grid: { left: 2, right: 44, top: 4, bottom: 2, containLabel: true },
+          xAxis: { type: 'value', max: maxV, show: false },
+          yAxis: {
+            type: 'category', inverse: true,
+            data: data.map(function (x) { return x.name; }),
+            axisTick: { show: false }, axisLine: { show: false },
+            axisLabel: {
+              color: p.text2, fontSize: 10.5, fontWeight: 600,
+              width: 74, overflow: 'truncate', fontFamily: p.font
+            }
+          },
+          series: [{
+            type: 'bar', barWidth: 9,
+            showBackground: true,
+            backgroundStyle: { color: p.surface3, borderRadius: 5 },
+            itemStyle: {
+              borderRadius: 5,
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: p.primary2 }, { offset: 1, color: p.primary }
+              ])
+            },
+            label: {
+              show: true, position: 'right', distance: 6,
+              fontSize: 10, fontWeight: 800, color: p.muted, formatter: '{c}'
+            },
+            data: data.map(function (x) { return x.value; })
           }]
         });
       } else {
@@ -2068,6 +2131,37 @@
       }
       sumBox.innerHTML = body;
       sumBox.setAttribute('aria-label', label + '：支出 ' + fmtBig(expSum) + '，收入 ' + fmtBig(incSum));
+    }
+    /* 「全部」时子类那一行本来是空的：这段空白改成最近 5 笔，
+       随手就能看见刚刚记下的账；选了具体分类就让位给子类按钮。 */
+    var strip = $('recentStrip'), rlist = $('recentList');
+    if (strip && rlist) {
+      strip.onclick = function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('.rs-item') : null;
+        if (b && b.dataset.day) jumpToDay(b.dataset.day);
+      };
+      var showRecent = (cat === 'all');
+      strip.hidden = !showRecent;
+      if (showRecent) {
+        var recs = sortedDesc(allRecords()).slice(0, 5);
+        var rsig = recs.map(function (r) {
+          return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type].join('|');
+        }).join('~');
+        if (rlist.dataset.sig !== rsig) {
+          rlist.dataset.sig = rsig;
+          rlist.innerHTML = recs.length ? recs.map(function (r) {
+            var inc = r.type === 'income';
+            var note = String(r.note || r.sub || r.category || '').trim();
+            return '<button type="button" class="rs-item" data-day="' + esc(r.date) + '" title="' +
+              esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '')) + '">' +
+              '<i class="rs-dot" style="--c:' + catColor(p, r.category) + '"></i>' +
+              '<b class="rs-day">' + esc(String(r.date || '').slice(5)) + '</b>' +
+              '<span class="rs-note">' + esc(note) + '</span>' +
+              '<em class="rs-amt ' + (inc ? 'is-inc' : 'is-exp') + '">' + (inc ? '+' : '-') +
+              esc(fmtTiny(r.amount)) + '</em></button>';
+          }).join('') : '<span class="rs-none">还没有记录</span>';
+        }
+      }
     }
     var subSig = names.length ? theme + '|' + p.primary + '|' + colSig + '|' + cat + '|' + names.join(',') + '|' +
       names.map(function (n) { return counts[n] || 0; }).join(',') + '|' + tot + '|' +
@@ -3387,11 +3481,17 @@
     var opt = sel.options[sel.selectedIndex];
     if (!opt) return;
     var c = opt.getAttribute('data-c') || '';
-    if (!c) { sel.style.color = ''; sel.style.backgroundColor = ''; sel.style.borderColor = ''; return; }
+    if (!c) {
+      sel.style.color = ''; sel.style.backgroundColor = ''; sel.style.borderColor = '';
+      if (window.UISelect) { try { UISelect.syncAll(); } catch (e) {} }
+      return;
+    }
     var p = palette();
     sel.style.color = catInk(p, c);
     sel.style.backgroundColor = mixColor(c, p.surface, .9);
     sel.style.borderColor = mixColor(c, p.border, .55);
+    /* 原生 select 已经隐身了，颜色只有同步到自绘 trigger 上才看得见 */
+    if (window.UISelect) { try { UISelect.syncAll(); } catch (e) {} }
   }
   function fillQuickCats() {
     var sel = $('qCategory');
