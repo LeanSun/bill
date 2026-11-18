@@ -2969,10 +2969,6 @@ html.theme-fading *::after {
 .ym-day.has { border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border)); }
 
 /* ---- 7. 换肤幕布：整体一次换，不逐块轮流 ------------------------ */
-.theme-curtain {
-  position: fixed; inset: 0; z-index: 500; pointer-events: none;
-  opacity: 0; transition: opacity .18s ease;
-}
 
 /* ---- 8. 本月结余比例条 ------------------------------------------ */
 .ir-bar.is-now i { background: linear-gradient(90deg, var(--expense), var(--primary)); }
@@ -3004,3 +3000,19 @@ html.theme-fading *::after {
 .modal-foot #modalCancel { justify-self: start; }
 .modal-foot #modalSave { justify-self: stretch; width: 100%; min-width: 150px; }
 .modal-foot #modalDelete { justify-self: end; }
+
+
+/* ================= v1.0.42 ================= */
+/* 1. 「已记下」整卡下移，仍保持居中大卡片的排版 */
+.toast.is-center.is-low { top: auto; bottom: 72px; }
+/* 2. 恢复提示只提示，不抢大卡片位置；保持在撤销条同一中轴 */
+.toast.is-low { left: 50%; right: auto; bottom: 84px; top: auto; transform: translateX(-50%); }
+/* 3. 最近记录跨天间隔 20px */
+.rs-item.is-newday { margin-left: 20px; }
+/* 4. 今年结余比例条改红 */
+.ir-bar.is-year i { background: var(--danger) !important; }
+/* 5. 整页换肤：View Transition 交叉淡入，一次性换完，不闪不逐块 */
+::view-transition-old(root), ::view-transition-new(root) {
+  animation-duration: .28s;
+  animation-timing-function: ease;
+}

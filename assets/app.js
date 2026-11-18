@@ -2278,7 +2278,7 @@
       var showRecent = (cat === 'all');
       strip.hidden = !showRecent;
       if (showRecent) {
-        var recs = sortedDesc(allRecords()).slice(0, 10);
+        var recs = sortedDesc(allRecords()).slice(0, 9);
         var rsig = recs.map(function (r) {
           return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type, catColor(p, r.category)].join('|');
         }).join('~');
@@ -3943,7 +3943,7 @@
       /* 正中那颗大字气泡，副标题把这一笔自己交代清楚：
          备注 · 分类/子类 · 日期 —— 存完抬头看一眼就知道记对了没有 */
       toast('已记下 ' + fmtYuan(rec.amount), 'success', {
-        center: true,
+        center: true, low: true,
         sub: [rec.note,
               rec.category + (rec.sub ? ' / ' + rec.sub : ''),
               rec.date].filter(Boolean).join('   ·   ')
@@ -4022,8 +4022,8 @@
       if (undoStack.length) paintUndo(); else hideUndo();
     }, 3000);
   }
-  function showUndo(label, snap) {
-    undoStack.push({ label: label, snap: snap });
+  function showUndo(label, snap, id) {
+    undoStack.push({ label: label, snap: snap, id: id });
     if (undoStack.length > 3) undoStack.shift();
     paintUndo();
   }
@@ -4036,22 +4036,19 @@
     state.store.deleted = back.deleted;
     saveStore();
     renderAll();
-    highlightRestored(back);
+    highlightRestored(top.id);
     toast('已恢复', 'success', { low: true });
     if (undoStack.length) paintUndo(); else hideUndo();
   }
 
-  /* 撤销恢复：把刚写回来的那几笔重新亮一下，方向和删除相反（从内往外亮） */
-  function highlightRestored(back) {
-    var ids = {};
-    (back.added || []).forEach(function (r) { ids[r.id] = true; });
-    Object.keys(back.edited || {}).forEach(function (id) { ids[id] = true; });
-    var rows = document.querySelectorAll('.cal-item[data-id]');
-    for (var i = 0; i < rows.length; i++) {
-      if (!ids[rows[i].getAttribute('data-id')]) continue;
-      rows[i].classList.add('is-restored');
-      (function (el) { setTimeout(function () { el.classList.remove('is-restored'); }, 1800); })(rows[i]);
-    }
+  /* 撤销恢复：只亮这一条，不把整份快照里的其他记录一起点亮 */
+  function highlightRestored(id) {
+    if (!id) return;
+    var row = document.querySelector('.cal-item[data-id="' + id + '"]') ||
+      document.querySelector('[data-id="' + id + '"]');
+    if (!row) return;
+    row.classList.add('is-restored');
+    setTimeout(function () { row.classList.remove('is-restored'); }, 1800);
   }
 
   /* ---------------- 粒子湮灭：删掉的那一行被左风向右吹散 ----------------
@@ -4142,7 +4139,7 @@
     /* 先抓 DOM 再动数据：renderAll 一跑，那一行就没了，粒子得从它还活着的位置起飞 */
     var node = document.querySelector('.cal-item[data-id="' + id + '"]') ||
       document.querySelector('[data-id="' + id + '"]');
-    dissolveNode(node, 380);
+    dissolveNode(node, 100);
 
     if (state.store.deleted.indexOf(id) === -1) state.store.deleted.push(id);
     state.store.added = state.store.added.filter(function (r) { return r.id !== id; });
@@ -4151,7 +4148,7 @@
     closeConfirm();
     closeModal();
     renderAll();
-    showUndo(label, snap);
+    showUndo(label, snap, id);
   }
 
   /* ---------------- 导出 CSV ---------------- */
@@ -4195,32 +4192,20 @@
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('is-active', bs[i].dataset.cat === state.filters.category);
   }
 
-  /* v1.0.41：整页当作一张图换肤 —— 先拉一层目标底色的幕布，
-     最不透明那一刻一次性换 token，再淡出。不会一块一块轮流变色。 */
-  function themeCurtain(swap) {
-    var c = $('themeCurtain');
-    if (!c) { c = document.createElement('div'); c.id = 'themeCurtain'; document.body.appendChild(c); }
-    c.className = 'theme-curtain';
-    var target = document.documentElement.getAttribute('data-theme') === 'dark' ? '#f5f7fa' : '#0d121c';
-    c.style.background = target;
-    c.hidden = false;
-    c.style.opacity = '0';
-    requestAnimationFrame(function () { c.style.transition = 'opacity .18s ease'; c.style.opacity = '1'; });
-    setTimeout(function () {
-      swap();
-      c.style.opacity = '0';
-      setTimeout(function () { c.hidden = true; }, 200);
-    }, 190);
-  }
   function applyTheme(t, deferCharts) {
     state.theme = t;
     try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* noop */ }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
-    themeCurtain(function () {
+    var swap = function () {
       document.documentElement.setAttribute('data-theme', t);
       if (!deferCharts) renderCharts(state.view, 'instant');
-    });
+      /* 让 iframe 同一帧换色；子页自己会 repaint 行底色与图表 */
+      var f = $('cubeFrame');
+      if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __ledgerTheme: t }, '*'); } catch (e) {} }
+    };
+    if (document.startViewTransition) document.startViewTransition(swap);
+    else swap();
   }
 
   /* 换肤：光晕已取消。只做一次 token + 图表配色的同步替换，
@@ -4656,6 +4641,11 @@
       renderCharts('overview', 'instant');
     });
     /* v1.0.40：魔方子页在 iframe 里开弹窗时，父页这一层也跟着糊起来 */
+    var veil = $('cubeGlobalVeil');
+    if (veil) veil.addEventListener('click', function () {
+      var f = $('cubeFrame');
+      if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __cubeModalClose: true }, '*'); } catch (e) {} }
+    });
     window.addEventListener('message', function (e) {
       var d = e && e.data; if (!d || !d.__cubeModal) return;
       var veil = $('cubeGlobalVeil'); if (!veil) return;
@@ -5193,9 +5183,11 @@
     /* 这一页已经排满了，再来一格就记在账上，交割后紧接着翻 —— 连滚不丢手感 */
     if (soft.on && soft.aim >= 1) { soft.queue = Math.min(1, soft.queue + 1); return; }
     if (!softStart(dir)) { shiftCalStep(dir); return; }
-    /* v1.0.41：滚轮起手直接把位置推到手指 / 滚轮对应的地方，
-       弹簧只负责停手后的收尾 —— 不再有「滚了半页却卡住不动」的迟滞。 */
+    /* v1.0.42：上一轮停手结算的弹簧可能还在跑，会和滚轮直接推位置抢同一帧，
+       看起来就是「刚滑就卡」。新滚轮一到先撤掉它，再同步推到光标位置。 */
+    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
     soft.p = Math.min(1, soft.p + mag / SOFT_SPAN);
+    soft.v = 0;
     soft.aim = soft.p;
     softPaint(soft.p);
     if (softIdle) clearTimeout(softIdle);
