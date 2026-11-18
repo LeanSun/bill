@@ -184,7 +184,7 @@
           </article>
 
           <article class="card chart-card" style="--i:5" data-page-node-id="pSZnkf8tsGNlKSlLSCMTyM">
-            <div class="card-head" data-page-node-id="5EBQZiLUZRnIrAtNNFftQ3"><div data-page-node-id="SVErta2EbmTTEuH4teaLEr"><h3 data-page-node-id="XdrirwgSyOiC19LmzicKD7">支出构成</h3><p data-page-node-id="qphDAqRJwxacJTCxyuoAVx">点击分类跳到日历查看</p></div></div>
+            <div class="card-head" data-page-node-id="5EBQZiLUZRnIrAtNNFftQ3"><div data-page-node-id="SVErta2EbmTTEuH4teaLEr"><h3 data-page-node-id="XdrirwgSyOiC19LmzicKD7">支出构成</h3><p data-page-node-id="qphDAqRJwxacJTCxyuoAVx">点击分类跳到日历查看</p></div><div class="donut-years" id="donutYear" aria-label="支出构成年度筛选"></div></div>
             <div class="chart chart-donut" id="chartDonut" data-page-node-id="CLQyD6LoaBO3oxNp7KTdZY"></div>
           </article>
 
@@ -235,7 +235,6 @@
                   <span class="csg-lab">收藏 / 购买</span>
                 </span>
                 <span class="csg-num"><b id="cubeCnt">0</b><i>件</i></span>
-                <i class="csg-bar"><u id="csgBarCount" style="width:0%"></u></i>
               </div>
               <div class="csg-tile" data-tone="cube" data-cube-filter="spend" role="button" tabindex="0" title="点击查看魔方购买支出">
                 <span class="csg-top">
@@ -243,7 +242,6 @@
                   <span class="csg-lab">魔方相关支出</span>
                 </span>
                 <span class="csg-num"><b id="cubeSpend">¥0.00</b><i>累计</i></span>
-                <i class="csg-bar"><u id="csgBarSpend" style="width:0%"></u></i>
               </div>
               <div class="csg-tile" data-tone="comp" data-cube-filter="comp" role="button" tabindex="0" title="点击查看比赛记录">
                 <span class="csg-top">
@@ -251,7 +249,6 @@
                   <span class="csg-lab">参赛次数</span>
                 </span>
                 <span class="csg-num"><b id="cubeComp">0</b><i>场</i></span>
-                <i class="csg-bar"><u id="csgBarComp" style="width:0%"></u></i>
               </div>
               <div class="csg-tile" data-tone="comp" data-cube-filter="fee" role="button" tabindex="0" title="点击查看比赛报名费">
                 <span class="csg-top">
@@ -259,7 +256,6 @@
                   <span class="csg-lab">比赛报名费</span>
                 </span>
                 <span class="csg-num"><b id="cubeFee">¥0.00</b><i>累计</i></span>
-                <i class="csg-bar"><u id="csgBarFee" style="width:0%"></u></i>
               </div>
             </div>
           </article>
@@ -463,6 +459,7 @@
 </div>
 
 <!-- ============ 记账弹窗 ============ -->
+<div class="cube-global-veil" id="cubeGlobalVeil" hidden aria-hidden="true"></div>
 <div class="modal-backdrop" id="modalBackdrop" hidden data-page-node-id="FYbNWtdtItsB5VmufHRIN7">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" data-page-node-id="6cKHXMkwL6CPv4NGtEQy5R">
     <div class="modal-head" data-page-node-id="qxhra1JGz9psKKXXeqmPPM">

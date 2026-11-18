@@ -2839,3 +2839,84 @@ html[data-theme="dark"] .cal-item.is-new::after { mix-blend-mode: screen; opacit
 @media (prefers-reduced-motion: reduce) {
   .dissolve-layer { animation: none; }
 }
+
+
+/* ==================================================================
+   v1.0.40
+   ------------------------------------------------------------------
+   1. 最近胶囊按分类色填充；6. 新账描边改用分类色同系深色；
+   7. 「还剩多少」多一行，卡内节奏收紧；16. 换肤柔和过渡；
+   17. 支出构成年份条。
+   ================================================================== */
+
+/* ---- 1. 最近记录胶囊：整颗吃分类色 ------------------------------ */
+.rs-item {
+  background: color-mix(in srgb, var(--c, var(--primary)) 17%, var(--surface));
+  border-color: color-mix(in srgb, var(--c, var(--primary)) 34%, var(--border));
+}
+.rs-item:hover {
+  background: color-mix(in srgb, var(--c, var(--primary)) 25%, var(--surface));
+  border-color: color-mix(in srgb, var(--c, var(--primary)) 58%, var(--border));
+  box-shadow: 0 3px 12px -5px color-mix(in srgb, var(--c, var(--primary)) 55%, transparent);
+}
+.rs-dot { background: var(--ink, var(--c, var(--primary))); }
+.rs-note { color: var(--ink, var(--text)); }
+.rs-amt.is-exp { color: var(--ink, var(--expense)); }
+.rs-amt.is-inc { color: var(--income); }
+
+/* ---- 6. 新账高亮：描边与高光都从这一笔自己的分类色派生 ---------- */
+.cal-item.is-new { --ring-c: color-mix(in srgb, var(--c, var(--primary)) 80%, #101828); }
+html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c, var(--primary)) 70%, #ffffff); }
+.cal-item.is-new::after {
+  background: linear-gradient(100deg,
+    transparent 12%,
+    color-mix(in srgb, var(--c, var(--primary)) 42%, transparent) 46%,
+    transparent 78%);
+}
+@keyframes newRowRing {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ring-c) 62%, transparent); }
+  18%  { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--ring-c) 78%, transparent); }
+  70%  { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--ring-c) 34%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cal-item.is-new { box-shadow: inset 0 0 0 2px var(--ring-c); }
+}
+
+/* ---- 7. 三行版「还剩多少」：字号收紧，别把卡片撑破 -------------- */
+.ins-rest .ir-line b { font-size: 15.5px; }
+.ins-rest .ir-bar { margin: 3px 0 1px; }
+.ins-rest .ir-line.is-now { margin-top: 1px; }
+
+/* ---- 16. 深浅切换：只在切换那 520ms 内挂过渡 -------------------- */
+html.theme-fading,
+html.theme-fading *,
+html.theme-fading *::before,
+html.theme-fading *::after {
+  transition: background-color .46s ease, border-color .46s ease,
+              color .46s ease, box-shadow .46s ease !important;
+}
+
+/* ---- 17. 支出构成的年度筛选 ------------------------------------ */
+.donut-years { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.donut-years button {
+  padding: 4px 8px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+  font-size: 10.5px; font-weight: 700; line-height: 1; white-space: nowrap;
+  transition: background-color .18s, color .18s, border-color .18s;
+}
+.donut-years button:hover { border-color: var(--primary); color: var(--primary); }
+.donut-years button.is-active {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+
+
+/* ---- 13. 魔方 iframe 弹窗：父页工作台也要一起糊 ----------------- */
+.cube-global-veil {
+  position: fixed; inset: 0; z-index: 80; pointer-events: none;
+  background: rgba(16, 24, 42, .26);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  opacity: 0; transition: opacity .22s ease;
+}
+.cube-global-veil.is-on { opacity: 1; }
+#view-cube.is-active .cube-frame { position: relative; z-index: 90; }

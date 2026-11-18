@@ -172,6 +172,7 @@
        这里留 id + 一个到期时间戳，条目渲染时据此打上 is-new。 */
     newId: '',
     newUntil: 0,
+    donutYear: 'all',
     store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     catColors: {},
     layout: null
@@ -1309,9 +1310,37 @@
     setOpt('chartWeight', o);
   }
 
+  /* v1.0.40：支出构成自己的年度筛选。全局那枚 yearSwitch 在当前页面
+     根本没有挂载点，不能指望它；这里给这张卡一条独立的年份条。 */
+  function fillDonutYears() {
+    var box = $('donutYear'); if (!box) return;
+    var years = [];
+    allRecords().forEach(function (r) { var y = Number(r.year); if (y && years.indexOf(y) < 0) years.push(y); });
+    years.sort(function (a, b) { return b - a; });
+    var sig = state.donutYear + '|' + years.join(',');
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.innerHTML = ['all'].concat(years).map(function (y) {
+      return '<button type="button" data-dy="' + y + '" class="' + (String(state.donutYear) === String(y) ? 'is-active' : '') + '">' +
+        (y === 'all' ? '全部' : y) + '</button>';
+    }).join('');
+  }
+  function bindDonutYear() {
+    var box = $('donutYear'); if (!box) return;
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-dy]') : null;
+      if (!b) return;
+      state.donutYear = b.dataset.dy;
+      renderCharts('overview', 'instant');
+    });
+  }
+
   /* 支出构成：图例上墙，用引线连到扇区，不再另起一段下方图例 */
   function renderDonut(p) {
-    var data = catTotals(scopeRecords()).filter(function (d) { return d.value > 0; });
+    fillDonutYears();
+    var data = catTotals(scopeRecords().filter(function (r) {
+      return state.donutYear === 'all' || String(r.year) === String(state.donutYear);
+    })).filter(function (d) { return d.value > 0; });
     var total = data.reduce(function (s, d) { return s + d.value; }, 0);
     var colors = catColors(p);
     var nameIndex = {};
@@ -1440,6 +1469,12 @@
     var o = baseOption(p);
     o.tooltip = tooltipCommon(p, {
       trigger: 'item',
+      confine: false,
+      position: function (pt, params, dom, rect, size) {
+        var w = size.contentSize[0], h = size.contentSize[1];
+        return [Math.min(Math.max(pt[0] - w / 2, 6), Math.max(6, size.viewSize[0] - w - 6)),
+                Math.max(6, pt[1] - h - 16)];
+      },
       formatter: function (d) {
         if (!d.data) return '';
         var cnt = d.data[3] || 0;
@@ -1836,7 +1871,7 @@
     var specs = [
       { kind: 'model', gram: 'rank', rows: rankRows(cubes, function (x) { return x.model || '未命名型号'; }), fmt: cnt('条'), tab: 'cubes', key: 'q' },
       { kind: 'brand', gram: 'rank', rows: rankRows(cubes, function (x) { return x.brand || '未分类'; }), fmt: cnt('条'), tab: 'cubes', key: 'brand' },
-      { kind: 'cubeprice', gram: 'year', rows: yearRows(cubes, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'cubes', key: 'year' },
+      { kind: 'cubeprice', gram: 'line', rows: yearRows(cubes, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'cubes', key: 'year' },
       { kind: 'compyear', gram: 'year', rows: yearRows(comps, true), fmt: cnt('场'), axisFmt: function (v) { return v; }, tab: 'competitions', key: 'year' },
       { kind: 'compprov', gram: 'rank', rows: rankRows(comps, function (x) { return x.province || '未填写'; }), fmt: cnt('场'), tab: 'competitions', key: 'province' },
       { kind: 'compprice', gram: 'year', rows: yearRows(comps, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'competitions', key: 'year' }
@@ -1864,7 +1899,9 @@
             accent: accent, accent2: isComp ? '#3fd0b0' : p.primary2,
             fmt: sp.fmt, labelWidth: 74, labelSize: 10.5, right: 54, barWidth: 9
           })
-        : yearBar(p, sp.rows, { accent: accent, fmt: sp.fmt, axisFmt: sp.axisFmt, barWidth: 20 });
+        : sp.gram === 'line'
+          ? yearLine(p, sp.rows, { accent: accent, fmt: sp.fmt, axisFmt: sp.axisFmt })
+          : yearBar(p, sp.rows, { accent: accent, fmt: sp.fmt, axisFmt: sp.axisFmt, barWidth: 20 });
       var chart = cubePaint(host, opt);
       if (!chart) return;
       chart.off('click');
@@ -1895,11 +1932,7 @@
     };
     var cntAll = cubes.length + comps.length;
     var cashAll = spend + compSpend;
-    bar('csgBarCount', cntAll ? cubes.length / cntAll * 100 : 0);
-    bar('csgBarComp', cntAll ? comps.length / cntAll * 100 : 0);
-    bar('csgBarSpend', cashAll ? spend / cashAll * 100 : 0);
-    bar('csgBarFee', cashAll ? compSpend / cashAll * 100 : 0);
-
+    /* v1.0.40：四块统计砖只留数字，比例条拿掉 */
     /* 四格并在一条里：每一格都是一扇门，点进去就是筛好的魔方页 */
     var cells = document.querySelectorAll('[data-cube-filter]');
     for (var ci = 0; ci < cells.length; ci++) {
@@ -2222,7 +2255,7 @@
       if (showRecent) {
         var recs = sortedDesc(allRecords()).slice(0, 5);
         var rsig = recs.map(function (r) {
-          return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type].join('|');
+          return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type, catColor(p, r.category)].join('|');
         }).join('~');
         if (rlist.dataset.sig !== rsig) {
           rlist.dataset.sig = rsig;
@@ -2231,9 +2264,10 @@
             var note = String(r.note || r.sub || r.category || '').trim();
             /* 133×36 两行装：上行备注，下行「日期 · 金额」。备注因此不用被
                金额和日期挤成一团省略号，五颗并排也是齐的。 */
-            return '<button type="button" class="rs-item" data-day="' + esc(r.date) + '" title="' +
+            var c = catColor(p, r.category);
+            return '<button type="button" class="rs-item" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
               esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '')) + '">' +
-              '<i class="rs-dot" style="--c:' + catColor(p, r.category) + '"></i>' +
+              '<i class="rs-dot"></i>' +
               '<span class="rs-body">' +
               '<span class="rs-note">' + esc(note) + '</span>' +
               '<span class="rs-meta">' +
@@ -2657,6 +2691,15 @@
       if (String(r.date).slice(0, 4) !== yYear) return;
       if (r.type === 'income') yInc += r.amount; else yExp += r.amount;
     });
+    /* v1.0.40：新「本月剩余」= 本月收入 − 本月支出；
+       老那一条改名「过往对比」，仍拿近 6 月月均当参照，两者不混。 */
+    var mKey = yYear + '-' + ('0' + (d0.getMonth() + 1)).slice(-2);
+    var mInc = 0, mExp = 0;
+    allRecords().forEach(function (r) {
+      if (String(r.date || '').slice(0, 7) !== mKey) return;
+      if (r.type === 'income') mInc += r.amount; else mExp += r.amount;
+    });
+    var mNow = round(mInc - mExp);
     var mLeft = monthBudget - mtd, yLeft = round(yInc - yExp);
     var mLeftPct = monthBudget > 0 ? Math.max(0, Math.min(100, mtd / monthBudget * 100)) : 0;
     /* 年结余的进度条按"花掉收入的比例"显示，越低越省 */
@@ -2782,11 +2825,14 @@
     }
     var restCard =
       '<div class="ins-rest">' +
-      '<div class="ir-line"><span>本月剩余</span><b class="' + (mLeft < 0 ? 'is-over' : '') + '">' +
+      '<div class="ir-line"><span>过往对比</span><b class="' + (mLeft < 0 ? 'is-over' : '') + '">' +
       (mLeft < 0 ? '超支 ' + fmtYuan(-mLeft) : fmtYuan(mLeft)) + '</b></div>' +
       '<div class="ir-bar" data-tip="' + esc('已花 ' + fmtYuan(mtd) + ' / 近 6 月月均 ' + fmtYuan(monthBudget)) +
       '"><i style="width:' + mLeftPct.toFixed(1) + '%"></i></div>' +
       '<div class="ir-note">已花 ' + fmtYuan(mtd) + ' · 近 6 月月均 ' + fmtYuan(monthBudget) + '</div>' +
+      '<div class="ir-line is-now"><span>本月剩余</span><b class="' + (mNow < 0 ? 'is-over' : '') + '">' +
+      (mNow < 0 ? '超支 ' + fmtYuan(-mNow) : fmtYuan(mNow)) + '</b></div>' +
+      '<div class="ir-note">本月收 ' + fmtYuan(mInc) + ' · 支 ' + fmtYuan(mExp) + '</div>' +
       '<div class="ir-line is-year"><span>今年结余</span><b class="' + (yLeft < 0 ? 'is-over' : '') + '">' +
       (yLeft < 0 ? '超支 ' + fmtYuan(-yLeft) : fmtYuan(yLeft)) + '</b></div>' +
       '<div class="ir-bar is-year" data-tip="' + esc('今年收 ' + fmtYuan(yInc) + ' / 支 ' + fmtYuan(yExp)) +
@@ -2955,6 +3001,9 @@
     var box = $('calYearBoard');
     if (!box) return;
     var y = state.calMonth.year;
+    /* v1.0.40：年历格子跟随当前分类色；「全部」保持原来的绿色 */
+    var catKey = state.filters.category || 'all';
+    var catHue = catKey === 'all' ? p.expense : (catKey === '收入' ? p.income : catColor(p, catKey));
     /* 一天里可能既有支出又有收入，所以两本账分开累计：
        支出染绿、收入染红，两样都有就把格子上下分色。
        早年版按筛选方向二选一，切到收入整张年历全空 —— 现在不分方向，各算各的。 */
@@ -2986,12 +3035,12 @@
         var ae = alphaOf(e, peakE), ai = alphaOf(inc, peakI);
         var bg = mixColor(p.surface3, p.surface, .45), ink = p.muted, tip = key + ' · 无记录';
         if (e && inc) {
-          bg = 'linear-gradient(155deg,' + withAlpha(p.expense, ae) + ' 0 47%,' +
+            bg = 'linear-gradient(155deg,' + withAlpha(catHue, ae) + ' 0 47%,' +
             withAlpha(p.income, ai) + ' 53% 100%)';
           ink = Math.max(ae, ai) > .42 ? '#ffffff' : p.text2;
         } else if (e) {
-          bg = withAlpha(p.expense, ae);
-          ink = ae > .42 ? '#ffffff' : catInk(p, p.expense);
+          bg = withAlpha(catHue, ae);
+          ink = ae > .42 ? '#ffffff' : catInk(p, catHue);
         } else if (inc) {
           bg = withAlpha(p.income, ai);
           ink = ai > .42 ? '#ffffff' : catInk(p, p.income);
@@ -3157,6 +3206,10 @@
   }
   function setView(view, cubeTab) {
     if (!VIEW_META[view]) return;
+    if (view !== 'cube') {
+      var veil = $('cubeGlobalVeil');
+      if (veil) { veil.classList.remove('is-on'); veil.hidden = true; }
+    }
     if (soft && soft.on) softReset();
     /* 从有 title 的元素移进 iframe 时父页收不到 mouseout，提示会卡住不消失 */
     var stuckTip = $('hoverTip');
@@ -3718,42 +3771,11 @@
     }
     fillCategoryOptions();
   }
-  /* v1.0.33：记一笔草稿。点空白关闭保留，Esc 明确丢弃。 */
+  /* v1.0.40：取消记一笔的输入记忆。
+     上一笔的备注 / 分类 / 金额不再跟到下一笔；这里只留一个清道夫，
+     把老版本写进 localStorage 的草稿删掉，免得升级后第一次打开还回填旧值。 */
   var ENTRY_DRAFT_KEY = 'qingzhang.entryDraft.v1';
-  function readEntryDraft() {
-    try { return JSON.parse(localStorage.getItem(ENTRY_DRAFT_KEY) || 'null'); } catch (e) { return null; }
-  }
-  function writeEntryDraft(d) { try { localStorage.setItem(ENTRY_DRAFT_KEY, JSON.stringify(d)); } catch (e) {} }
   function clearEntryDraft() { try { localStorage.removeItem(ENTRY_DRAFT_KEY); } catch (e) {} }
-  function collectEntryDraft() {
-    return {
-      type: state.entryType,
-      amount: $('fAmount') ? $('fAmount').value : '',
-      date: $('fDate') ? $('fDate').value : '',
-      note: $('fNote') ? $('fNote').value : '',
-      category: $('fCategory') ? $('fCategory').value : '',
-      sub: $('fSub') ? $('fSub').value : ''
-    };
-  }
-  function saveEntryDraft() { if (!state.editingId) writeEntryDraft(collectEntryDraft()); }
-  function bindEntryDraft() {
-    var form = $('entryForm'); if (!form) return;
-    form.oninput = saveEntryDraft; form.onchange = saveEntryDraft;
-  }
-  function applyEntryDraft(d) {
-    if (!d) return;
-    if (d.type && d.type !== state.entryType) setEntryType(d.type);
-    if ($('fAmount')) $('fAmount').value = d.amount || '';
-    setDateValue(d.date || todayStr());
-    if ($('fNote')) $('fNote').value = d.note || '';
-    if ($('fCategory')) {
-      var found = false;
-      for (var i = 0; i < $('fCategory').options.length; i++) if ($('fCategory').options[i].value === d.category) found = true;
-      if (!found && d.category) $('fCategory').add(new Option(d.category, d.category));
-      $('fCategory').value = d.category || $('fCategory').value;
-    }
-    fillSubOptions(d.sub || '');
-  }
   function openModal(record, prefillDate, mode) {
     /* 手机上记账浮层弹出前先收起筛选区，别让那一排按钮压在表单上 */
     collapseFiltersOnMobile();
@@ -3761,7 +3783,7 @@
     state.editingId = record ? record.id : null;
     if ($('modalTitle')) $('modalTitle').textContent = record ? '编辑记录' : '记一笔';
     if ($('modalDesc')) $('modalDesc').textContent = record ? '修改后即时更新所有图表与统计。' : '记录一条新的收支流水';
-    if ($('modalSave')) $('modalSave').textContent = record ? '保存修改' : '保存记录';
+    if ($('modalSave')) $('modalSave').textContent = '保存';
     if ($('modalDelete')) $('modalDelete').hidden = !record;
     /* cell：从月历 / 周历格子弹出来的，用天页那套「内容在上、金额在下」的排布；
        default：侧栏「记一笔」，保持原来的顺序 */
@@ -3787,8 +3809,7 @@
     /* 只有显式存过子类的记录才回填选择；旧账留「自动识别」并实时显示推断结果 */
     fillSubOptions(record && record.subExplicit ? record.sub : '');
     if ($('formError')) { $('formError').hidden = true; $('formError').textContent = ''; }
-    if (!record) applyEntryDraft(readEntryDraft());
-    bindEntryDraft();
+    if (!record) clearEntryDraft();
     var back = $('modalBackdrop');
     if (back) { clearTimeout(modalCloseTimer); back.classList.remove('is-closing'); back.hidden = false; }
     setTimeout(function () {
@@ -3917,7 +3938,7 @@
   }
 
   /* ---------------- 撤销删除：底部悬浮条 + 3 秒倒计时 ---------------- */
-  var undoState = null, undoTimer = 0;
+  var undoStack = [], undoTimer = 0;   /* v1.0.40：保留最近 3 次删除 */
   function snapshotStore() {
     return JSON.stringify({
       added: state.store.added,
@@ -3930,38 +3951,42 @@
     undoTimer = 0;
     var bar = $('undoBar');
     if (bar) {
-      if (keep) { bar.hidden = true; bar.classList.remove('is-out'); return; }
+      if (keep) { bar.hidden = true; bar.classList.remove('is-out'); undoStack = []; return; }
       bar.classList.add('is-out');
       setTimeout(function () { if (bar.classList.contains('is-out')) { bar.hidden = true; bar.classList.remove('is-out'); } }, 240);
     }
-    undoState = null;
+    undoStack = [];
+  }
+  /* 展示栈顶：一条倒计时归零后弹出它，下面还有就接着显示（重新给 3 秒） */
+  function paintUndo() {
+    var bar = $('undoBar'), txt = $('undoText'), prog = $('undoProg');
+    var top = undoStack[undoStack.length - 1];
+    if (!top) { hideUndo(); return; }
+    if (bar) { bar.hidden = false; bar.classList.remove('is-out'); }
+    if (txt) txt.textContent = top.label + (undoStack.length > 1 ? ' · 还可撤销 ' + (undoStack.length - 1) + ' 项' : '');
+    if (prog) { prog.style.animation = 'none'; void prog.offsetWidth; prog.style.animation = ''; }
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(function () {
+      undoStack.pop(); undoTimer = 0;
+      if (undoStack.length) paintUndo(); else hideUndo();
+    }, 3000);
   }
   function showUndo(label, snap) {
-    var bar = $('undoBar'), txt = $('undoText'), prog = $('undoProg');
-    if (!bar) return;
-    undoState = snap;
-    if (txt) txt.textContent = label;
-    bar.hidden = false;
-    bar.classList.remove('is-out');
-    /* 进度条靠 CSS 动画跑：先摘掉父级的播放入口再挂回去，才会从头再来一遍 */
-    if (prog) {
-      prog.style.animation = 'none';
-      void prog.offsetWidth;
-      prog.style.animation = '';
-    }
-    clearTimeout(undoTimer);
-    undoTimer = setTimeout(function () { hideUndo(); }, 3000);
+    undoStack.push({ label: label, snap: snap });
+    if (undoStack.length > 3) undoStack.shift();
+    paintUndo();
   }
   function doUndo() {
-    if (!undoState) return;
-    var back = JSON.parse(undoState);
+    var top = undoStack.pop();
+    if (!top) return;
+    var back = JSON.parse(top.snap);
     state.store.added = back.added;
     state.store.edited = back.edited;
     state.store.deleted = back.deleted;
-    hideUndo();
     saveStore();
     renderAll();
     toast('已恢复', 'info');
+    if (undoStack.length) paintUndo(); else hideUndo();
   }
 
   /* ---------------- 粒子湮灭：删掉的那一行被左风向右吹散 ----------------
@@ -3985,7 +4010,9 @@
     var cs = getComputedStyle(node);
     var nodeBg = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? cs.backgroundColor : p.surface2;
     var accent = (cs.getPropertyValue('--c') || '').trim() || p.primary;
-    var tints = [accent, accent, accent, p.primary, nodeBg, '#ffffff'];
+    /* v1.0.40：粒子一律从这一行自己的颜色派生，不再混进全局蓝色 */
+    var tints = [accent, accent, mixColor(accent, '#ffffff', .24), mixColor(accent, p.text, .18),
+                 mixColor(accent, '#ffffff', .46), nodeBg];
 
     var layer = document.createElement('div');
     layer.className = 'dissolve-layer';
@@ -3999,14 +4026,14 @@
     layer.appendChild(flash);
 
     var area = r.width * r.height;
-    var count = Math.max(64, Math.min(170, Math.round(area / 420)));
+    var count = Math.max(120, Math.min(320, Math.round(area / 165)));
     var spreadY = r.height * 1.3 + 96;      /* 纵向散开范围：比行高再多一截 */
 
     for (var i = 0; i < count; i++) {
       var dot = document.createElement('b');
       /* 三档粒径：细沙 / 碎屑 / 小块，混着撒才不像筛子 */
       var tier = Math.random();
-      var size = tier < .55 ? 1.8 + Math.random() * 2.2 : (tier < .88 ? 4 + Math.random() * 2.6 : 6.4 + Math.random() * 3.2);
+      var size = tier < .62 ? .9 + Math.random() * 1.3 : (tier < .92 ? 2.1 + Math.random() * 1.4 : 3.5 + Math.random() * 1.8);
       var x = Math.random() * r.width;
       var y = Math.random() * r.height;
       dot.style.cssText = 'left:' + x.toFixed(1) + 'px;top:' + y.toFixed(1) + 'px;' +
@@ -4101,9 +4128,16 @@
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('is-active', bs[i].dataset.cat === state.filters.category);
   }
 
+  var themeFadeTimer = 0;
   function applyTheme(t, deferCharts) {
     state.theme = t;
-    document.documentElement.setAttribute('data-theme', t);
+    /* v1.0.40：换肤时临时挂一个过渡类，让底色 / 卡面 / 边框一起柔和过渡；
+       520ms 后摘掉，不干扰平时的 hover 动画和图表 instant 重绘。 */
+    var root = document.documentElement;
+    root.classList.add('theme-fading');
+    root.setAttribute('data-theme', t);
+    clearTimeout(themeFadeTimer);
+    themeFadeTimer = setTimeout(function () { root.classList.remove('theme-fading'); }, 520);
     try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* noop */ }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
@@ -4537,6 +4571,19 @@
     if ($('confirmOk')) $('confirmOk').addEventListener('click', confirmDelete);
     backdropDismiss($('confirmBackdrop'), closeConfirm);
     if ($('undoBtn')) $('undoBtn').addEventListener('click', doUndo);
+    bindDonutYear();
+    /* v1.0.40：魔方子页在 iframe 里开弹窗时，父页这一层也跟着糊起来 */
+    window.addEventListener('message', function (e) {
+      var d = e && e.data; if (!d || !d.__cubeModal) return;
+      var veil = $('cubeGlobalVeil'); if (!veil) return;
+      if (d.open) {
+        veil.hidden = false;
+        requestAnimationFrame(function () { veil.classList.add('is-on'); });
+      } else {
+        veil.classList.remove('is-on');
+        setTimeout(function () { veil.hidden = true; }, 240);
+      }
+    });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         if (dp.open) { closeDp(); return; }

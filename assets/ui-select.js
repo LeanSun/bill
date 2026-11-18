@@ -152,6 +152,17 @@
     if (!t) return;
     var inp = t.querySelector('.ui-sel-input');
     if (!inp) return;
+    /* v1.0.40：宽度跟着最长选项走。中文按 1.85 个西文字符估，
+       筛选项短的收窄长的放宽；只有筛选栏的 CSS 会消费这个变量，
+       弹窗表单仍保持整格宽。 */
+    var longest = '';
+    for (var oi = 0; oi < sel.options.length; oi++) {
+      var lab = sel.options[oi].textContent || sel.options[oi].text || '';
+      if (lab.length > longest.length) longest = lab;
+    }
+    var cjk = (longest.match(/[\u4e00-\u9fff]/g) || []).length;
+    var units = longest.length - cjk + cjk * 1.85;
+    t.style.setProperty('--sel-w', Math.round(Math.min(240, Math.max(112, units * 8.4 + 46))) + 'px');
     t.classList.toggle('is-disabled', !!sel.disabled);
     t.setAttribute('aria-disabled', sel.disabled ? 'true' : 'false');
     t.tabIndex = sel.disabled ? -1 : 0;
