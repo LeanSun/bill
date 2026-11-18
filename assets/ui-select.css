@@ -120,18 +120,33 @@ select.ui-native-select {
   box-shadow: none; transform: none;
   transition: background-color .12s ease, color .12s ease;
 }
-.ui-sel-option:hover,
-.ui-sel-option.is-active {
+/* v1.0.38 · 高亮只有一个
+   以前「当前值」是深色底（is-selected），「键盘/鼠标停在哪儿」是浅灰底（is-active），
+   两个同时亮着：按上下键时光块在动，深色那块钉在原处不动，看起来像没跟上来。
+   现在 is-active 就是那唯一的深色高亮，is-selected 降级成左边一颗小圆点
+   —— 走位看得清，当前值也还认得出来。 */
+.ui-sel-option::before {
+  content: ''; width: 5px; height: 5px; flex: 0 0 5px;
+  margin-right: 7px; border-radius: 50%;
+  background: transparent;
+  transition: background-color .12s ease;
+}
+.ui-sel-option:hover:not(.is-active) {
   background: var(--ui-surface2);
   transform: none; filter: none;
 }
-.ui-sel-option.is-selected {
-  background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+.ui-sel-option.is-active {
+  background: color-mix(in srgb, var(--ui-primary) 15%, transparent);
   color: var(--ui-primary); font-weight: 750;
+  transform: none; filter: none;
 }
+.ui-sel-option.is-selected { background: transparent; color: var(--ui-ink); font-weight: 750; }
+.ui-sel-option.is-selected::before { background: var(--ui-primary); }
 .ui-sel-option.is-selected.is-active {
-  background: color-mix(in srgb, var(--ui-primary) 20%, transparent);
+  background: color-mix(in srgb, var(--ui-primary) 22%, transparent);
+  color: var(--ui-primary);
 }
+.ui-sel-option.is-selected.is-active::before { background: var(--ui-primary); }
 .ui-sel-empty {
   padding: 16px 10px; text-align: center;
   color: var(--ui-muted); font-size: 12px;
@@ -214,3 +229,37 @@ html[data-density="cube"] .field .ui-sel-trigger {
   font-weight: 600;
 }
 html[data-density="cube"] .field .ui-sel-caret { width: 16px; height: 16px; flex-basis: 16px; }
+
+/* ================= v1.0.38 · trigger 里那枚输入框必须彻底透明 =================
+   病根：trigger 里面是真 <input class="ui-sel-input">（点开就是搜索框）。
+   但两个页面都有更「具体」的输入框规则：
+       账本  .field input { padding:10px 12px; border:1px solid; background:var(--surface-2); }
+              .ds-quick input[type="text"] { height:32px; padding:0 8px; border:… }
+   它们的选择器权重（0,2,1 / 0,1,1）压得过共享的 .ui-sel-trigger .ui-sel-input（0,2,0），
+   于是 32px 的 trigger 里又画了一个带边框、带底色的 42px 输入框：
+   默认没上色时两者同色，看着还行；一旦选中分类、trigger 染上分类色，
+   里面那层白/灰就露出来了 —— 也就是「框里套了个框、还错位」。
+   这里全部 !important 钉死，页面级输入框样式再具体也穿不进来。 */
+.ui-sel-trigger .ui-sel-input {
+  width: auto !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: inherit !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+.ui-sel-trigger .ui-sel-input:focus { box-shadow: none !important; }

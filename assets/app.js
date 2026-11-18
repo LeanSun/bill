@@ -1518,23 +1518,138 @@
     });
   }
 
+  /* ================= v1.0.38 · 图表统一规格 =================
+     七张图以前各写各的：这张折线、那张饼、另一张方块图，网格边距、字号、圆角
+     一人一套，摆在同一页里像七个人画的。现在归成两种语法，差别只剩数据：
+       rankBar —— 排名类：名字在左，横条长度读大小，右边挂数值
+       yearBar —— 年份类：年份在横轴，竖条高度读大小，柱顶挂数值
+     两套共用同一批字号（10.5 / 11）、同一套圆角（5 / 7）、同一个入场节奏
+     （640ms cubicOut）、同一张 tooltip 卡片。换数据不换脸。 */
+  function rankBar(p, rows, opt) {
+    opt = opt || {};
+    var accent = opt.accent || p.primary;
+    var accent2 = opt.accent2 || p.primary2;
+    var fmt = opt.fmt || function (v) { return v; };
+    var inst = RENDER_MODE === 'instant';
+    var maxV = Math.max.apply(null, rows.map(function (r) { return Number(r.value) || 0; }).concat([1]));
+    var total = rows.reduce(function (s, r) { return s + (Number(r.value) || 0); }, 0) || 1;
+    return {
+      backgroundColor: 'transparent',
+      animation: !inst,
+      animationDuration: inst ? 0 : 640,
+      animationDurationUpdate: inst ? 0 : 420,
+      animationEasing: 'cubicOut',
+      textStyle: { fontFamily: p.font },
+      grid: { left: 2, right: opt.right || 66, top: 6, bottom: 6, containLabel: true },
+      tooltip: tooltipCommon(p, {
+        trigger: 'item',
+        formatter: function (a) {
+          return '<span style="color:' + p.muted + ';font-size:11px">' + esc(a.name) + '</span>' +
+            '<div style="margin-top:3px"><b style="font-size:13px">' + fmt(a.value) + '</b>' +
+            '<span style="margin-left:8px;color:' + p.muted + ';font-size:11px">' + (a.value / total * 100).toFixed(1) + '%</span></div>';
+        }
+      }),
+      xAxis: { type: 'value', max: maxV, show: false },
+      yAxis: {
+        type: 'category', inverse: true,
+        data: rows.map(function (r) { return r.name; }),
+        axisTick: { show: false }, axisLine: { show: false },
+        axisLabel: {
+          color: p.text2, fontSize: opt.labelSize || 11, fontWeight: 600, fontFamily: p.font,
+          width: opt.labelWidth || 92, overflow: 'truncate', margin: 10
+        }
+      },
+      series: [{
+        type: 'bar', barWidth: opt.barWidth || 10,
+        showBackground: true,
+        backgroundStyle: { color: p.surface3, borderRadius: 5 },
+        itemStyle: {
+          borderRadius: 5,
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: withAlpha(accent2, .42) },
+            { offset: .6, color: accent },
+            { offset: 1, color: accent }
+          ])
+        },
+        label: {
+          show: true, position: 'right', distance: 7,
+          color: p.text2, fontSize: 10.5, fontWeight: 800, fontFamily: p.font,
+          formatter: function (a) { return fmt(a.value); }
+        },
+        emphasis: { itemStyle: { shadowBlur: 14, shadowColor: withAlpha(accent, .32) } },
+        data: rows.map(function (r) { return { name: r.name, value: r.value }; })
+      }]
+    };
+  }
+
+  function yearBar(p, rows, opt) {
+    opt = opt || {};
+    var accent = opt.accent || p.primary;
+    var fmt = opt.fmt || function (v) { return v; };
+    var axisFmt = opt.axisFmt || fmtAxis;
+    var inst = RENDER_MODE === 'instant';
+    var dense = rows.length > 9;
+    return {
+      backgroundColor: 'transparent',
+      animation: !inst,
+      animationDuration: inst ? 0 : 700,
+      animationDurationUpdate: inst ? 0 : 420,
+      animationEasing: 'cubicOut',
+      textStyle: { fontFamily: p.font },
+      grid: { left: 2, right: 10, top: 28, bottom: 2, containLabel: true },
+      tooltip: tooltipCommon(p, {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow', shadowStyle: { color: withAlpha(accent, .07) } },
+        formatter: function (a) {
+          var v = a[0]; if (!v) return '';
+          return '<span style="color:' + p.muted + ';font-size:11px">' + v.axisValue + '</span>' +
+            '<div style="margin-top:3px"><b style="font-size:13px">' + fmt(v.value) + '</b></div>';
+        }
+      }),
+      xAxis: {
+        type: 'category', data: rows.map(function (r) { return r.name; }), boundaryGap: true,
+        axisTick: { show: false }, axisLine: { show: false },
+        axisLabel: {
+          color: p.muted, fontSize: 10.5, fontWeight: 600, fontFamily: p.font,
+          margin: 9, hideOverlap: true, rotate: dense ? 38 : 0
+        }
+      },
+      yAxis: {
+        type: 'value', splitNumber: 3,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: axisFmt },
+        splitLine: { lineStyle: { color: withAlpha(p.text, .08), type: 'dashed' } }
+      },
+      series: [{
+        type: 'bar', barMaxWidth: opt.barWidth || 24, barMinHeight: 3,
+        itemStyle: {
+          borderRadius: [7, 7, 2, 2],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: accent },
+            { offset: 1, color: withAlpha(accent, .28) }
+          ])
+        },
+        label: {
+          show: true, position: 'top', distance: 6,
+          color: p.text2, fontSize: 10.5, fontWeight: 800, fontFamily: p.font,
+          formatter: function (a) { return fmt(a.value); }
+        },
+        emphasis: { itemStyle: { shadowBlur: 14, shadowColor: withAlpha(accent, .3) } },
+        data: rows.map(function (r) { return r.value; })
+      }]
+    };
+  }
+  /* 魔方一组蓝、比赛一组青绿：两族数据在页面上本来就分色，图里继续分 */
+  function cubeAccent(p) { return p.primary; }
+  function compAccent(p) { return p.expense; }
+
   function renderTop(p) {
-    var data = topItems(scopeRecords(), 10).reverse();
-    var o = baseOption(p);
-    o.grid = { left: 6, right: 84, top: 8, bottom: 6, containLabel: true };
-    o.tooltip = tooltipCommon(p, { trigger: 'item', formatter: function (d) { return esc(d.name) + ' · <b>' + fmtYuan(d.value) + '</b>'; } });
-    o.xAxis = valAxis(p);
-    o.yAxis = catAxis(p, data.map(function (d) { return d.name; }), {
-      axisLine: { show: false },
-      axisLabel: { color: p.text2, fontSize: 11.5, fontFamily: p.font, width: 108, overflow: 'truncate' }
-    });
-    o.series = [{
-      type: 'bar', barWidth: 12,
-      data: data.map(function (d) { return { value: d.value, itemStyle: { color: gradH(withAlpha(p.primary, .32), p.primary), borderRadius: [0, 6, 6, 0] } }; }),
-      label: { show: true, position: 'right', distance: 8, formatter: function (d) { return fmtYuan(d.value); }, color: p.text2, fontSize: 11, fontFamily: p.font },
-      emphasis: { itemStyle: { shadowBlur: 12, shadowColor: withAlpha(p.primary, .28) } }
-    }];
-    setOpt('chartTop', o);
+    var data = topItems(scopeRecords(), 10);
+    var rows = data.map(function (d) { return { name: d.name, value: d.value }; });
+    setOpt('chartTop', rankBar(p, rows, {
+      fmt: function (v) { return fmtYuan(v); },
+      labelWidth: 98, right: 82, barWidth: 11
+    }));
     bindClick('chartTop', function (params) {
       if (params.name) jumpToDetail({ reset: true, q: params.name, label: '已搜索：' + params.name });
     });
@@ -1636,130 +1751,49 @@
       return Object.keys(m).map(function (k) { return { k: k, n: m[k].n, sum: m[k].sum }; })
         .sort(function (a, b) { return a.k.localeCompare(b.k); });
     };
+    /* 六张卡各算一组 {name, value}，再选一种语法：
+       排名类（型号 / 厂家 / 省份）走 rankBar，年份类（购买、年度价格、
+       比赛年份、比赛年度价格）走 yearBar。语法统一，参数不同。 */
+    var rankRows = function (list, pick) {
+      return tally(list, pick).map(function (r) { return { name: r.k, value: r.n }; });
+    };
+    var yearRows = function (list, countOnly) {
+      return byYear(list, countOnly).map(function (r) { return { name: r.k, value: countOnly ? r.n : r.sum }; });
+    };
+    var yuanAxis = function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; };
+    var cnt = function (u) { return function (v) { return v + ' ' + u; }; };
     var specs = [
-      { kind: 'model', rows: tally(cubes, function (x) { return x.model || '未命名型号'; }), type: 'treemap', unit: '条', tab: 'cubes', key: 'q', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
-      { kind: 'brand', rows: tally(cubes, function (x) { return x.brand || '未分类'; }), type: 'barh', unit: '条', tab: 'cubes', key: 'brand', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 条'; } },
-      { kind: 'cubeprice', rows: byYear(cubes, false), type: 'line', unit: '元', tab: 'cubes', key: 'year', val: function (r) { return r.sum; }, label: function (r) { return cubeMoney(r.sum); } },
-      { kind: 'compyear', rows: byYear(comps, true), type: 'bar', unit: '场', tab: 'competitions', key: 'year', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 场'; } },
-      { kind: 'compprov', rows: tally(comps, function (x) { return x.province || '未填写'; }), type: 'barh', unit: '场', tab: 'competitions', key: 'province', val: function (r) { return r.n; }, label: function (r) { return String(r.n) + ' 场'; } },
-      { kind: 'compprice', rows: byYear(comps, false), type: 'line', unit: '元', tab: 'competitions', key: 'year', val: function (r) { return r.sum; }, label: function (r) { return cubeMoney(r.sum); } }
+      { kind: 'model', gram: 'rank', rows: rankRows(cubes, function (x) { return x.model || '未命名型号'; }), fmt: cnt('条'), tab: 'cubes', key: 'q' },
+      { kind: 'brand', gram: 'rank', rows: rankRows(cubes, function (x) { return x.brand || '未分类'; }), fmt: cnt('条'), tab: 'cubes', key: 'brand' },
+      { kind: 'cubeprice', gram: 'year', rows: yearRows(cubes, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'cubes', key: 'year' },
+      { kind: 'compyear', gram: 'year', rows: yearRows(comps, true), fmt: cnt('场'), axisFmt: function (v) { return v; }, tab: 'competitions', key: 'year' },
+      { kind: 'compprov', gram: 'rank', rows: rankRows(comps, function (x) { return x.province || '未填写'; }), fmt: cnt('场'), tab: 'competitions', key: 'province' },
+      { kind: 'compprice', gram: 'year', rows: yearRows(comps, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'competitions', key: 'year' }
     ];
     var fallback = function (sp) {
       var host = document.querySelector('[data-cube-list="' + sp.kind + '"]'); if (!host) return;
-      var max = Math.max.apply(null, [1].concat(sp.rows.map(sp.val)));
+      var max = Math.max.apply(null, [1].concat(sp.rows.map(function (r) { return r.value; })));
       host.innerHTML = sp.rows.length ? sp.rows.map(function (r) {
-        return '<button type="button" class="cm-row" data-cube-jump="' + sp.tab + '" data-cube-key="' + sp.key + '" data-v="' + esc(r.k) + '">' +
-          '<span class="cm-name">' + esc(r.k) + '</span><span class="cm-track"><i style="width:' + (sp.val(r) / max * 100).toFixed(1) + '%"></i></span>' +
-          '<b class="cm-val">' + esc(sp.label(r)) + '</b></button>';
+        return '<button type="button" class="cm-row" data-cube-jump="' + sp.tab + '" data-cube-key="' + sp.key + '" data-v="' + esc(r.name) + '">' +
+          '<span class="cm-name">' + esc(r.name) + '</span><span class="cm-track"><i style="width:' + (r.value / max * 100).toFixed(1) + '%"></i></span>' +
+          '<b class="cm-val">' + esc(sp.fmt(r.value)) + '</b></button>';
       }).join('') : '<div class="cm-empty">暂无数据</div>';
     };
     if (!hasEcharts) { specs.forEach(fallback); return; }
     var p = palette();
-    var pieColors = [p.primary, p.sky, p.violet, p.expense, p.amber, p.income, p.primary2, p.text2];
     specs.forEach(function (sp) {
       var host = document.querySelector('[data-cube-list="' + sp.kind + '"]'); if (!host) return;
       host.id = 'cmChart_' + sp.kind;
-      host.className = 'cm-list cm-chart';
+      host.className = 'cm-list cm-chart ' + (sp.gram === 'rank' ? 'is-rank' : 'is-year');
       if (!sp.rows.length) { host.innerHTML = '<div class="cm-empty">暂无数据</div>'; return; }
-      var data = sp.rows.map(function (r) { return { name: r.k, value: sp.val(r) }; });
-      var total = data.reduce(function (a, x) { return a + x.value; }, 0);
-      var base = {
-        animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
-        animationEasing: 'cubicOut',
-        color: pieColors,
-        tooltip: tooltipCommon(p, {
-          trigger: (sp.type === 'pie' || sp.type === 'treemap') ? 'item' : 'axis',
-          formatter: function (a) {
-            if (sp.type === 'pie') return a.name + '<br><b>' + (sp.kind.indexOf('price') >= 0 ? cubeMoney(a.value) : a.value + ' ' + sp.unit) + '</b> · ' + a.percent + '%';
-            if (sp.type === 'treemap') return a.name + '<br><b>' + a.value + ' ' + sp.unit + '</b>';
-            if (sp.type === 'barh') { var tot = data.reduce(function (q, x) { return q + x.value; }, 0) || 1; return a.name + '<br><b>' + a.value + ' ' + sp.unit + '</b> · ' + (a.value / tot * 100).toFixed(1) + '%'; }
-            var v = Array.isArray(a) ? a[0] : a;
-            return v.name + '<br><b>' + (sp.kind.indexOf('price') >= 0 ? cubeMoney(v.value) : v.value + ' ' + sp.unit) + '</b>';
-          }
-        })
-      };
-      var opt;
-      if (sp.type === 'pie') {
-        opt = Object.assign({}, base, {
-          graphic: [
-            { type: 'text', left: 'center', top: '44%', silent: true, style: { text: String(total), fill: p.text, fontSize: 18, fontWeight: 800, textAlign: 'center', fontFamily: p.font } },
-            { type: 'text', left: 'center', top: '63%', silent: true, style: { text: '合计 ' + sp.unit, fill: p.muted, fontSize: 10, textAlign: 'center', fontFamily: p.font } }
-          ],
-          series: [{
-            type: 'pie', radius: ['43%', '68%'], center: ['50%', '56%'],
-            avoidLabelOverlap: true, minAngle: 4,
-            itemStyle: { borderColor: p.surface, borderWidth: 2, borderRadius: 5 },
-            label: { show: false }, labelLine: { show: false },
-            emphasis: { scale: true, scaleSize: 6, label: { show: true, fontSize: 11, fontWeight: 700, color: p.text, formatter: '{b}\n{d}%' } },
-            data: data
-          }]
-        });
-      } else if (sp.type === 'treemap') {
-        /* 型号是一个个具体的名字，长短不一、量级差得远。
-           饼图切不出可读的标签，方块图能一眼看出「哪几个型号占大头」。 */
-        var tColors = [p.primary, p.sky, p.violet, p.amber, p.expense, p.income, p.primary2, p.text2];
-        opt = Object.assign({}, base, {
-          series: [{
-            type: 'treemap', roam: false, nodeClick: false,
-            breadcrumb: { show: false },
-            left: 0, right: 0, top: 0, bottom: 0,
-            itemStyle: { borderColor: p.surface, borderWidth: 2, gapWidth: 2, borderRadius: 6 },
-            label: {
-              show: true, color: '#fff', fontSize: 10.5, fontWeight: 700,
-              lineHeight: 13, overflow: 'truncate',
-              formatter: function (a) { return a.name + '\n' + a.value + ' ' + sp.unit; }
-            },
-            data: data.map(function (x, i) {
-              return { name: x.name, value: x.value, itemStyle: { color: tColors[i % tColors.length] } };
-            })
-          }]
-        });
-      } else if (sp.type === 'barh') {
-        /* 分布类数据：类别名长（黑龙江省 / 某某旗舰店），量级差距大。
-           横向条形把名字放左侧一行一个，长短直接读，比扇形角度准。 */
-        var maxV = Math.max.apply(null, data.map(function (x) { return x.value; }).concat([1]));
-        opt = Object.assign({}, base, {
-          grid: { left: 2, right: 44, top: 4, bottom: 2, containLabel: true },
-          xAxis: { type: 'value', max: maxV, show: false },
-          yAxis: {
-            type: 'category', inverse: true,
-            data: data.map(function (x) { return x.name; }),
-            axisTick: { show: false }, axisLine: { show: false },
-            axisLabel: {
-              color: p.text2, fontSize: 10.5, fontWeight: 600,
-              width: 74, overflow: 'truncate', fontFamily: p.font
-            }
-          },
-          series: [{
-            type: 'bar', barWidth: 9,
-            showBackground: true,
-            backgroundStyle: { color: p.surface3, borderRadius: 5 },
-            itemStyle: {
-              borderRadius: 5,
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                { offset: 0, color: p.primary2 }, { offset: 1, color: p.primary }
-              ])
-            },
-            label: {
-              show: true, position: 'right', distance: 6,
-              fontSize: 10, fontWeight: 800, color: p.muted, formatter: '{c}'
-            },
-            data: data.map(function (x) { return x.value; })
-          }]
-        });
-      } else {
-        var gradient = window.echarts ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: p.primary }, { offset: 1, color: 'rgba(74,108,247,.06)' }
-        ]) : p.primary;
-        opt = Object.assign({}, base, {
-          grid: { left: 8, right: 12, top: 16, bottom: 20, containLabel: true },
-          xAxis: { type: 'category', data: data.map(function (x) { return x.name; }), boundaryGap: sp.type === 'bar', axisTick: { show: false }, axisLine: { lineStyle: { color: p.border } }, axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font } },
-          yAxis: { type: 'value', splitLine: { lineStyle: { color: p.border } }, axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: function (v) { return sp.kind.indexOf('price') >= 0 ? cubeMoneyShort(v) : v; } } },
-          series: sp.type === 'bar'
-            ? [{ type: 'bar', barMaxWidth: 26, data: data.map(function (x) { return { value: x.value, itemStyle: { color: p.primary, borderRadius: [6, 6, 0, 0] } }; }) }]
-            : [{ type: 'line', smooth: true, symbol: 'circle', symbolSize: 7, data: data.map(function (x) { return x.value; }), lineStyle: { width: 2.6, color: p.primary }, itemStyle: { color: p.primary, borderColor: p.surface, borderWidth: 2 }, areaStyle: { color: gradient } }]
-        });
-      }
+      var isComp = sp.tab === 'competitions';
+      var accent = isComp ? compAccent(p) : cubeAccent(p);
+      var opt = sp.gram === 'rank'
+        ? rankBar(p, sp.rows, {
+            accent: accent, accent2: isComp ? '#3fd0b0' : p.primary2,
+            fmt: sp.fmt, labelWidth: 74, labelSize: 10.5, right: 54, barWidth: 9
+          })
+        : yearBar(p, sp.rows, { accent: accent, fmt: sp.fmt, axisFmt: sp.axisFmt, barWidth: 20 });
       var chart = cubePaint(host, opt);
       if (!chart) return;
       chart.off('click');
@@ -1801,84 +1835,40 @@
     if (!hasEcharts) return;
     var p = palette();
 
-    /* 年度购买支出：面积折线，和总览其它趋势图同一套笔画 */
+    /* 年度购买支出：年份竖条。跟型号 / 省份那几张共用 yearBar 一套尺寸，
+       卡片长宽怎么拖都不变形；点一根柱子就跳去那一年。 */
     var years = {};
     cubes.forEach(function (x) {
       var y = String(x.date || '').slice(0, 4);
       if (/^\d{4}$/.test(y)) years[y] = (years[y] || 0) + (Number(x.price) || 0);
     });
     var yk = Object.keys(years).sort();
-    var yearChart = cubePaint($('cubeYearChart'), {
-      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
-      grid: { left: 6, right: 14, top: 18, bottom: 22, containLabel: true },
-      tooltip: tooltipCommon(p, {
-        trigger: 'axis',
-        formatter: function (a) { return a[0].axisValue + '<br>购买支出：<b>' + cubeMoney(a[0].value) + '</b>'; }
-      }),
-      xAxis: {
-        type: 'category', data: yk, boundaryGap: yk.length < 3,
-        axisTick: { show: false },
-        axisLine: { lineStyle: { color: p.border } },
-        axisLabel: { color: p.muted, fontSize: 10.5, fontFamily: p.font }
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: { color: p.muted, fontSize: 10.5, fontFamily: p.font, formatter: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; } },
-        splitLine: { lineStyle: { color: withAlpha(p.text, .08) } }
-      },
-      series: [{
-        type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
-        data: yk.map(function (y) { return round(years[y]); }),
-        itemStyle: { color: p.primary, borderColor: p.surface, borderWidth: 2 },
-        lineStyle: { width: 2.6, color: p.primary },
-        areaStyle: { color: gradH(withAlpha(p.primary, .26), withAlpha(p.primary, .02)) }
-      }]
-    });
+    var yearChart = cubePaint($('cubeYearChart'), yearBar(p, yk.map(function (y) {
+      return { name: y, value: round(years[y]) };
+    }), {
+      accent: cubeAccent(p),
+      fmt: cubeMoneyShort,
+      axisFmt: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; },
+      barWidth: yk.length > 8 ? 18 : 30
+    }));
     if (yearChart) {
       yearChart.off('click');
       yearChart.on('click', function (a) { jumpCube({ tab: 'cubes', year: String(a.name) }); });
     }
 
-    /* 类型支出排行：跟「高频项目 TOP 10」同款横向柱 */
+    /* 类型支出排行：跟「高频项目 TOP 10」同一种横向柱 —— 长名字截断、
+       条长读比例、右侧挂金额，一张页面上所有排名图长得一模一样。 */
     var types = {};
     cubes.forEach(function (x) {
       var t = String(x.type || '').trim() || '未分类';
       types[t] = (types[t] || 0) + (Number(x.price) || 0);
     });
     var rows = Object.keys(types).map(function (k) { return { name: k, value: round(types[k]) }; })
-      .sort(function (a, b) { return b.value - a.value; }).slice(0, 8).reverse();
-    var typeChart = cubePaint($('cubeTypeChart'), {
-      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
-      grid: { left: 6, right: 96, top: 8, bottom: 6, containLabel: true },
-      tooltip: tooltipCommon(p, {
-        trigger: 'item',
-        formatter: function (a) { return esc(a.name) + ' · <b>' + cubeMoney(a.value) + '</b>'; }
-      }),
-      xAxis: {
-        type: 'value',
-        axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; } },
-        splitLine: { lineStyle: { color: withAlpha(p.text, .07) } },
-        axisLine: { show: false }, axisTick: { show: false }
-      },
-      yAxis: {
-        type: 'category',
-        data: rows.map(function (r) { return r.name; }),
-        axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: p.text2, fontSize: 11.5, fontFamily: p.font, width: 96, overflow: 'truncate' }
-      },
-      series: [{
-        type: 'bar', barWidth: 12,
-        data: rows.map(function (r) {
-          return { value: r.value, itemStyle: { color: gradH(withAlpha(p.primary, .32), p.primary), borderRadius: [0, 6, 6, 0] } };
-        }),
-        label: {
-          show: true, position: 'right', distance: 8,
-          formatter: function (a) { return cubeMoneyShort(a.value); },
-          color: p.text2, fontSize: 10.5, fontFamily: p.font
-        },
-        emphasis: { itemStyle: { shadowBlur: 12, shadowColor: withAlpha(p.primary, .28) } }
-      }]
-    });
+      .sort(function (a, b) { return b.value - a.value; }).slice(0, 8);
+    var typeChart = cubePaint($('cubeTypeChart'), rankBar(p, rows, {
+      accent: cubeAccent(p), accent2: p.primary2,
+      fmt: cubeMoneyShort, labelWidth: 96, right: 68, barWidth: 11
+    }));
     if (typeChart) {
       typeChart.off('click');
       typeChart.on('click', function (a) { jumpCube({ tab: 'cubes', type: String(a.name) }); });
@@ -2152,13 +2142,18 @@
           rlist.innerHTML = recs.length ? recs.map(function (r) {
             var inc = r.type === 'income';
             var note = String(r.note || r.sub || r.category || '').trim();
+            /* 133×36 两行装：上行备注，下行「日期 · 金额」。备注因此不用被
+               金额和日期挤成一团省略号，五颗并排也是齐的。 */
             return '<button type="button" class="rs-item" data-day="' + esc(r.date) + '" title="' +
               esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '')) + '">' +
               '<i class="rs-dot" style="--c:' + catColor(p, r.category) + '"></i>' +
-              '<b class="rs-day">' + esc(String(r.date || '').slice(5)) + '</b>' +
+              '<span class="rs-body">' +
               '<span class="rs-note">' + esc(note) + '</span>' +
+              '<span class="rs-meta">' +
+              '<b class="rs-day">' + esc(String(r.date || '').slice(5)) + '</b>' +
               '<em class="rs-amt ' + (inc ? 'is-inc' : 'is-exp') + '">' + (inc ? '+' : '-') +
-              esc(fmtTiny(r.amount)) + '</em></button>';
+              esc(fmtTiny(r.amount)) + '</em>' +
+              '</span></span></button>';
           }).join('') : '<span class="rs-none">还没有记录</span>';
         }
       }
@@ -3171,18 +3166,33 @@
     resetSegInd(el);
   }
 
-  /* ---------------- Toast ---------------- */
-  function toast(msg, kind) {
+  /* ---------------- Toast ----------------
+     v1.0.38：加两档。
+       opts.center —— 「已记下」那颗走屏幕正中、字号放大，记账是这一天的正事，
+                      缩在右下角太像个通知。
+       opts.sub    —— 第二行放这条记录本身（备注 · 分类 / 子类 · 日期），
+                      刚存完就能核对，不用再翻列表。
+     其余提示维持右下角小条，不抢戏。 */
+  function toast(msg, kind, opts) {
     var stack = $('toastStack');
     if (!stack) return;
+    opts = opts || {};
     var el = document.createElement('div');
-    el.className = 'toast' + (kind ? ' ' + kind : '');
-    el.innerHTML = '<i></i><span>' + esc(msg) + '</span>';
+    el.className = 'toast' + (kind ? ' ' + kind : '') + (opts.center ? ' is-center' : '');
+    /* 正中那颗带一个勾：一眼是「成了」，不是「有事」。其余提示还是小圆点。 */
+    var mark = opts.center
+      ? '<i class="t-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none">' +
+        '<path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="3" ' +
+        'stroke-linecap="round" stroke-linejoin="round"/></svg></i>'
+      : '<i></i>';
+    el.innerHTML = mark + '<span class="t-main">' + esc(msg) + '</span>' +
+      (opts.sub ? '<span class="t-sub">' + esc(opts.sub) + '</span>' : '');
     stack.appendChild(el);
+    var life = opts.ms || (opts.center ? 2100 : 2600);
     setTimeout(function () {
       el.classList.add('is-out');
-      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 340);
-    }, 2600);
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 360);
+    }, life);
   }
 
   /* ---------------- 自定义日历选择器 ---------------- */
@@ -3737,7 +3747,14 @@
       toast('已更新「' + rec.note + '」', 'info');
     } else {
       state.store.added.push(rec);
-      toast('已记下 ' + fmtYuan(rec.amount), 'success');
+      /* 正中那颗大字气泡，副标题把这一笔自己交代清楚：
+         备注 · 分类/子类 · 日期 —— 存完抬头看一眼就知道记对了没有 */
+      toast('已记下 ' + fmtYuan(rec.amount), 'success', {
+        center: true,
+        sub: [rec.note,
+              rec.category + (rec.sub ? ' / ' + rec.sub : ''),
+              rec.date].filter(Boolean).join('   ·   ')
+      });
     }
     saveStore();
     renderAll();
@@ -3763,7 +3780,7 @@
   function openConfirm(id) {
     state.pendingDeleteId = id;
     var rec = allRecords().filter(function (r) { return r.id === id; })[0];
-    if ($('confirmDesc') && rec) $('confirmDesc').textContent = rec.date + ' · ' + rec.note + ' · ' + fmtYuan(rec.amount) + '，删除后不可撤销。';
+    if ($('confirmDesc') && rec) $('confirmDesc').textContent = rec.date + ' · ' + rec.note + ' · ' + fmtYuan(rec.amount) + '，删除后 3 秒内可以撤销。';
     var back = $('confirmBackdrop');
     if (back) back.hidden = false;
   }
@@ -3772,9 +3789,124 @@
     if (back) back.hidden = true;
     state.pendingDeleteId = null;
   }
+
+  /* ---------------- 撤销删除：底部悬浮条 + 3 秒倒计时 ---------------- */
+  var undoState = null, undoTimer = 0;
+  function snapshotStore() {
+    return JSON.stringify({
+      added: state.store.added,
+      edited: state.store.edited,
+      deleted: state.store.deleted
+    });
+  }
+  function hideUndo(keep) {
+    clearTimeout(undoTimer);
+    undoTimer = 0;
+    var bar = $('undoBar');
+    if (bar) {
+      if (keep) { bar.hidden = true; bar.classList.remove('is-out'); return; }
+      bar.classList.add('is-out');
+      setTimeout(function () { if (bar.classList.contains('is-out')) { bar.hidden = true; bar.classList.remove('is-out'); } }, 240);
+    }
+    undoState = null;
+  }
+  function showUndo(label, snap) {
+    var bar = $('undoBar'), txt = $('undoText'), prog = $('undoProg');
+    if (!bar) return;
+    undoState = snap;
+    if (txt) txt.textContent = label;
+    bar.hidden = false;
+    bar.classList.remove('is-out');
+    /* 进度条靠 CSS 动画跑：先摘掉父级的播放入口再挂回去，才会从头再来一遍 */
+    if (prog) {
+      prog.style.animation = 'none';
+      void prog.offsetWidth;
+      prog.style.animation = '';
+    }
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(function () { hideUndo(); }, 3000);
+  }
+  function doUndo() {
+    if (!undoState) return;
+    var back = JSON.parse(undoState);
+    state.store.added = back.added;
+    state.store.edited = back.edited;
+    state.store.deleted = back.deleted;
+    hideUndo();
+    saveStore();
+    renderAll();
+    toast('已恢复', 'info');
+  }
+
+  /* ---------------- 粒子湮灭：删掉的那一行被吹散 ----------------
+     行一消失，账就已经从数据里没了；留在屏幕上的是它的「灰」。
+     取那一行的位置铺一层固定层，撒几十粒小方块，往上带一点风，
+     边飞边缩小、边淡出；底下再压一层白闪，像被抹掉的一瞬间。 */
+  function dissolveNode(node) {
+    if (!node || !node.getBoundingClientRect) return false;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    var r = node.getBoundingClientRect();
+    if (r.width < 6 || r.height < 4) return false;
+    if (r.bottom < -40 || r.top > window.innerHeight + 40) return false;
+
+    var p = palette();
+    var cs = getComputedStyle(node);
+    var nodeBg = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? cs.backgroundColor : p.surface2;
+    var accent = (cs.getPropertyValue('--c') || '').trim() || p.primary;
+    var palette4 = [accent, accent, p.primary, nodeBg, '#ffffff'];
+
+    var layer = document.createElement('div');
+    layer.className = 'dissolve-layer';
+    layer.style.left = r.left + 'px';
+    layer.style.top = r.top + 'px';
+    layer.style.width = r.width + 'px';
+    layer.style.height = r.height + 'px';
+
+    var flash = document.createElement('i');
+    flash.className = 'dissolve-flash';
+    layer.appendChild(flash);
+
+    var count = Math.max(30, Math.min(72, Math.round(r.width * r.height / 240)));
+    for (var i = 0; i < count; i++) {
+      var dot = document.createElement('b');
+      var size = 2 + Math.random() * 4.4;
+      var x = Math.random() * r.width;
+      var y = Math.random() * r.height;
+      dot.style.cssText = 'left:' + x.toFixed(1) + 'px;top:' + y.toFixed(1) + 'px;' +
+        'width:' + size.toFixed(1) + 'px;height:' + size.toFixed(1) + 'px;' +
+        'background:' + palette4[i % palette4.length] + ';' +
+        'border-radius:' + (Math.random() < .5 ? '50%' : '1.5px') + ';';
+      layer.appendChild(dot);
+      var dx = (x - r.width / 2) * 1.5 + (Math.random() - .5) * 46;
+      var dy = -(18 + Math.random() * 74) + (y - r.height / 2) * .5;
+      if (!dot.animate) { dot.style.opacity = '0'; continue; }
+      dot.animate([
+        { transform: 'translate3d(0,0,0) scale(1)', opacity: .95 },
+        { transform: 'translate3d(' + (dx * .55).toFixed(1) + 'px,' + (dy * .6).toFixed(1) + 'px,0) scale(.8)', opacity: .7, offset: .55 },
+        { transform: 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(.1)', opacity: 0 }
+      ], {
+        duration: 520 + Math.random() * 280,
+        delay: Math.random() * 90,
+        easing: 'cubic-bezier(.18,.72,.28,1)',
+        fill: 'forwards'
+      });
+    }
+    document.body.appendChild(layer);
+    setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 980);
+    return true;
+  }
+
   function confirmDelete() {
     var id = state.pendingDeleteId;
     if (!id) return;
+    var snap = snapshotStore();
+    var rec = allRecords().filter(function (r) { return r.id === id; })[0] || {};
+    var label = '已删除「' + (rec.note || rec.category || '这条记录') + '」 ' + fmtYuan(Math.abs(Number(rec.amount) || 0));
+    /* 先抓 DOM 再动数据：renderAll 一跑，那一行就没了，粒子得从它还活着的位置起飞 */
+    var node = document.querySelector('.cal-item[data-id="' + id + '"]') ||
+      document.querySelector('[data-id="' + id + '"]');
+    dissolveNode(node);
+
     if (state.store.deleted.indexOf(id) === -1) state.store.deleted.push(id);
     state.store.added = state.store.added.filter(function (r) { return r.id !== id; });
     if (state.store.edited[id]) delete state.store.edited[id];
@@ -3782,7 +3914,7 @@
     closeConfirm();
     closeModal();
     renderAll();
-    toast('记录已删除', 'warn');
+    showUndo(label, snap);
   }
 
   /* ---------------- 导出 CSV ---------------- */
@@ -4243,10 +4375,25 @@
     if ($('modalDelete')) $('modalDelete').addEventListener('click', function () {
       if (state.editingId) openConfirm(state.editingId);
     });
-    if ($('modalBackdrop')) $('modalBackdrop').addEventListener('click', function (e) { if (e.target === this) closeModal(); });
+    /* v1.0.38 · 只有「在遮罩上按下、又在遮罩上松手」才算点空白处。
+       以前只判 click 的 target：在弹窗里按住鼠标往外一拖，松手时浏览器把 click
+       派给两者的共同祖先（也就是遮罩），弹窗就这么被误关了。
+       现在按下那一刻记住起手位置，松手位置对不上就不关。 */
+    function backdropDismiss(back, onClose) {
+      if (!back) return;
+      var downOnBack = false;
+      back.addEventListener('mousedown', function (e) { downOnBack = (e.target === back); });
+      back.addEventListener('pointerdown', function (e) { downOnBack = (e.target === back); });
+      back.addEventListener('click', function (e) {
+        if (e.target === back && downOnBack) { downOnBack = false; onClose(); return; }
+        downOnBack = false;
+      });
+    }
+    backdropDismiss($('modalBackdrop'), closeModal);
     if ($('confirmCancel')) $('confirmCancel').addEventListener('click', function () { closeConfirm(); });
     if ($('confirmOk')) $('confirmOk').addEventListener('click', confirmDelete);
-    if ($('confirmBackdrop')) $('confirmBackdrop').addEventListener('click', function (e) { if (e.target === this) closeConfirm(); });
+    backdropDismiss($('confirmBackdrop'), closeConfirm);
+    if ($('undoBtn')) $('undoBtn').addEventListener('click', doUndo);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         if (dp.open) { closeDp(); return; }

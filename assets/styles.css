@@ -1098,7 +1098,10 @@ body.modal-cell .mc-date { display: inline-flex; }
 .amount-input { position: relative; }
 .amount-input i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 15px; font-weight: 700; color: var(--muted); }
 .amount-input input { padding-left: 30px; font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.form-error { margin: -4px 0 14px; padding: 8px 11px; border-radius: 8px; font-size: 12px; color: var(--danger); background: var(--danger-soft); }
+/* v1.0.38：以前是 margin:-4px 往上顶，金额框本身是 position:relative 的定位元素，
+   定位元素永远压过静态兄弟 —— 提示语就被金额框盖掉半行。
+   改成往下让 2px，并把自己抬到金额框之上，谁也压不着谁。 */
+.form-error { position: relative; z-index: 3; margin: 2px 0 14px; padding: 8px 11px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--danger); background: var(--danger-soft); }
 
 /* 底部按钮：删除占左，取消 / 保存靠右，两端对齐 */
 .modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-top: 22px; }
@@ -2504,12 +2507,15 @@ html[data-theme="dark"] .ym-day.is-today{
 }
 .rs-list::-webkit-scrollbar { display: none; }
 .rs-item {
-  display: inline-flex; align-items: center; gap: 6px;
-  flex: 0 0 auto; height: 30px; padding: 0 9px 0 8px;
-  border: 1px solid var(--border-strong, var(--border)); border-radius: 9px;
+  /* v1.0.38：定死 133 × 36 —— 原来高度跟着字数飘，五颗并排看着高低不齐。
+     36px 装得下两行：上行备注，下行「日期 · 金额」，备注因此能吃到 100px 宽。 */
+  display: flex; align-items: center; gap: 7px;
+  flex: 0 0 133px; width: 133px; height: 36px; padding: 0 9px;
+  border: 1px solid var(--border-strong, var(--border)); border-radius: 10px;
   background: var(--surface); color: var(--text);
   box-shadow: 0 1px 2px rgba(24, 39, 75, .05);
-  font-size: 11.5px; font-weight: 650; white-space: nowrap;
+  font-size: 11px; font-weight: 650; white-space: nowrap;
+  text-align: left; overflow: hidden;
   transition: border-color .16s, background-color .16s, box-shadow .16s;
 }
 .rs-item:hover {
@@ -2518,12 +2524,139 @@ html[data-theme="dark"] .ym-day.is-today{
   transform: none;
 }
 .rs-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--c, var(--primary)); }
-.rs-day { font-weight: 800; color: var(--text-2); font-variant-numeric: tabular-nums; }
-.rs-note { max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
-.rs-amt { font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rs-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.rs-note {
+  display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; font-weight: 750; line-height: 1.1; color: var(--text);
+}
+.rs-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 5px; line-height: 1; }
+.rs-day { font-size: 10px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rs-amt { font-style: normal; font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .rs-amt.is-exp { color: var(--expense); }
 .rs-amt.is-inc { color: var(--income); }
 .rs-none { font-size: 11.5px; color: var(--muted); padding-left: 2px; }
 
 /* 三张统计卡的图表区：给一个稳定的高度，方块图 / 条形图都不会塌 */
 .cm-list.cm-chart { height: 150px; flex: 0 0 150px; min-height: 150px; overflow: hidden; }
+/* v1.0.38：排名图要容得下 8 行，年份图只要一根柱子撑开 */
+.cm-list.cm-chart.is-rank { height: 198px; flex: 0 0 198px; min-height: 198px; }
+.cm-list.cm-chart.is-year { height: 176px; flex: 0 0 176px; min-height: 176px; }
+
+/* ================= v1.0.38 · 记下之后 / 删掉之后 ================= */
+
+/* ---- 1. 「已记下」气泡：屏幕正中 ----
+   记账是这一天的正事，提示缩在右下角太像个通知。正中、放大、把这一笔
+   自己交代清楚（备注 · 分类/子类 · 日期），抬头扫一眼就能核对。 */
+.toast.is-center {
+  position: fixed; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  align-items: center; gap: 6px 12px;
+  min-width: 250px; max-width: min(460px, calc(100vw - 48px));
+  padding: 20px 28px 18px;
+  border-radius: 17px;
+  font-size: 17.5px; font-weight: 800; letter-spacing: .01em;
+  box-shadow: 0 30px 74px -26px rgba(20, 32, 62, .52), 0 2px 10px rgba(20, 32, 62, .08);
+  animation: toastCenterIn .36s cubic-bezier(.16, .9, .3, 1) both;
+  z-index: 200;
+}
+.toast.is-center .t-ico {
+  width: 28px; height: 28px; flex: 0 0 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--primary); color: #fff;
+  box-shadow: 0 0 0 5px var(--primary-soft);
+}
+.toast.is-center .t-ico svg { width: 15px; height: 15px; }
+.toast.is-center .t-main { white-space: nowrap; }
+.toast.is-center .t-sub {
+  grid-column: 1 / -1;
+  margin-top: 9px; padding-top: 9px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  line-height: 1.45; letter-spacing: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.toast.is-center.is-out { animation: toastCenterOut .3s cubic-bezier(.4, 0, 1, 1) both; }
+@keyframes toastCenterIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.9); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes toastCenterOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(.94); }
+}
+
+/* ---- 2. 撤销删除：底部悬浮条 + 3 秒倒计时 ---- */
+.undo-bar {
+  position: fixed; left: 50%; bottom: 26px;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 11px;
+  min-width: 320px; max-width: min(480px, calc(100vw - 36px));
+  padding: 10px 11px 11px 13px;
+  border-radius: 13px;
+  background: var(--text); color: var(--surface);
+  box-shadow: 0 22px 50px -20px rgba(16, 26, 48, .6);
+  overflow: hidden; z-index: 210;
+  animation: undoIn .3s cubic-bezier(.16, .9, .3, 1) both;
+}
+.undo-bar[hidden] { display: none; }
+.undo-bar.is-out { animation: undoOut .24s ease both; }
+.ub-ico {
+  width: 22px; height: 22px; flex: 0 0 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 7px; background: color-mix(in srgb, var(--surface) 18%, transparent);
+  color: var(--surface);
+}
+.ub-ico svg { width: 13px; height: 13px; }
+.ub-text {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 12.5px; font-weight: 650;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: .94;
+}
+.ub-btn {
+  flex: 0 0 auto; height: 28px; padding: 0 13px;
+  border: 0; border-radius: 8px;
+  background: var(--primary); color: #fff;
+  font-size: 12px; font-weight: 800; cursor: pointer;
+  transition: filter .16s ease, transform .12s ease;
+}
+.ub-btn:hover { filter: brightness(1.08); transform: none; }
+.ub-btn:active { transform: scale(.97); }
+.ub-prog {
+  position: absolute; left: 0; bottom: 0; height: 3px; width: 100%;
+  background: var(--primary);
+  transform-origin: left center;
+  animation: ubCount 3s linear forwards;
+}
+@keyframes ubCount { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes undoIn {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes undoOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, 14px); }
+}
+@media (max-width: 620px) {
+  .undo-bar { min-width: 0; width: calc(100vw - 24px); bottom: 14px; }
+}
+
+/* ---- 3. 删除的粒子湮灭 ----
+   数据删掉的那一刻，屏幕上的那一行先化成灰：几十粒小方块往上被风吹散，
+   底下压一层白闪。位置由 JS 按行盒量好后写死，所以滚动 / 布局变化都不影响。 */
+.dissolve-layer {
+  position: fixed; pointer-events: none; z-index: 160;
+  overflow: visible;
+}
+.dissolve-layer b { position: absolute; display: block; will-change: transform, opacity; }
+.dissolve-flash {
+  position: absolute; inset: 0; border-radius: 8px;
+  background: var(--surface);
+  animation: dissolveFlash .32s ease-out forwards;
+}
+@keyframes dissolveFlash {
+  from { opacity: .58; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.07); }
+}

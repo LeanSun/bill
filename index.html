@@ -522,7 +522,7 @@
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" data-page-node-id="AOPQIVEgbpLWbqBFqYD2a8"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="4LrSkIzcGwrp01ZCu3CL4Y"/></svg>
     </div>
     <h2 id="confirmTitle" data-page-node-id="OzY6wPG4pGVGt1MMkwIdX3">删除这条记录？</h2>
-    <p id="confirmDesc" data-page-node-id="0qmeuchjy0axxMjFA0tFDO">删除后不可撤销，建议先在云同步里导出备份。</p>
+    <p id="confirmDesc" data-page-node-id="0qmeuchjy0axxMjFA0tFDO">删除后 3 秒内可以撤销。</p>
     <div class="modal-foot" data-page-node-id="enE1cgrliFdJWYV0oO08uw">
       <button type="button" class="btn btn-ghost" id="confirmCancel" data-page-node-id="8pM8zPMywKr4VJxylgBzct">再想想</button>
       <button type="button" class="btn btn-danger" id="confirmOk" data-page-node-id="zpYr38rRTffoZZ7jUhvs6N">确认删除</button>
@@ -611,6 +611,16 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- ============ 撤销删除：底部悬浮 3 秒 ============ -->
+<div class="undo-bar" id="undoBar" hidden role="status" aria-live="polite">
+  <span class="ub-ico" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </span>
+  <span class="ub-text" id="undoText">已删除</span>
+  <button type="button" class="ub-btn" id="undoBtn">撤销</button>
+  <i class="ub-prog" id="undoProg" aria-hidden="true"></i>
 </div>
 
 <div class="toast-stack" id="toastStack" aria-live="polite" data-page-node-id="HULjr2IpjoOyavuodIrgcO"></div>
