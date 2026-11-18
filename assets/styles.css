@@ -3006,7 +3006,7 @@ html.theme-fading *::after {
 /* 1. 「已记下」整卡下移，仍保持居中大卡片的排版 */
 .toast.is-center.is-low { top: auto; bottom: 72px; }
 /* 2. 恢复提示只提示，不抢大卡片位置；保持在撤销条同一中轴 */
-.toast.is-low { left: 50%; right: auto; bottom: 84px; top: auto; transform: translateX(-50%); }
+.toast.is-low { position: fixed; left: 50%; right: auto; bottom: 84px; top: auto; transform: translateX(-50%); }
 /* 3. 最近记录跨天间隔 20px */
 .rs-item.is-newday { margin-left: 20px; }
 /* 4. 今年结余比例条改红 */
