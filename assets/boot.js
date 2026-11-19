@@ -153,6 +153,14 @@
     } catch (e) { /* 无痕模式 */ }
     return Promise.all([vault.load(key, 'ledger'), vault.load(key, 'cube'), vault.load(key, 'seed')]).then(function (r) {
       var store = r[0] || null, cube = r[1] || null, seed = r[2] || null;
+      /* 早期版本只把魔方数据放在 cubeLedger_v1，密屉里没有那一份。
+         门禁通过就直接拿它当本机副本，别让 iframe 卡在 3 秒网络等待上。 */
+      if (!cube) {
+        try {
+          var plain = JSON.parse(localStorage.getItem('cubeLedger_v1') || 'null');
+          if (plain && Array.isArray(plain.cubes) && Array.isArray(plain.competitions)) cube = plain;
+        } catch (e5) { /* 坏数据当没有 */ }
+      }
       if (!store && legacyStore) {
         try { store = JSON.parse(legacyStore); } catch (e2) { store = null; }
         if (store && legacyPay) {
@@ -249,6 +257,15 @@
         try { window.QZPrivate.onRemote(window.BILL_DATA); } catch (e) { /* 页面还没初始化完 */ }
       }
       cubeReload(!!r[1]);
+      /* 把最新的魔方数据也封进密屉，下次刷新起就不必再等网络 */
+      if (window.QZ_VAULT_KEY && window.QZVault) {
+        try {
+          var cubeNow = JSON.parse(localStorage.getItem('cubeLedger_v1') || 'null');
+          if (cubeNow && Array.isArray(cubeNow.cubes)) {
+            window.QZVault.save(window.QZ_VAULT_KEY, 'cube', cubeNow);
+          }
+        } catch (e7) { /* 无痕模式静默 */ }
+      }
     });
   });
 
