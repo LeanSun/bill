@@ -2378,15 +2378,15 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 /* v1.0.33：箭头连点逐次翻页 + 今日标记跨月/周/年统一 */
 /* 日历翻页：一页淡出、下一页淡入，方向带一点位移。
    只有一条时间线 —— 不拍快照、不叠位移、不重播。 */
-.pt-out { animation: ptOut .13s cubic-bezier(.4,0,.75,1) both; }
-.pt-in { animation: ptIn .24s cubic-bezier(.2,.72,.3,1) both; }
+.pt-out { animation: ptOut .13s cubic-bezier(.45,0,.8,.6) both; will-change: transform, opacity; }
+.pt-in { animation: ptIn .24s cubic-bezier(.16,.78,.28,1) both; will-change: transform, opacity; }
 @keyframes ptOut {
-  from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translate3d(var(--pt-x, 0px), 0, 0) scale(.996); }
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(var(--pt-x, 0px), var(--pt-y, 0px), 0); }
 }
 @keyframes ptIn {
-  from { opacity: 0; transform: translate3d(var(--pt-x, 0px), 0, 0) scale(.996); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate3d(var(--pt-x, 0px), var(--pt-y, 0px), 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .pt-out, .pt-in { animation-duration: 1ms !important; }
@@ -3127,3 +3127,27 @@ html[data-theme="dark"] .cube-global-veil { background: rgba(3, 7, 14, .62); }
 @media (max-width: 940px) {
   .lock-gate { position: fixed; inset: 0; padding: 20px 16px; }
 }
+
+/* ==================================================================
+   v1.0.45
+   ------------------------------------------------------------------
+   1. 最近记录跨天间隔 20 → 30（读起来不再像同一串）；
+   2. 日历翻页：年历 / 月历竖着滚，周历 / 天横着拨，位移走 --pt-x/--pt-y；
+   3. 总览去掉「魔方型号统计」后，五张小卡重排成 3 + 2。
+   ================================================================== */
+
+/* ---- 1. 最近记录：不同日期之间留 30px ---- */
+.rs-item.is-newday { margin-left: 30px; }
+
+/* ---- 2. 翻页：四个棋盘都按轴向的变量走，纵向不再借用横向位移 ----
+   （关键帧见上方 .pt-out / .pt-in，位移量由脚本按粒度写进变量） */
+#calGrid, #calWeekGrid, #calDayBoard, #calYearBoard {
+  backface-visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  #calGrid, #calWeekGrid, #calDayBoard, #calYearBoard { --pt-x: 0px; --pt-y: 0px; }
+}
+
+/* 纵向翻页时棋盘会向上滑进「周一…周日」那一条：给表头单独一层，
+   让滑上去的内容从它底下过，而不是压在它上面。 */
+.cal-weekhead { position: relative; z-index: 2; }

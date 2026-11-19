@@ -1920,7 +1920,6 @@
     var yuanAxis = function (v) { return v >= 1000 ? '¥' + (v / 1000) + 'k' : '¥' + v; };
     var cnt = function (u) { return function (v) { return v + ' ' + u; }; };
     var specs = [
-      { kind: 'model', gram: 'rank', rows: rankRows(cubes, function (x) { return x.model || '未命名型号'; }), fmt: cnt('条'), tab: 'cubes', key: 'q' },
       { kind: 'brand', gram: 'rank', rows: rankRows(cubes, function (x) { return x.brand || '未分类'; }), fmt: cnt('条'), tab: 'cubes', key: 'brand' },
       { kind: 'cubeprice', gram: 'line', rows: yearRows(cubes, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'cubes', key: 'year' },
       { kind: 'compyear', gram: 'year', rows: yearRows(comps, true), fmt: cnt('场'), axisFmt: function (v) { return v; }, tab: 'competitions', key: 'year' },
@@ -5053,11 +5052,19 @@
     turnLock = 0; wheelAcc = 0; wheelDir = 0;
     ['calGrid', 'calWeekGrid', 'calDayBoard', 'calYearBoard'].forEach(function (id) {
       var el = $(id);
-      if (el) el.classList.remove('pt-out', 'pt-in');
+      if (!el) return;
+      el.classList.remove('pt-out', 'pt-in');
+      el.style.removeProperty('--pt-x');
+      el.style.removeProperty('--pt-y');
     });
   }
 
-  /* 一次翻页：出 → 换内容 → 进。dir > 0 是往后翻（下一月 / 下一周）。 */
+  /* 一次翻页：出 → 换内容 → 进。dir > 0 是往后翻（下一月 / 下一周）。
+     轴向按粒度分：年历 / 月历是竖着滚（拿着日历本往下翻），周历/天是横着拨。
+     位移量 30px（竖）/ 22px（横），出 130ms、进 240ms，中间只有一次内容交换。 */
+  function turnVertical() {
+    return state.scale === 'year' || state.scale === 'month';
+  }
   function pageTurn(dir) {
     var el = softTarget();
     if (!el) { shiftCalStep(dir); return; }
@@ -5068,20 +5075,26 @@
       el.classList.remove('pt-out', 'pt-in');
       void el.offsetWidth;
     }
-    var x = (dir > 0 ? -1 : 1) * 22;
-    el.style.setProperty('--pt-x', x + 'px');
+    var vert = turnVertical();
+    var dist = vert ? 30 : 22;
+    var sign = dir > 0 ? -1 : 1;
+    var ox = vert ? 0 : sign * dist;
+    var oy = vert ? sign * dist : 0;
+    el.style.setProperty('--pt-x', ox + 'px');
+    el.style.setProperty('--pt-y', oy + 'px');
     el.classList.add('pt-out');
     turnTimer = setTimeout(function () {
       turnTimer = 0;
       shiftCalStep(dir);
       el.classList.remove('pt-out');
-      el.style.setProperty('--pt-x', (-x) + 'px');
+      el.style.setProperty('--pt-x', (-ox) + 'px');
+      el.style.setProperty('--pt-y', (-oy) + 'px');
       el.classList.add('pt-in');
       turnTimer = setTimeout(function () {
         el.classList.remove('pt-in');
         turnTimer = 0;
-      }, 250);
-    }, 120);
+      }, 260);
+    }, 130);
   }
 
   /* 箭头 / ← →：一次点击就是一次翻页 */
@@ -5246,18 +5259,18 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 8,
+    v: 9,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
-      'cubemodel', 'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
+      'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
       'salary', 'reimb'],
     spans: {
       kpi: [12, 3], calheat: [12, 7], trend: [5, 6], donut: [3, 6], balance: [4, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
       cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
-      cubemodel: [4, 5], cubebrand: [4, 5], cubeprice: [4, 5],
-      compyear: [4, 5], compprov: [4, 5], compprice: [4, 5],
+      cubebrand: [4, 5], cubeprice: [4, 5], compyear: [4, 5],
+      compprov: [6, 5], compprice: [6, 5],
       salary: [6, 11], reimb: [6, 8]
     }
   };
@@ -5281,7 +5294,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 8 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 9 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
