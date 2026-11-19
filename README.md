@@ -656,13 +656,7 @@ node server/server.js
 
 1. **筛选行去掉「× 清空」**。类型行和项目行各自那一枚 `#cubeTypeClear` / `#compEventClear` 都删了 —— 点亮一枚图标，再点一次就是取消，不需要额外的按钮。删掉之后第二行仍是「标签 → 图标格 → 已筛 N 条（贴右）」，实测左端 x=43、右端 x=1397，和第一行搜索框、下面表头首格还是同一条竖线，没有留出空位。
 2. **弹窗里只剩报名一个动作**。`pickModalEvent()` 现在就是勾上 / 取消勾上：点一次＝报名（默认已参加），再点一次＝取消报名。之前「已报名的再点一次＝报名但没参加（红色填充 + 删除线）」那条分支去掉了，弹窗里也不会再把项目点成红的。「报名未参加」改成**只在比赛列表里点项目名切换** —— 列表那一侧的 `toggleCompEventStatus()` 一直在，`status-missed` 的红色填充和 2px 删除线照旧。实测单点循环：`未报名 → 已报名 → 未报名 → 已报名`，全程 `missed=false`。
-3. **「年度结余」真的变红了**。上一条改在 `app.js` 和 `styles.css` 里是对的，但两条更早的规则还挂着 `!important`，把它们盖了回去：
-   ```css
-   .ir-bar.is-year i { background: var(--amber); }            /* 老灰蓝条 */
-   .ir-bar.is-year i { background: var(--danger) !important; }
-   .ir-bar.is-year i { background: #f09199 !important; }      /* v1.0.43 浅红 */
-   ```
-   现在三条全删，只留一处：比例条 `#e35c5c`（暗色 `#ef6f6f`）、金额同色、超支深一档 `#c0342a`。实测计算色 `rgb(227, 92, 92)`，标题「年度结余」也在同一行里。
+3. **「年度结余」确认在线上是对的**。`app.js` 从 v1.0.46 起标题就是「年度结余」，`styles.css` 里比例条和金额都写死 `#e35c5c`，实测计算色 `rgb(227, 92, 92)`、两者一致。你截图里还是「今年结余」加黑字金额，说明浏览器端拿到的是旧那一份包 —— 原因见第 4 条。顺手把三条更早的 `.ir-bar.is-year i` 覆盖规则删了（`var(--amber)`、`var(--danger)`、`#f09199`）：它们本来就排在后面那条之前、属于死规则，留着只会让下次读代码的人以为年份条还会变橙或变浅粉。现在这个颜色全站只有一处定义。
 4. **静态资源带版本号**。`index.html` 里 `styles.css` / `app.js` / `vault.js` / `boot.js` / `sync.js` / `ui-select.js` 全部加 `?v=1.0.47`，`cube.html` 的 iframe 与「新窗口打开」也走同一个 `ASSET_V`。之前改完刷新还看到旧样式，就是 GitHub Pages 的 `max-age=600` 把老文件又端上来了 —— 现在每次发版换 URL，刷新即生效，不用再按 Ctrl+F5。
 
 改动文件：`cube.html`、`index.html`、`assets/app.js`、`assets/styles.css`、`README.md`。
