@@ -435,9 +435,12 @@
       pw.placeholder = mode === 'github' ? 'github_pat_… （只给这一个仓库的 Contents 读写）'
         : '服务器首次启动时生成的那串口令';
     }
-    if ($('syncRepo')) $('syncRepo').value = (cfg.owner && cfg.repo) ? (cfg.owner + '/' + cfg.repo) : 'LeanSun/bill-data';
-    if ($('syncBranch') && !$('syncBranch').value) $('syncBranch').value = cfg.branch || 'main';
-    if ($('syncPath') && !$('syncPath').value) $('syncPath').value = cfg.path || 'state.json';
+    /* 这台机器从没连过就是一片空白 —— 不替别人预填任何仓库信息（v1.0.46）。
+       连过（或令牌过期但仓库还在）才把上次填的放回去。 */
+    var known = !!(cfg.owner && cfg.repo);
+    if ($('syncRepo')) $('syncRepo').value = known ? (cfg.owner + '/' + cfg.repo) : '';
+    if ($('syncBranch') && !$('syncBranch').value) $('syncBranch').value = known ? (cfg.branch || '') : '';
+    if ($('syncPath') && !$('syncPath').value) $('syncPath').value = known ? (cfg.path || '') : '';
     if ($('syncUrl') && !$('syncUrl').value) $('syncUrl').value = cfg.url || '';
   }
 
@@ -451,9 +454,10 @@
     if (!mask) return;
     if ($('syncUrl')) $('syncUrl').value = cfg.url || '';
     if ($('syncPw')) $('syncPw').value = '';
-    if ($('syncBranch')) $('syncBranch').value = cfg.branch || 'main';
-    if ($('syncPath')) $('syncPath').value = cfg.path || 'state.json';
-    if ($('syncRepo')) $('syncRepo').value = (cfg.owner && cfg.repo) ? (cfg.owner + '/' + cfg.repo) : 'LeanSun/bill-data';
+    var known = !!(cfg.owner && cfg.repo);
+    if ($('syncBranch')) $('syncBranch').value = known ? (cfg.branch || '') : '';
+    if ($('syncPath')) $('syncPath').value = known ? (cfg.path || '') : '';
+    if ($('syncRepo')) $('syncRepo').value = known ? (cfg.owner + '/' + cfg.repo) : '';
     pendingConflict = null;
     pendingConflictSha = null;
     mask.hidden = false;

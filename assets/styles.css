@@ -2376,21 +2376,10 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .view.is-active > *:nth-child(3) .cb-panel { animation-delay: 110ms; }
 
 /* v1.0.33：箭头连点逐次翻页 + 今日标记跨月/周/年统一 */
-/* 日历翻页：一页淡出、下一页淡入，方向带一点位移。
-   只有一条时间线 —— 不拍快照、不叠位移、不重播。 */
-.pt-out { animation: ptOut .13s cubic-bezier(.45,0,.8,.6) both; will-change: transform, opacity; }
-.pt-in { animation: ptIn .24s cubic-bezier(.16,.78,.28,1) both; will-change: transform, opacity; }
-@keyframes ptOut {
-  from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to { opacity: 0; transform: translate3d(var(--pt-x, 0px), var(--pt-y, 0px), 0); }
-}
-@keyframes ptIn {
-  from { opacity: 0; transform: translate3d(var(--pt-x, 0px), var(--pt-y, 0px), 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pt-out, .pt-in { animation-duration: 1ms !important; }
-}
+/* 日历翻页：v1.0.46 起是整页滑动 —— 旧页副本 .pt-ghost 由脚本克隆，
+   两层走同一条内联 transform 过渡（时长 / 缓动都在 app.js 里），
+   这里只管副本别抢指针、别被选中。淡出淡入那套关键帧已经不用了。 */
+.pt-ghost { pointer-events: none !important; user-select: none; }
 .wk-col.is-today, .ym-day.is-today { position: relative; }
 .wk-col.is-today::before, .ym-day.is-today::before {
   content: ""; position: absolute; left: 50%; bottom: 5px;
@@ -3151,3 +3140,22 @@ html[data-theme="dark"] .cube-global-veil { background: rgba(3, 7, 14, .62); }
 /* 纵向翻页时棋盘会向上滑进「周一…周日」那一条：给表头单独一层，
    让滑上去的内容从它底下过，而不是压在它上面。 */
 .cal-weekhead { position: relative; z-index: 2; }
+
+/* ==================================================================
+   v1.0.46
+   ------------------------------------------------------------------
+   1. 「年度结余」：标题改名，比例条与金额统一 #e35c5c；
+   2. 日历翻页改成整页滑动（副本规则见上方 .pt-ghost）。
+   ================================================================== */
+
+/* ---- 1. 年度结余：条和金额同一种红 ------------------------------ */
+.ir-bar.is-year i { background: #e35c5c !important; }
+html[data-theme="dark"] .ir-bar.is-year i { background: #ef6f6f !important; }
+.ir-line.is-year b { color: #e35c5c; }
+html[data-theme="dark"] .ir-line.is-year b { color: #ef6f6f; }
+/* 超支仍要比「存下多少」更扎眼一档 */
+.ir-line.is-year b.is-over { color: #c0342a; }
+html[data-theme="dark"] .ir-line.is-year b.is-over { color: #f08a80; }
+
+/* 整页滑动期间棋盘之间不留缝隙：副本本身有底色，滑过时看不出接缝 */
+.cal-board { isolation: isolate; }

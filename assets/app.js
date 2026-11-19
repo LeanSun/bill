@@ -2887,7 +2887,7 @@
       '<div class="ir-bar is-now" data-tip="' + esc('本月已花 ' + fmtYuan(mExp) + ' / 本月收 ' + fmtYuan(mInc)) +
       '"><i style="width:' + mNowPct.toFixed(1) + '%"></i></div>' +
       '<div class="ir-note">本月收 ' + fmtYuan(mInc) + ' · 支 ' + fmtYuan(mExp) + '</div>' +
-      '<div class="ir-line is-year"><span>今年结余</span><b class="' + (yLeft < 0 ? 'is-over' : '') + '">' +
+      '<div class="ir-line is-year"><span>年度结余</span><b class="' + (yLeft < 0 ? 'is-over' : '') + '">' +
       (yLeft < 0 ? '超支 ' + fmtYuan(-yLeft) : fmtYuan(yLeft)) + '</b></div>' +
       '<div class="ir-bar is-year" data-tip="' + esc('今年收 ' + fmtYuan(yInc) + ' / 支 ' + fmtYuan(yExp)) +
       '"><i style="width:' + yLeftPct.toFixed(1) + '%"></i></div>' +
@@ -5026,15 +5026,17 @@
     openByTap = { key: '', t: 0 };
   }
 
-  /* ---------------- 翻页：一页淡出，下一页淡入 ----------------
-     旧版是「拍快照 + 弹簧追随 + 交割」三件套：滚轮一推，位置、目标、
-     重绘三件事同时发生，于是先跳到结果页、再闪一下重走一遍动画。
-     现在只留一条时间线：旧页 120ms 收掉 → 换内容 → 新页 200ms 出来。
-     滚轮只负责「攒够一格翻一次」，翻的过程和点箭头是同一条动画，
-     没有第二套位移参与，也就没有重播。 */
-  var TURN_MS = 300;            /* 一次翻页的整段时长，期间不再接新的翻页 */
+  /* ---------------- 翻页：整页推走，下一页跟着顶进来 ----------------
+     v1.0.44 那版是「淡出 130ms → 换内容 → 淡入 240ms」：位移只有 30px，
+     观感就是滑了一点点、内容忽然没了、又忽然出来 —— 你说的「闪一下」。
+     现在是真翻页：旧页连内容一起做成一张绝对定位的副本（ghost）压在原位，
+     新内容先渲染在屏幕外，然后两层同一时长、同一条缓动、同时平移一整页高度
+     （年历 / 月历竖着推，周历 / 天横着推）。中途没有任何透明度变化、
+     没有内容交换的瞬间，所以不存在闪。 */
+  var TURN_MS = 420;            /* 一整页滑完的时长，期间不再接新的翻页 */
+  var TURN_EASE = 'cubic-bezier(.4,0,.2,1)';
   var WHEEL_TRIGGER = 80;       /* 滚轮攒够这么多像素算一格 */
-  var turnLock = 0, turnTimer = 0;
+  var turnLock = 0, turnTimer = 0, ptGhost = null;
   var wheelAcc = 0, wheelDir = 0, wheelQuiet = 0;
 
   function softTarget() {
@@ -5044,57 +5046,91 @@
       : s === 'week' ? $('calWeekGrid') : $('calDayBoard');
   }
 
-  /* 收掉还没走完的翻页：换粒度、换视图、关弹窗时都要先清干净。
-     四块棋盘各擦一遍 —— 换粒度那一瞬间，正在动的可能是上一块。 */
+  /* 把翻页留下的东西全收掉：ghost 摘掉、内联位移清空、旧类名也擦一遍
+     （换粒度那一瞬间，正在动的可能是上一块棋盘）。 */
+  function ptSettle(el) {
+    if (ptGhost && ptGhost.parentNode) ptGhost.parentNode.removeChild(ptGhost);
+    ptGhost = null;
+    [el, $('calGrid'), $('calWeekGrid'), $('calDayBoard'), $('calYearBoard')].forEach(function (n) {
+      if (!n) return;
+      n.classList.remove('pt-out', 'pt-in');
+      n.style.transition = '';
+      n.style.transform = '';
+      n.style.willChange = '';
+      n.style.removeProperty('--pt-x');
+      n.style.removeProperty('--pt-y');
+    });
+  }
+
   function softReset() {
     if (turnTimer) { clearTimeout(turnTimer); turnTimer = 0; }
     if (wheelQuiet) { clearTimeout(wheelQuiet); wheelQuiet = 0; }
     turnLock = 0; wheelAcc = 0; wheelDir = 0;
-    ['calGrid', 'calWeekGrid', 'calDayBoard', 'calYearBoard'].forEach(function (id) {
-      var el = $(id);
-      if (!el) return;
-      el.classList.remove('pt-out', 'pt-in');
-      el.style.removeProperty('--pt-x');
-      el.style.removeProperty('--pt-y');
-    });
+    ptSettle(softTarget());
   }
 
-  /* 一次翻页：出 → 换内容 → 进。dir > 0 是往后翻（下一月 / 下一周）。
-     轴向按粒度分：年历 / 月历是竖着滚（拿着日历本往下翻），周历/天是横着拨。
-     位移量 30px（竖）/ 22px（横），出 130ms、进 240ms，中间只有一次内容交换。 */
+  /* 一次翻页：旧页整块推出去，新页从另一头滑进来。
+     dir > 0 是往后翻（下一月 / 下一周）。轴按粒度分：
+     年历 / 月历竖着推，周历 / 天横着拨。 */
   function turnVertical() {
     return state.scale === 'year' || state.scale === 'month';
   }
+
   function pageTurn(dir) {
     var el = softTarget();
     if (!el) { shiftCalStep(dir); return; }
-    if (el.classList.contains('pt-in') || el.classList.contains('pt-out')) {
-      /* 上一段还没收完：先把它连定时器一起收干净，再从零走一整段 ——
-         留着半截动画会卡在 opacity:0 上 */
-      if (turnTimer) { clearTimeout(turnTimer); turnTimer = 0; }
-      el.classList.remove('pt-out', 'pt-in');
-      void el.offsetWidth;
-    }
+    if (turnTimer) { clearTimeout(turnTimer); turnTimer = 0; }
+    ptSettle(el);
+
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { shiftCalStep(dir); return; }
+
     var vert = turnVertical();
-    var dist = vert ? 30 : 22;
-    var sign = dir > 0 ? -1 : 1;
-    var ox = vert ? 0 : sign * dist;
-    var oy = vert ? sign * dist : 0;
-    el.style.setProperty('--pt-x', ox + 'px');
-    el.style.setProperty('--pt-y', oy + 'px');
-    el.classList.add('pt-out');
-    turnTimer = setTimeout(function () {
-      turnTimer = 0;
-      shiftCalStep(dir);
-      el.classList.remove('pt-out');
-      el.style.setProperty('--pt-x', (-ox) + 'px');
-      el.style.setProperty('--pt-y', (-oy) + 'px');
-      el.classList.add('pt-in');
+    var w = el.offsetWidth, h = el.offsetHeight;
+    var size = vert ? h : w;
+    if (!size) { shiftCalStep(dir); return; }
+
+    /* 旧页副本：绝对定位盖在原位，接着自己滑走 */
+    var host = el.offsetParent || el.parentNode;
+    var ghost = el.cloneNode(true);
+    ghost.removeAttribute('id');
+    ghost.removeAttribute('hidden');
+    Array.prototype.forEach.call(ghost.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.className = el.className + ' pt-ghost';
+    ghost.style.cssText = 'position:absolute;left:' + el.offsetLeft + 'px;top:' + el.offsetTop + 'px;' +
+      'width:' + w + 'px;height:' + h + 'px;margin:0;pointer-events:none;z-index:1;' +
+      'transform:translate3d(0,0,0);will-change:transform;';
+    host.appendChild(ghost);
+    ptGhost = ghost;
+
+    /* 终点：旧页 = ±一整页；新页起点 = 反方向一整页（此刻屏外，看不见） */
+    var out = dir > 0 ? -size : size;
+    var push = function (px) { return vert ? 'translate3d(0,' + px + 'px,0)' : 'translate3d(' + px + 'px,0,0)'; };
+
+    el.style.transition = 'none';
+    el.style.willChange = 'transform';
+    el.style.transform = push(-out);
+    void el.offsetWidth;
+
+    /* 新内容在屏幕外渲染好 —— 换内容这一步不留任何视觉痕迹 */
+    shiftCalStep(dir);
+
+    var run = function () {
+      var tf = 'transform ' + TURN_MS + 'ms ' + TURN_EASE;
+      ghost.style.transition = tf;
+      el.style.transition = tf;
+      ghost.style.transform = push(out);
+      el.style.transform = 'translate3d(0,0,0)';
       turnTimer = setTimeout(function () {
-        el.classList.remove('pt-in');
         turnTimer = 0;
-      }, 260);
-    }, 130);
+        ptSettle(el);
+      }, TURN_MS + 60);
+    };
+    if (window.requestAnimationFrame) {
+      requestAnimationFrame(function () { requestAnimationFrame(run); });
+    } else {
+      run();
+    }
   }
 
   /* 箭头 / ← →：一次点击就是一次翻页 */
