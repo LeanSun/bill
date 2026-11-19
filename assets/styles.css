@@ -214,7 +214,7 @@ svg { display: block; }
 /* ---------------- 主区与侧栏工具位 ----------------
    顶栏整块撤掉：标题、介绍、日期、按钮全部不再占一整行，
    正文从顶部 18px 起排，日历因此多出约 70px 的净高。 */
-.main { min-width: 0; padding: var(--main-pt) clamp(16px, 2.2vw, 30px) 56px; }
+.main { position: relative; min-width: 0; padding: var(--main-pt) clamp(16px, 2.2vw, 30px) 56px; }
 
 .side-tools {
   margin-top: 22px; padding: 0 4px;
@@ -2093,12 +2093,8 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 
 /* ==================== 连续滚动翻页 / 体重卡重排 ==================== */
 
-/* 翻页用两页同屏滑动：棋盘裁边，旧内容快照浮在里面跟着走 */
+/* 翻页：单页淡出淡入，不再需要同屏两页与快照层 */
 .cal-board { position: relative; }
-.soft-ghost {
-  position: absolute; z-index: 4; pointer-events: none;
-  will-change: transform; backface-visibility: hidden;
-}
 .cal-grid, .cal-week, .cal-day, .cal-year { will-change: auto; }
 
 /* 体重记录：读数 / 变化量 / 迷你线 / 区间，四层各就各位。
@@ -2380,18 +2376,20 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 .view.is-active > *:nth-child(3) .cb-panel { animation-delay: 110ms; }
 
 /* v1.0.33：箭头连点逐次翻页 + 今日标记跨月/周/年统一 */
-.cal-step-next { animation: calStepNext .34s cubic-bezier(.22,1,.36,1) both; }
-.cal-step-prev { animation: calStepPrev .34s cubic-bezier(.22,1,.36,1) both; }
-@keyframes calStepNext {
-  from { opacity: .45; transform: translateX(16px) scale(.992); }
-  to { opacity: 1; transform: none; }
+/* 日历翻页：一页淡出、下一页淡入，方向带一点位移。
+   只有一条时间线 —— 不拍快照、不叠位移、不重播。 */
+.pt-out { animation: ptOut .13s cubic-bezier(.4,0,.75,1) both; }
+.pt-in { animation: ptIn .24s cubic-bezier(.2,.72,.3,1) both; }
+@keyframes ptOut {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(var(--pt-x, 0px), 0, 0) scale(.996); }
 }
-@keyframes calStepPrev {
-  from { opacity: .45; transform: translateX(-16px) scale(.992); }
+@keyframes ptIn {
+  from { opacity: 0; transform: translate3d(var(--pt-x, 0px), 0, 0) scale(.996); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cal-step-next, .cal-step-prev { animation: none !important; }
+  .pt-out, .pt-in { animation-duration: 1ms !important; }
 }
 .wk-col.is-today, .ym-day.is-today { position: relative; }
 .wk-col.is-today::before, .ym-day.is-today::before {
@@ -3080,3 +3078,52 @@ html.theme-snap *::after {
   backdrop-filter: blur(7px);
 }
 html[data-theme="dark"] .cube-global-veil { background: rgba(3, 7, 14, .62); }
+
+/* ================= v1.0.44 · 私人数据门禁 =================
+   没连上私有仓库时，内容区被这一层整块替掉。
+   它不是「把数据藏起来」的遮罩 —— 底下的账本本来就是空的：
+   没令牌，密屉打不开，SEED 也不会注入。 */
+.lock-gate {
+  position: absolute; inset: 0; z-index: 60;
+  display: grid; place-items: center; padding: 26px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity .2s ease;
+}
+.lock-gate[hidden] { display: none; }
+.lock-gate.is-on { opacity: 1; }
+.lock-card {
+  max-width: 436px; padding: 22px 24px 20px;
+  border-radius: 16px; border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 20px 48px -26px rgba(24, 39, 75, .42);
+  text-align: center;
+}
+.lock-ico {
+  width: 44px; height: 44px; margin: 0 auto 12px; border-radius: 13px;
+  display: grid; place-items: center; color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.lock-ico svg { width: 23px; height: 23px; }
+.lock-card h3 {
+  margin: 0 0 8px; font-size: 16.5px; font-weight: 800;
+  letter-spacing: -.01em; color: var(--text);
+}
+.lock-card p {
+  margin: 0; font-size: 12.5px; line-height: 1.75;
+  color: var(--muted); text-align: left;
+}
+.lock-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.lock-actions .btn { min-width: 172px; height: 38px; }
+.lock-hint { font-size: 11px; color: var(--muted); }
+.lock-gate.is-nudge .lock-card { animation: lockNudge .34s cubic-bezier(.36, .07, .19, .97) both; }
+@keyframes lockNudge {
+  0%, 100% { transform: none; }
+  22% { transform: translateX(-5px); }
+  52% { transform: translateX(5px); }
+  78% { transform: translateX(-2px); }
+}
+@media (max-width: 940px) {
+  .lock-gate { position: fixed; inset: 0; padding: 20px 16px; }
+}

@@ -30,6 +30,9 @@
     state.calendarYear = Y_LAST;
     state.calMonth = { year: Y_LAST, month: new Date().getMonth() + 1 };
   }
+  /* 门禁：没连上私有仓库，这台机器上就不该出现任何一条记录。
+     判断在 assets/boot.js 里同步算好，这里只读结果。 */
+  var LOCKED = !(window.QZGate && window.QZGate.ok);
   var STORE_KEY = 'qingzhang.ledger.v1';
   var THEME_KEY = 'qingzhang.theme.v1';
   var CATCOLOR_KEY = 'qingzhang.catcolors.v1';
@@ -522,27 +525,46 @@
       if (isFinite(v) && v >= 20 && v <= 300) s.weights[k] = Math.round(v * 10) / 10;
     });
   }
+  function shapeStore(o) {
+    o = o || {};
+    return {
+      added: Array.isArray(o.added) ? o.added : [],
+      edited: (o.edited && typeof o.edited === 'object' && !Array.isArray(o.edited)) ? o.edited : {},
+      deleted: Array.isArray(o.deleted) ? o.deleted : [],
+      weights: cleanWeights(o.weights),
+      weightCleared: cleanWeightCleared(o.weightCleared),
+      pay: cleanPay(o.pay)
+    };
+  }
+  /* 读：门禁没过就是空账本，本机一个键都不碰。
+     门禁过了优先用密屉里解出来的那份（boot.js 已经打开）；
+     明文老账只在搬家那一刻由 boot.js 读一次，之后就没了。 */
   function loadStore() {
+    if (LOCKED) return emptyStore();
+    var cache = window.QZ_CACHE && window.QZ_CACHE.store;
+    if (cache) return shapeStore(cache);
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (!raw) return emptyStore();
-      var o = JSON.parse(raw);
-      return {
-        added: Array.isArray(o.added) ? o.added : [],
-        edited: (o.edited && typeof o.edited === 'object' && !Array.isArray(o.edited)) ? o.edited : {},
-        deleted: Array.isArray(o.deleted) ? o.deleted : [],
-        weights: cleanWeights(o.weights),
-        weightCleared: cleanWeightCleared(o.weightCleared),
-        pay: cleanPay(o.pay)
-      };
+      return shapeStore(JSON.parse(raw));
     } catch (e) { return emptyStore(); }
   }
+  /* 写：只写密文。明文那份不再落盘 —— 换台机器、换个浏览器、
+     甚至同一台机器上别人打开开发者工具，都读不到东西。 */
+  var vaultTimer = 0;
   function saveStore() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state.store)); } catch (e) { /* 隐私模式下静默 */ }
+    if (LOCKED) return;
     storeRev++;
     for (var i = 0; i < STORE_HOOKS.length; i++) {
       try { STORE_HOOKS[i](); } catch (e) { /* 通知失败不能拖垮记账 */ }
     }
+    if (vaultTimer) return;
+    vaultTimer = setTimeout(function () {
+      vaultTimer = 0;
+      var key = window.QZ_VAULT_KEY;
+      if (key && window.QZVault) window.QZVault.save(key, 'ledger', state.store);
+      try { localStorage.removeItem(STORE_KEY); } catch (e) { /* 无痕模式 */ }
+    }, 180);
   }
   function canonNote(n) {
     var s = String(n || '').trim();
@@ -1160,7 +1182,7 @@
     return same ? dateKey(t) : dateKey(new Date(state.calMonth.year, state.calMonth.month - 1, 1));
   }
   function setScale(s) {
-    if (soft && soft.on) softReset();   /* 翻滚到一半换粒度：先把快照收掉 */
+    softReset();                        /* 翻到一半换粒度：先把动画收干净 */
     state.scale = s;
     if (s === 'day' || s === 'week') {
       if (!state.anchorDate) {
@@ -1789,6 +1811,10 @@
   /* 总览里的魔方板块：只读 cubeLedger_v1，跟账本 store 一丁点都不交叉。
      四张数字卡各自独立成块，两张图也各有自己的卡 —— 不再挤在一个大容器里。 */
   function cubeData() {
+    if (LOCKED) {
+      var s = window.QZ_CACHE && window.QZ_CACHE.cube;
+      return (s && Array.isArray(s.cubes) && Array.isArray(s.competitions)) ? s : null;
+    }
     try {
       var raw = localStorage.getItem('cubeLedger_v1');
       var d = raw ? JSON.parse(raw) : null;
@@ -3180,6 +3206,7 @@
   function mountCube() {
     var f = $('cubeFrame');
     if (!f) return;
+    if (LOCKED) return;        /* 没连仓库：iframe 连挂都不挂，子页那份数据也不落盘 */
     /* 私人仓库还在取魔方数据时先不挂 iframe —— 免得先画一屏空白再刷新 */
     if (window.__cubeDataReady === false) { setTimeout(mountCube, 120); return; }
     if (!f.getAttribute('src')) f.setAttribute('src', 'cube.html');
@@ -3245,7 +3272,7 @@
       var veil = $('cubeGlobalVeil');
       if (veil) { veil.classList.remove('is-on'); veil.hidden = true; }
     }
-    if (soft && soft.on) softReset();
+    softReset();
     /* 从有 title 的元素移进 iframe 时父页收不到 mouseout，提示会卡住不消失 */
     var stuckTip = $('hoverTip');
     if (stuckTip) stuckTip.hidden = true;
@@ -3828,6 +3855,8 @@
   var ENTRY_DRAFT_KEY = 'qingzhang.entryDraft.v1';
   function clearEntryDraft() { try { localStorage.removeItem(ENTRY_DRAFT_KEY); } catch (e) {} }
   function openModal(record, prefillDate, mode) {
+    /* 没连私有仓库就不给记账口子：写了也没地方去，还会在本机留痕 */
+    if (LOCKED) { showLockGate(true); return; }
     /* 手机上记账浮层弹出前先收起筛选区，别让那一排按钮压在表单上 */
     collapseFiltersOnMobile();
     lastFocused = document.activeElement;
@@ -4299,8 +4328,10 @@
     return d;
   }
   /* 数据从哪来：① store（云端 / 上次落盘）优先；② 老版本只存 localStorage，
-     读出来当场接管，之后跟着云同步一起走 —— 一次性的搬家。 */
+     读出来当场接管，之后跟着云同步一起走 —— 一次性的搬家。
+     门禁没过就没有 ① 也没有 ②：社保、报销一并归零，页面上不出现任何数字。 */
   function loadPay() {
+    if (LOCKED) { pay = payOrDefaults(null); return; }
     var src = (state.store && state.store.pay) ? cleanPay(state.store.pay) : null;
     var fromLocal = false;
     if (!src) {
@@ -4312,9 +4343,10 @@
     pay = payOrDefaults(src);
     if (fromLocal) savePay();          /* 搬家：写进 store，下一次同步就带上云 */
   }
-  /* 双写：localStorage 留一份镜像（离线 / 换主题立刻可读），store 那份才是随云同步走的 */
+  /* 只写 store（→ 密屉）。明文那份不再落盘。 */
   function savePay() {
-    try { localStorage.setItem(PAY_KEY, JSON.stringify(pay)); } catch (e) { /* noop */ }
+    if (LOCKED) return;
+    try { localStorage.removeItem(PAY_KEY); } catch (e) { /* noop */ }
     if (!state.store) return;
     state.store.pay = cleanPay({
       base: pay.base, wage: pay.wage, perf: pay.perf, subsidy: pay.subsidy, gap: pay.gap,
@@ -4995,26 +5027,16 @@
     openByTap = { key: '', t: 0 };
   }
 
-  /* ---------------- 翻页：连续滚动 ----------------
-     滚轮不再「一格跳半页」，也不是「每帧补剩余距离的一个比例」——
-     后者第一帧补得最多，一帧就是一百多像素，就是那种「一耸」的硬。
-     这里用临界阻尼弹簧：位置 p、速度 v，每帧按
-         a = ω²(goal − p) − 2ω·v
-     积分。速度是连续的，没有一帧会突然加速，起手是从静止柔起、
-     中段匀速带过、末尾自己收力停住 —— 三段的加速度都在变，位置不变。
-     滚轮只改目标（一格 ≈ 0.28 页），谁滚得快目标叠得远，画面跟着加速。
-     两页同屏：旧内容拍快照（ghost）滑出去，真节点装新页滑进来，
-     p 到 1 才交割 —— 那一帧新旧完全重合，看不见换页。
-     四档方向：月/年/日竖向，周横向。 */
-  var SOFT_SPAN = 620;          /* 滚轮量累计 620px = 一整页；一格 120px ≈ 0.19 页 */
-  var SOFT_IDLE = 150;          /* 停手多久开始结算 */
-  var SOFT_COMMIT = .18;        /* 结算时进度超过这里就交割，否则原路退回 */
-  var wheelLock = 0;
-  var soft = {
-    on: false, el: null, ghost: null, host: null,
-    p: 0, v: 0, aim: 0, axis: 'y', size: 0, dir: 1, head: null
-  };
-  var softIdle = 0, softRaf = 0, softKill = 0, softLast = 0;
+  /* ---------------- 翻页：一页淡出，下一页淡入 ----------------
+     旧版是「拍快照 + 弹簧追随 + 交割」三件套：滚轮一推，位置、目标、
+     重绘三件事同时发生，于是先跳到结果页、再闪一下重走一遍动画。
+     现在只留一条时间线：旧页 120ms 收掉 → 换内容 → 新页 200ms 出来。
+     滚轮只负责「攒够一格翻一次」，翻的过程和点箭头是同一条动画，
+     没有第二套位移参与，也就没有重播。 */
+  var TURN_MS = 300;            /* 一次翻页的整段时长，期间不再接新的翻页 */
+  var WHEEL_TRIGGER = 80;       /* 滚轮攒够这么多像素算一格 */
+  var turnLock = 0, turnTimer = 0;
+  var wheelAcc = 0, wheelDir = 0, wheelQuiet = 0;
 
   function softTarget() {
     var s = state.scale;
@@ -5022,213 +5044,65 @@
       : s === 'month' ? $('calGrid')
       : s === 'week' ? $('calWeekGrid') : $('calDayBoard');
   }
-  function softAxisOf(s) { return s === 'week' ? 'x' : 'y'; }
 
+  /* 收掉还没走完的翻页：换粒度、换视图、关弹窗时都要先清干净 */
   function softReset() {
-    if (softKill) { clearTimeout(softKill); softKill = 0; }
-    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
-    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
-    if (soft.ghost && soft.ghost.parentNode) soft.ghost.parentNode.removeChild(soft.ghost);
-    if (soft.el) {
-      soft.el.style.transition = '';
-      soft.el.style.transform = '';
-      soft.el.style.willChange = '';
-    }
-    soft.on = false; soft.el = null; soft.ghost = null; soft.host = null;
-    soft.p = 0; soft.v = 0; soft.aim = 0; soft.size = 0; soft.head = null;
-    softLast = 0;
-  }
-
-  /* 标题 / 计数先按住不动：滑到一半就报出下个月会很跳，交割那一刻才换 */
-  function headSnap() {
-    var o = { t: null, s: null, e: null };
-    var a = $('calTitleText'), b = $('calSub'), c = $('calTitle'), d = $('boardEmpty');
-    if (a) { o.t = [a.textContent, a.getAttribute('title') || '']; }
-    if (b) { o.s = [b.textContent, b.getAttribute('title') || '']; }
-    if (c) o.c = c.className;
-    /* 空态浮层也跟着旧页走：滑到一半就冒出「没有匹配的记录」会很跳 */
-    if (d) o.e = d.hidden;
-    return o;
-  }
-  function headApply(o) {
-    if (!o) return;
-    var a = $('calTitleText'), b = $('calSub'), c = $('calTitle');
-    if (o.t && a) { a.textContent = o.t[0]; a.setAttribute('title', o.t[1]); }
-    if (o.s && b) { b.textContent = o.s[0]; b.setAttribute('title', o.s[1]); }
-    if (o.c && c) c.className = o.c;
-    var d = $('boardEmpty');
-    if (o.e !== null && o.e !== undefined && d) d.hidden = o.e;
-  }
-
-  /* 一帧的排布：旧页顺着滚动方向出框，新页从另一侧按比例顶上来 */
-  function softPaint(p) {
-    if (!soft.on || !soft.el || !soft.ghost) return;
-    var s = soft.size, dir = soft.dir;
-    var mag = Math.max(0, Math.min(1, p));
-    var out = -dir * mag * s;
-    var inn = dir * (1 - mag) * s;
-    if (soft.axis === 'x') {
-      soft.ghost.style.transform = 'translate3d(' + out + 'px,0,0)';
-      soft.el.style.transform = 'translate3d(' + inn + 'px,0,0)';
-    } else {
-      soft.ghost.style.transform = 'translate3d(0,' + out + 'px,0)';
-      soft.el.style.transform = 'translate3d(0,' + inn + 'px,0)';
-    }
-  }
-
-  /* 起手：给旧内容拍快照、把新页渲染进真节点并先摆到框外 */
-  function softStart(dir) {
+    if (turnTimer) { clearTimeout(turnTimer); turnTimer = 0; }
+    if (wheelQuiet) { clearTimeout(wheelQuiet); wheelQuiet = 0; }
+    turnLock = 0; wheelAcc = 0; wheelDir = 0;
     var el = softTarget();
-    if (!el) return false;
-    if (soft.on && soft.el === el && soft.dir === dir) return true;
-    softReset();
-    var host = el.parentNode;
-    if (!host) return false;
-    el.style.transition = 'none';
-    el.style.transform = '';
-    void el.offsetWidth;
-    var hb = host.getBoundingClientRect(), eb = el.getBoundingClientRect();
-    var axis = softAxisOf(state.scale);
-    var size = axis === 'x' ? eb.width : eb.height;
-    if (!size || !eb.width) return false;
-
-    var ghost = el.cloneNode(true);
-    ghost.removeAttribute('id');
-    var kids = ghost.querySelectorAll('[id]');
-    for (var i = 0; i < kids.length; i++) kids[i].removeAttribute('id');
-    ghost.classList.add('soft-ghost');
-    ghost.setAttribute('aria-hidden', 'true');
-    ghost.style.position = 'absolute';
-    ghost.style.left = (eb.left - hb.left) + 'px';
-    ghost.style.top = (eb.top - hb.top) + 'px';
-    ghost.style.width = eb.width + 'px';
-    ghost.style.height = eb.height + 'px';
-    ghost.style.margin = '0';
-    ghost.style.zIndex = '4';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.transition = 'none';
-    ghost.style.transform = 'none';
-    ghost.style.willChange = 'transform';
-    host.appendChild(ghost);
-
-    soft.on = true; soft.el = el; soft.ghost = ghost; soft.host = host;
-    soft.axis = axis; soft.size = size; soft.dir = dir;
-    soft.p = 0; soft.v = 0; soft.aim = 0;
-    el.style.willChange = 'transform';
-    softPaint(0);
-    var oldHead = headSnap();
-    shiftCalStep(dir);           /* 真节点里现在装的是下一页，还在框外 */
-    soft.head = headSnap();      /* 新页的标题先收着，交割时再放出来 */
-    headApply(oldHead);
-    return true;
+    if (el) el.classList.remove('pt-out', 'pt-in');
   }
 
-  /* 交割：已经滑到底，把 ghost 撤掉，真节点归位 —— 此刻它本就在 0 */
-  function softSettle() {
-    if (!soft.on) return;
-    var el = soft.el, dir = soft.dir;
-    var ax = soft.axis;
-    if (el) { el.style.transition = 'none'; }
-    headApply(soft.head);
-    wheelLock = Date.now() + 24;   /* 只挡同一个 notch 的重入，不掐后续滚轮 */
-    softReset();
-    /* 交割后一记很轻的曲线回弹：先越过 4px 再收回来，收在 cubic-bezier 上 */
-    if (el && el.animate) {
-      var d = (dir > 0 ? -1 : 1) * 4;
-      var frames = ax === 'x'
-        ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(' + d + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }]
-        : [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(0,' + d + 'px,0)' }, { transform: 'translate3d(0,0,0)' }];
-      el.animate(frames, { duration: 340, easing: 'cubic-bezier(.22,1,.36,1)' });
-    }
-  }
-
-  /* 退回：p 已经走回 0，把旧页重新渲进真节点，撤掉 ghost */
-  function softRollback() {
-    if (!soft.on) return;
-    var dir = soft.dir;
-    soft.p = 0; soft.v = 0; soft.aim = 0;
-    softPaint(0);                  /* 同一帧内完成，浏览器不会画出错位的那一页 */
-    shiftCalStep(-dir);
-    softReset();
-  }
-
-  /* 追随：p 指数逼近目标。
-     v1.0.43 换掉那条临界阻尼弹簧 —— 弹簧每帧要「先加速再收力」，
-     和滚轮一格一格往里塞目标叠在一起时，位置会跑到目标前面去，
-     于是滚轮刚到 100% 页面已经交割、剩下的动量又推着走一遍。
-     指数逼近的好处是只有一条曲线：目标一改就往那儿走，
-     帧间位移单调递减，不越过目标，也就没有「重播」那回事。
-     时间常数 85ms：一格滚轮（0.19 页）大约四帧走完，跟着手走。 */
-  function softFollowTo(goal) {
-    soft.aim = Math.max(0, Math.min(1, goal));
-    if (softRaf) return;                  /* 已经在追，改目标就够了 */
-    softLast = 0;
-    softRaf = requestAnimationFrame(function step(ts) {
-      softRaf = 0;
-      if (!soft.on) return;
-      var dt = softLast ? Math.min(48, ts - softLast) : 16;
-      softLast = ts;
-      var k = 1 - Math.exp(-dt / 85);
-      soft.p += (soft.aim - soft.p) * k;
-      if (Math.abs(soft.aim - soft.p) < .002) soft.p = soft.aim;
-      if (soft.p >= 1) { soft.p = 1; softPaint(1); softSettle(); return; }
-      if (soft.p <= 0 && soft.aim <= 0) { soft.p = 0; softPaint(0); softRollback(); return; }
-      softPaint(soft.p);
-      if (soft.p === soft.aim) return;    /* 追上了，停在这里等下一个滚轮 */
-      softRaf = requestAnimationFrame(step);
-    });
-  }
-
-  /* 滚轮：一格 ≈ 0.19 页，画面几帧之内跟到位；停手 150ms 后结算。
-     攒够 18% 才认这一页 —— 轻扫一格也能翻，但翻的过程是滑过去的。 */
-  function softWheel(d) {
-    var dir = d > 0 ? 1 : -1;
-    var mag = Math.min(240, Math.abs(d));
-    if (mag < .6) return;
-    if (soft.on && dir !== soft.dir) {
-      /* 中途换向：按「就近归属」处理 —— 没滑过一半就原路回上一页 */
-      softFollowTo(soft.p < .5 ? 0 : 1);
+  /* 一次翻页：出 → 换内容 → 进。dir > 0 是往后翻（下一月 / 下一周）。 */
+  function pageTurn(dir) {
+    var el = softTarget();
+    if (!el) { shiftCalStep(dir); return; }
+    if (el.classList.contains('pt-in') || el.classList.contains('pt-out')) {
+      /* 上一段还没收完：直接换内容，动画从新的一段重来，
+         绝不让两层位移叠在同一帧上 */
+      shiftCalStep(dir);
       return;
     }
-    if (!soft.on) { if (!softStart(dir)) { shiftCalStep(dir); return; } }
-    /* 目标往上叠：滚得快的人目标叠得远，画面一直追着它走 */
-    softFollowTo(soft.aim + mag / SOFT_SPAN);
-    if (softIdle) clearTimeout(softIdle);
-    softIdle = setTimeout(function () {
-      softIdle = 0;
-      if (!soft.on) return;
-      softFollowTo(soft.aim >= SOFT_COMMIT ? 1 : 0);
-    }, SOFT_IDLE);
+    var x = (dir > 0 ? -1 : 1) * 22;
+    el.style.setProperty('--pt-x', x + 'px');
+    el.classList.add('pt-out');
+    turnTimer = setTimeout(function () {
+      turnTimer = 0;
+      shiftCalStep(dir);
+      el.classList.remove('pt-out');
+      el.style.setProperty('--pt-x', (-x) + 'px');
+      el.classList.add('pt-in');
+      turnTimer = setTimeout(function () {
+        el.classList.remove('pt-in');
+        turnTimer = 0;
+      }, 210);
+    }, 120);
   }
 
-  /* 交割到满页：把目标推到 1，剩下的交给追随 */
-  function softFinish() {
-    if (!soft.on) return;
-    if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
-    softFollowTo(1);
-  }
-
-  /* 箭头 / ← →：定时曲线推到 1，比滚轮更「有主见」，但不硬切 */
-  /* v1.0.33：一次点击就是一次真实翻页。旧 ghost 动画在连点时被 cancel，
-     第二次只重启动画却不推进月份；现在先同步推进，再给新网格补一段短滑入。 */
+  /* 箭头 / ← →：一次点击就是一次翻页 */
   function softStep(dir) {
     closeCmp();
-    /* 滚轮那一页还在半路就点了箭头：先把滚轮按「不认」撤回去，
-       再走箭头这一步 —— 否则两套推进叠在一起，会一次跳两页 */
-    if (soft.on) {
-      var back = soft.dir;
-      soft.p = 0; soft.aim = 0; soft.v = 0;
-      softPaint(0);
-      shiftCalStep(-back);
-      softReset();
-    }
-    shiftCalStep(dir);
-    var el = softTarget(); if (!el) return;
-    var cls = dir > 0 ? 'cal-step-next' : 'cal-step-prev';
-    el.classList.remove('cal-step-next', 'cal-step-prev');
-    void el.offsetWidth;
-    el.classList.add(cls);
-    setTimeout(function () { el.classList.remove(cls); }, 380);
+    if (turnLock && Date.now() < turnLock) return;
+    turnLock = Date.now() + TURN_MS;
+    pageTurn(dir);
+  }
+
+  /* 滚轮：攒够一格翻一次。翻页那 300ms 里再来的滚轮直接丢掉 ——
+     一次手势就是一页；长按着滚也只是一页页翻完，绝不叠着跳。 */
+  function softWheel(d) {
+    if (!d) return;
+    var dir = d > 0 ? 1 : -1;
+    if (wheelDir && dir !== wheelDir) wheelAcc = 0;
+    wheelDir = dir;
+    wheelAcc += d;
+    if (wheelQuiet) clearTimeout(wheelQuiet);
+    wheelQuiet = setTimeout(function () { wheelQuiet = 0; wheelAcc = 0; wheelDir = 0; }, 240);
+    if (Math.abs(wheelAcc) < WHEEL_TRIGGER) return;
+    wheelAcc = 0;
+    if (turnLock && Date.now() < turnLock) return;
+    turnLock = Date.now() + TURN_MS;
+    pageTurn(dir);
   }
 
   function bindWheelPaging() {
@@ -5248,7 +5122,6 @@
         var raw = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
         if (!raw) return;
         e.preventDefault();
-        if (Date.now() < wheelLock) return;
         /* 统一成像素：按行滚的老设备 ×16，按页滚的 ×320 */
         var d = raw;
         if (e.deltaMode === 1) d = raw * 16;
@@ -5293,6 +5166,29 @@
   }
 
   /* ---------------- 启动 ---------------- */
+  /* 未连接时的整屏门禁：主内容区一块说明，按钮直接开云同步面板。
+     页面结构上不是「数据藏起来了」，而是根本没有数据可渲染。 */
+  var lockShown = false;
+  function showLockGate(pulse) {
+    var el = $('lockGate');
+    if (!el) return;
+    if (!lockShown) {
+      lockShown = true;
+      el.hidden = false;
+      requestAnimationFrame(function () { el.classList.add('is-on'); });
+      var b = $('lockConnect');
+      if (b) b.addEventListener('click', function () {
+        var s = $('syncBtn');
+        if (s) { s.click(); return; }
+        if (window.QZSync && window.QZSync.open) window.QZSync.open();
+      });
+    }
+    if (pulse) {
+      el.classList.remove('is-nudge');
+      void el.offsetWidth;
+      el.classList.add('is-nudge');
+    }
+  }
   /* 全局悬浮提示：接管原生 title 与动态图表的 data-tip。
      气泡固定在鼠标上方、pointer-events:none，永远不会被光标挡住。 */
   function bindHoverTip() {
@@ -5806,6 +5702,9 @@
     var initialRoute = parseRoute() || 'calendar';
     bindRoute();
     setView(initialRoute);
+
+    /* 门禁没过：整块内容换成「未解锁」，不给看也不给记 */
+    if (LOCKED) showLockGate(false);
 
     if (!hasEcharts) toast('ECharts 未加载，图表不可用', 'warn');
     /* 魔方页在后台先热起来：点导航时不再等 iframe 加载 + 图表首绘 */

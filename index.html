@@ -647,7 +647,24 @@
 </div>
 
 <div class="hover-tip" id="hoverTip" hidden data-page-node-id="EHiQ9FUqob4KNwXd57JLKc"></div>
+
+<!-- 私人数据门禁：没连上私有仓库时，这里替掉整块内容区 -->
+<div class="lock-gate" id="lockGate" hidden>
+  <div class="lock-card" role="alert">
+    <div class="lock-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="4.5" y="10.5" width="15" height="10" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="15.4" r="1.5" fill="currentColor"/></svg>
+    </div>
+    <h3>账本没解锁</h3>
+    <p>这个页面是公开的空壳。收支、体重、社保和报销只存在你自己的私有仓库里，连上才取得回来；本机只留一份加密副本，没有令牌就是一堆噪声。</p>
+    <div class="lock-actions">
+      <button type="button" class="btn btn-primary" id="lockConnect">连接私有仓库</button>
+      <span class="lock-hint">连过却打不开？多半是令牌过期了，重新填一次就行。</span>
+    </div>
+  </div>
+</div>
+
 <script src="assets/echarts.min.js"></script>
+<script src="assets/vault.js"></script>
 <script src="assets/boot.js"></script>
 <script src="assets/ui-select.js"></script>
 <script src="assets/app.js"></script>

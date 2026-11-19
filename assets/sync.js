@@ -620,11 +620,12 @@
     pendingConflict = null;
     pendingConflictSha = null;
     saveCfg();
-    setStatus('已断开，本地数据照旧保留');
+    /* 断开就等于「这台机器上不该再有账本」：内存、密屉、明文一起清，
+       再刷一次让门禁重新判定。仓库里那份原样保留。 */
+    setStatus('已断开，本机副本已清除 · 数据仍在私有仓库里');
     render();
-    if (window.QZPrivate && window.QZPrivate.dropIfActive()) {
-      setTimeout(function () { location.reload(); }, 250);
-    }
+    if (window.QZPrivate && window.QZPrivate.dropIfActive) window.QZPrivate.dropIfActive();
+    setTimeout(function () { location.reload(); }, 260);
   }
 
   function download(obj, name) {
@@ -760,6 +761,10 @@
     });
 
     render();
+
+    /* 启动时刚从明文老账搬进密屉的那份：云端还没有，按「本地有改动」处理，
+       交给正常的冲突流程，绝不静默覆盖任何一边 */
+    if (window.__QZ_MIGRATED) { dirty = true; refreshMeta(); }
 
     /* 回到标签页就顺一次；断开状态什么都不做 */
     document.addEventListener('visibilitychange', function () {

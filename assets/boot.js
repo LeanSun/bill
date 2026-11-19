@@ -119,17 +119,88 @@
   }
 
   var cfg = readCfg();
+  var ok = gate(cfg);
+
+  /* 门禁状态是同步的：app.js 一加载就要知道该不该读本机副本 */
+  window.QZGate = {
+    ok: ok,
+    owner: ok ? OWNER : '',
+    repo: ok ? REPO : '',
+    reason: ok ? '' : (cfg && cfg.token ? '凭证已过期' : '这台设备还没连上私有仓库')
+  };
+  /* 解密后的本机副本：只有门禁通过才可能有值 */
+  window.QZ_CACHE = null;
+  window.QZ_VAULT_KEY = null;
+
+  /* 密屉钥匙：令牌 + 仓库名派生。拿不到就是 null，本机副本谁也打不开。 */
+  function vaultKey() {
+    if (!ok || !window.QZVault || !window.QZVault.supported) return Promise.resolve(null);
+    return window.QZVault.derive(cfg.token, 'qingzhang::' + OWNER + '/' + REPO)
+      .catch(function () { return null; });
+  }
+
+  /* 打开密屉，顺手把老版本明文搬家：读出来、重新封好、删掉明文键。
+     搬家只发生在门禁通过的这一刻 —— 没连仓库的机器永远读不到明文。 */
+  function hydrate(key) {
+    if (!key) return Promise.resolve(null);
+    window.QZ_VAULT_KEY = key;
+    var vault = window.QZVault;
+    var legacyStore = '', legacyPay = '';
+    try {
+      legacyStore = localStorage.getItem('qingzhang.ledger.v1') || '';
+      legacyPay = localStorage.getItem('qingzhang.pay.v1') || '';
+    } catch (e) { /* 无痕模式 */ }
+    return Promise.all([vault.load(key, 'ledger'), vault.load(key, 'cube')]).then(function (r) {
+      var store = r[0] || null, cube = r[1] || null;
+      if (!store && legacyStore) {
+        try { store = JSON.parse(legacyStore); } catch (e2) { store = null; }
+        if (store && legacyPay) {
+          try {
+            var p = JSON.parse(legacyPay);
+            if (p && typeof p === 'object' && !store.pay) store.pay = p;
+          } catch (e3) { /* 坏数据丢掉 */ }
+        }
+        if (store) {
+          vault.save(key, 'ledger', store);
+          /* 刚搬完家：这份数据只在本地有过，云端还不知道，
+             标记一下，让同步层把它当成「未推送的改动」，由用户决定以哪边为准 */
+          window.__QZ_MIGRATED = true;
+        }
+      }
+      /* 明文留在盘上就是漏洞，搬完即删 */
+      if (legacyStore) { try { localStorage.removeItem('qingzhang.ledger.v1'); } catch (e4) {} }
+      if (legacyPay) { try { localStorage.removeItem('qingzhang.pay.v1'); } catch (e5) {} }
+      if (cube) window.__CUBE_SEED = cube;
+      window.QZ_CACHE = { store: store, cube: cube };
+      return store;
+    }).catch(function () {
+      window.QZ_CACHE = { store: null, cube: null };
+      return null;
+    });
+  }
+
   /* 魔方 iframe 等这个标记再挂载，保证它启动那一刻本地数据已经落地 */
-  window.__cubeDataReady = !gate(cfg);
+  window.__cubeDataReady = !ok;
   window.BILL_READY = new Promise(function (resolve) {
-    if (!gate(cfg)) { resolve(settle(null, '')); return; }
+    if (!ok) {
+      /* 没连仓库：不取、不读、不留 —— 本机就是一本空账本 */
+      window.QZ_CACHE = null;
+      resolve(settle(null, ''));
+      return;
+    }
+    var boot = vaultKey().then(hydrate);
     /* 魔方那份只有 20KB，和账本并行取，但不让它拖住账本启动 */
     fetchCube(cfg).catch(function () { /* 取不到就留给子页自己取 */ })
       .then(function () { window.__cubeDataReady = true; });
-    fetchPrivate(cfg).then(
-      function (d) { resolve(settle(d, '')); },
-      function (e) { resolve(settle(null, e && e.message || '读取私有数据失败')); }
-    );
+    Promise.all([
+      fetchPrivate(cfg).then(
+        function (d) { return { d: d, err: '' }; },
+        function (e) { return { d: null, err: (e && e.message) || '读取私有数据失败' }; }
+      ),
+      boot
+    ]).then(function (r) {
+      resolve(settle(r[0].d, r[0].err));
+    });
   });
 
   /* 给同步层用：连上仓库后要不要刷新一次、断开后要不要立刻清空内存里的数据 */
@@ -137,10 +208,22 @@
     status: function () { return state; },
     needsReload: function (c) { return gate(c || readCfg()) && !state.active; },
     dropIfActive: function () {
-      if (!state.active) return false;
+      /* 断开那一刻：内存、密屉、明文，三样一起清。
+         仓库里那份一个字不动，下次连上再取回来。 */
+      var had = state.active || !!(window.QZ_CACHE && window.QZ_CACHE.store);
       state.active = false;
       window.BILL_DATA = EMPTY;
-      return true;
+      window.QZ_CACHE = null;
+      window.QZ_VAULT_KEY = null;
+      if (window.QZVault) {
+        window.QZVault.drop('ledger');
+        window.QZVault.drop('cube');
+      }
+      try {
+        localStorage.removeItem('qingzhang.ledger.v1');
+        localStorage.removeItem('qingzhang.pay.v1');
+      } catch (e) { /* 无痕模式 */ }
+      return had;
     }
   };
 })();
