@@ -8,6 +8,10 @@
 (function () {
   'use strict';
 
+  /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
+     的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
+  var ASSET_V = '1.0.47';
+
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
      fetch 完私有仓库才能用。这里先空着，applyDataset() 在 init 前灌进来。 */
@@ -3208,7 +3212,7 @@
     if (LOCKED) return;        /* 没连仓库：iframe 连挂都不挂，子页那份数据也不落盘 */
     /* 私人仓库还在取魔方数据时先不挂 iframe —— 免得先画一屏空白再刷新 */
     if (window.__cubeDataReady === false) { setTimeout(mountCube, 120); return; }
-    if (!f.getAttribute('src')) f.setAttribute('src', 'cube.html');
+    if (!f.getAttribute('src')) f.setAttribute('src', 'cube.html?v=' + ASSET_V);
     if (!f.__cubeBound) { f.addEventListener('load', cubePing); f.__cubeBound = true; }
     cubePing();
   }
@@ -3221,7 +3225,7 @@
       jumpCube(filter);
     });
     var b = $('cubeOpenBtn');
-    if (b) b.addEventListener('click', function () { window.open('cube.html', '_blank', 'noopener'); });
+    if (b) b.addEventListener('click', function () { window.open('cube.html?v=' + ASSET_V, '_blank', 'noopener'); });
     var g = $('cubeGotoBtn');
     if (g) g.addEventListener('click', function () { setView('cube'); });
     var mini = $('cubeGotoMini');

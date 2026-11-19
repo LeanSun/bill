@@ -1731,7 +1731,6 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
 .ir-line b.is-over { color: var(--expense); }
 .ir-bar { height: 6px; margin: 4px 0 2px; border-radius: 4px; background: var(--surface-3); overflow: hidden; cursor: help; }
 .ir-bar i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
-.ir-bar.is-year i { background: var(--amber); }
 .ir-note { font-size: 10.2px; line-height: 1.2; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .ir-line.is-year { margin-top: 1px; }
 
@@ -2993,7 +2992,6 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 /* 3. 最近记录跨天间隔 20px */
 .rs-item.is-newday { margin-left: 20px; }
 /* 4. 今年结余比例条改红 */
-.ir-bar.is-year i { background: var(--danger) !important; }
 /* 5. 整页换肤（v1.0.42 的 View Transition 版本已撤，见文件末尾 v1.0.43） */
 
 
@@ -3037,8 +3035,6 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 }
 
 /* ---- 2. 今年结余：浅一档的红，压在卡片里不刺眼 ------------------ */
-.ir-bar.is-year i { background: #f09199 !important; }
-html[data-theme="dark"] .ir-bar.is-year i { background: #d9737d !important; }
 
 /* ---- 3. 换肤：一帧换完 ------------------------------------------
    上一版用 document.startViewTransition()：旧帧快照和新帧交叉淡入，
