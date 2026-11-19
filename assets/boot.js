@@ -99,13 +99,14 @@
       try {
         var raw = localStorage.getItem('cubeLedger_v1');
         var cur = raw ? JSON.parse(raw) : null;
-        if (cur && cur._privateOwner === 'LeanSun' && rev <= (Number(cur._rev) || 0)) return;
+        if (cur && cur._privateOwner === 'LeanSun' && rev <= (Number(cur._rev) || 0)) return false;
         var db = d.db;
         db._privateOwner = 'LeanSun';
         db._rev = rev;
         localStorage.setItem('cubeLedger_v1', JSON.stringify(db));
         localStorage.setItem('cubeLedger_remoteSha_v1', j.sha || '');
-      } catch (e) { /* 无痕模式静默 */ }
+        return true;
+      } catch (e) { return false; }
     });
   }
 
@@ -150,8 +151,8 @@
       legacyStore = localStorage.getItem('qingzhang.ledger.v1') || '';
       legacyPay = localStorage.getItem('qingzhang.pay.v1') || '';
     } catch (e) { /* 无痕模式 */ }
-    return Promise.all([vault.load(key, 'ledger'), vault.load(key, 'cube')]).then(function (r) {
-      var store = r[0] || null, cube = r[1] || null;
+    return Promise.all([vault.load(key, 'ledger'), vault.load(key, 'cube'), vault.load(key, 'seed')]).then(function (r) {
+      var store = r[0] || null, cube = r[1] || null, seed = r[2] || null;
       if (!store && legacyStore) {
         try { store = JSON.parse(legacyStore); } catch (e2) { store = null; }
         if (store && legacyPay) {
@@ -170,7 +171,13 @@
       /* 明文留在盘上就是漏洞，搬完即删 */
       if (legacyStore) { try { localStorage.removeItem('qingzhang.ledger.v1'); } catch (e4) {} }
       if (legacyPay) { try { localStorage.removeItem('qingzhang.pay.v1'); } catch (e5) {} }
-      if (cube) window.__CUBE_SEED = cube;
+      if (cube) {
+        window.__CUBE_SEED = cube;
+        /* 魔方 iframe 只读 cubeLedger_v1 —— 先把密屉里的那份放回去，
+           它起来那一刻就是完整数据，不用再等一趟 api.github.com */
+        try { localStorage.setItem('cubeLedger_v1', JSON.stringify(cube)); } catch (e6) { /* 无痕模式 */ }
+      }
+      window.QZ_SEED = (seed && Array.isArray(seed.records)) ? seed : null;
       window.QZ_CACHE = { store: store, cube: cube };
       return store;
     }).catch(function () {
@@ -179,8 +186,28 @@
     });
   }
 
-  /* 魔方 iframe 等这个标记再挂载，保证它启动那一刻本地数据已经落地 */
+  /* v1.0.48：启动不再等在 api.github.com 上。
+     密屉里本来就有一份加密的账单种子（seed）和魔方数据，解出来立刻放行 ——
+     页面先按这份画完，远端那趟请求转到后台，回来再补一次差量刷新。
+     门禁条件没变：拿不到令牌 / 仓库对不上，QZ_SEED 永远是 null。 */
+  function seedSig(d) {
+    if (!d) return '';
+    try {
+      var str = JSON.stringify(d), h = 0;
+      for (var i = 0; i < str.length; i += 7) h = (h * 31 + str.charCodeAt(i)) | 0;
+      return str.length + ':' + h;
+    } catch (e) { return String((d.records || []).length); }
+  }
+  function cubeReload(updated) {
+    if (!updated) return;
+    try {
+      var f = document.getElementById('cubeFrame');
+      if (f && f.contentWindow) f.contentWindow.postMessage({ __cubeDataUpdated: true }, '*');
+    } catch (e) { /* iframe 还没起来：它启动时自己读新的 localStorage */ }
+  }
+
   window.__cubeDataReady = !ok;
+  window.QZ_SEED = null;
   window.BILL_READY = new Promise(function (resolve) {
     if (!ok) {
       /* 没连仓库：不取、不读、不留 —— 本机就是一本空账本 */
@@ -189,22 +216,45 @@
       return;
     }
     var boot = vaultKey().then(hydrate);
-    /* 魔方那份只有 20KB，和账本并行取，但不让它拖住账本启动 */
-    fetchCube(cfg).catch(function () { /* 取不到就留给子页自己取 */ })
-      .then(function () { window.__cubeDataReady = true; });
+    boot.then(function () {
+      /* 密屉解完就放行：本地这份已经足够把所有图表画出来 */
+      window.__cubeDataReady = true;
+      resolve(settle(window.QZ_SEED, ''));
+    }, function () {
+      window.__cubeDataReady = true;
+      resolve(settle(null, ''));
+    });
+
+    /* 远端只做后台校正：拿到更新的快照就落密屉、通知页面与 iframe */
     Promise.all([
       fetchPrivate(cfg).then(
         function (d) { return { d: d, err: '' }; },
         function (e) { return { d: null, err: (e && e.message) || '读取私有数据失败' }; }
       ),
-      boot
+      fetchCube(cfg).catch(function () { return false; })
     ]).then(function (r) {
-      resolve(settle(r[0].d, r[0].err));
+      var remote = r[0].d, changed = false, hadSeed = !!window.QZ_SEED;
+      if (remote) {
+        changed = seedSig(remote) !== seedSig(window.QZ_SEED);
+        window.QZ_SEED = remote;
+        window.QZ_DATA = remote;
+        /* 没变就不重新加密一遍 —— 账单快照不小，没必要每次刷新都白忙 */
+        if ((changed || !hadSeed) && window.QZ_VAULT_KEY && window.QZVault) {
+          window.QZVault.save(window.QZ_VAULT_KEY, 'seed', remote);
+        }
+      }
+      if (r[0].err) state.error = r[0].err;
+      settle(window.QZ_SEED || null, state.error);
+      if (changed && window.QZPrivate && window.QZPrivate.onRemote) {
+        try { window.QZPrivate.onRemote(window.BILL_DATA); } catch (e) { /* 页面还没初始化完 */ }
+      }
+      cubeReload(!!r[1]);
     });
   });
 
   /* 给同步层用：连上仓库后要不要刷新一次、断开后要不要立刻清空内存里的数据 */
   window.QZPrivate = {
+    onRemote: null,
     status: function () { return state; },
     needsReload: function (c) { return gate(c || readCfg()) && !state.active; },
     dropIfActive: function () {
@@ -218,6 +268,8 @@
       if (window.QZVault) {
         window.QZVault.drop('ledger');
         window.QZVault.drop('cube');
+        window.QZVault.drop('seed');
+        window.QZ_SEED = null;
       }
       try {
         localStorage.removeItem('qingzhang.ledger.v1');

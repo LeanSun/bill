@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.47';
+  var ASSET_V = '1.0.48';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1386,44 +1386,47 @@
     });
   }
 
-  /* 支出构成：图例上墙，用引线连到扇区，不再另起一段下方图例 */
+  /* 支出构成：v1.0.48 从环形图换成横向排行条。
+     环形图只给百分比、金额要靠悬浮猜；现在每一行「分类 — 条 — 金额 · 占比」，
+     排序后一眼看出钱花在哪，点一行依旧跳到该分类明细。 */
   function renderDonut(p) {
     fillDonutYears();
     var data = catTotals(scopeRecords().filter(function (r) {
       return state.donutYear === 'all' || String(r.year) === String(state.donutYear);
-    })).filter(function (d) { return d.value > 0; });
-    var total = data.reduce(function (s, d) { return s + d.value; }, 0);
+    })).filter(function (d) { return d.value > 0; }).sort(function (a, b) { return b.value - a.value; });
+    var total = data.reduce(function (sum, d) { return sum + d.value; }, 0);
     var colors = catColors(p);
     var nameIndex = {};
     EXPENSE_CATS.forEach(function (c, i) { nameIndex[c] = i; });
     var o = baseOption(p);
-    o.color = colors;
+    o.grid = { left: 2, right: 92, top: 6, bottom: 2, containLabel: true };
     o.tooltip = tooltipCommon(p, {
       trigger: 'item',
-      formatter: function (d) { return d.marker + d.name + '<br/><b>' + fmtYuan(d.value) + '</b> · ' + d.percent + '%'; }
+      formatter: function (d) {
+        return d.marker + d.name + '<br/><b>' + fmtYuan(d.value) + '</b> · ' + pctText(total ? d.value / total * 100 : 0) +
+          '<br/>点这一行看明细';
+      }
     });
-    o.graphic = [
-      { type: 'text', left: 'center', top: '46%', style: { text: fmtBig(total), fill: p.text, font: '700 21px ' + p.font, textAlign: 'center' } },
-      { type: 'text', left: 'center', top: '59%', style: { text: '总支出', fill: p.muted, font: '500 11px ' + p.font, textAlign: 'center' } }
-    ];
+    o.xAxis = { type: 'value', show: false, min: 0, max: total || 1 };
+    o.yAxis = {
+      type: 'category', inverse: true, data: data.map(function (d) { return d.name; }),
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: p.text2, fontSize: 11.5, fontWeight: 650, fontFamily: p.font, margin: 8 }
+    };
     o.series = [{
-      type: 'pie', radius: ['42%', '62%'], center: ['50%', '52%'],
-      avoidLabelOverlap: true, minAngle: 4,
-      itemStyle: { borderColor: p.surface, borderWidth: 3, borderRadius: 6 },
+      type: 'bar', barWidth: 10, barCategoryGap: '38%',
+      data: data.map(function (d) {
+        return {
+          name: d.name, value: d.value,
+          itemStyle: { color: colors[nameIndex[d.name]] || p.primary, borderRadius: [0, 6, 6, 0] }
+        };
+      }),
       label: {
-        show: true, position: 'outside', alignTo: 'edge', edgeDistance: 2, bleedMargin: 0,
-        formatter: function (d) { return d.name + '  {p|' + pctText(d.percent) + '}'; },
-        color: p.text2, fontSize: 11.5, fontFamily: p.font, fontWeight: 600,
-        rich: { p: { color: p.muted, fontSize: 10.5, fontWeight: 500 } }
+        show: true, position: 'right', distance: 7,
+        formatter: function (d) { return fmtBig(d.value) + '  ' + pctText(total ? d.value / total * 100 : 0); },
+        color: p.text2, fontSize: 11, fontWeight: 650, fontFamily: p.font
       },
-      labelLine: { show: true, length: 7, length2: 9, smooth: true, lineStyle: { color: p.borderStrong, width: 1 } },
-      labelLayout: { hideOverlap: true },
-      emphasis: {
-        scale: true, scaleSize: 6,
-        itemStyle: { shadowBlur: 20, shadowColor: withAlpha(p.primary, .3) },
-        label: { fontWeight: 700, color: p.text }
-      },
-      data: data.map(function (d) { return { name: d.name, value: d.value, itemStyle: { color: colors[nameIndex[d.name]] || p.primary } }; })
+      emphasis: { itemStyle: { opacity: .82 } }
     }];
     setOpt('chartDonut', o);
     bindClick('chartDonut', function (params) { if (params.name) jumpToDetail({ reset: true, category: params.name }); });
@@ -2689,8 +2692,8 @@
       var k = dateKey(d);
       return { k: k, v: round(byDate[k] || 0), d: d };
     }
-    function card(title, body, idx) {
-      return '<div class="ins-card" style="--i:' + idx + '"><h4>' + title + '</h4>' +
+    function card(title, body, idx, extra) {
+      return '<div class="ins-card' + (extra ? ' ' + extra : '') + '" style="--i:' + idx + '"><h4>' + title + '</h4>' +
         '<div class="ins-body">' + body + '</div></div>';
     }
 
@@ -2702,24 +2705,19 @@
       if (y.v > max7) max7 = y.v;
       if (y.v < min7) min7 = y.v;
     }
-    var span7 = Math.max(1, max7 - min7);
-    function lx(i) { return 7 + i * (206 / 6); }
-    function ly(v) { return 37 - ((v - min7) / span7) * 30; }
-    var pts7 = week.map(function (h, i) { return lx(i).toFixed(1) + ',' + ly(h.v).toFixed(1); }).join(' ');
-    var area7 = 'M' + lx(0).toFixed(1) + ',40 L' + pts7.split(' ').join(' L') + ' L' + lx(6).toFixed(1) + ',40 Z';
-    var dots7 = week.map(function (h, i) {
-      var t = h.k + '\n支出 ' + fmtYuan(h.v) + (i === 6 ? '\n今天' : '');
-      return '<circle class="ins-ln-dot' + (i === 6 ? ' is-today' : '') + '" cx="' + lx(i).toFixed(1) +
-        '" cy="' + ly(h.v).toFixed(1) + '" r="' + (i === 6 ? 3.4 : 2.4) +
-        '" data-tip="' + esc(t) + '" data-jump-day="' + h.k + '"/>';
+    /* 近 7 日支出：七根柱子，今天单独一种色并标「今天」；整根柱可点跳到那天。
+       折线那版图上七个点只有 2.4px，既看不出高低也点不中 —— 换成柱就都能了。 */
+    var bars7 = week.map(function (h, i) {
+      var isToday = i === 6;
+      var hgt = Math.max(4, h.v / max7 * 100);
+      var label = h.k + ' 支出 ' + fmtYuan(h.v) + (isToday ? '（今天）' : '');
+      return '<button type="button" class="ins-wd' + (isToday ? ' is-today' : '') + '"' +
+        ' data-jump-day="' + h.k + '" data-tip="' + esc(label) + '"' +
+        ' aria-label="' + esc(label) + '" style="--h:' + hgt.toFixed(1) + '%">' +
+        '<b style="height:' + hgt.toFixed(1) + '%"></b>' +
+        '<span>' + (isToday ? '今天' : WD[h.d.getDay()]) + '</span></button>';
     }).join('');
-    var line7 =
-      '<svg class="ins-line" viewBox="0 0 220 44" preserveAspectRatio="none" aria-hidden="true">' +
-      '<path class="ins-ln-area" d="' + area7 + '"/>' +
-      '<polyline class="ins-ln-path" points="' + pts7 + '"/>' + dots7 + '</svg>' +
-      '<div class="ins-ln-x">' + week.map(function (h, i) {
-        return '<span' + (i === 6 ? ' class="is-today"' : '') + '>' + WD[h.d.getDay()] + '</span>';
-      }).join('') + '</div>';
+    var line7 = '<div class="ins-wds">' + bars7 + '</div>';
 
     /* 3) 本月累计 / 今年收支：本月剩余拿近 6 个完整月的月均当参照，
        今年结余直接是当年收入减支出 —— 两个口径都写在卡片脚注里 */
@@ -2755,11 +2753,15 @@
       if (r.type === 'income') mInc += r.amount; else mExp += r.amount;
     });
     var mNow = round(mInc - mExp);
-    var mNowPct = mInc > 0 ? Math.max(0, Math.min(100, mExp / mInc * 100)) : 0;
-    var mLeft = monthBudget - mtd, yLeft = round(yInc - yExp);
-    var mLeftPct = monthBudget > 0 ? Math.max(0, Math.min(100, mtd / monthBudget * 100)) : 0;
-    /* 年结余的进度条按"花掉收入的比例"显示，越低越省 */
-    var yLeftPct = yInc > 0 ? Math.max(0, Math.min(100, yExp / yInc * 100)) : 0;
+    /* v1.0.48：条长一律表达「还剩多少 / 参照多少」，不再是花掉的比例。
+       超支时剩余为负，条子落到 0，金额那侧照旧显示「超支 ¥X」。 */
+    function leftPct(left, base) {
+      return base > 0 ? Math.max(0, Math.min(100, left / base * 100)) : 0;
+    }
+    var mLeft = round(monthBudget - mtd), yLeft = round(yInc - yExp);
+    var mNowPct = leftPct(mNow, mInc);
+    var mLeftPct = leftPct(mLeft, monthBudget);
+    var yLeftPct = leftPct(yLeft, yInc);
 
     /* 2b) 今天花得多吗：只回答一个问题——今天这笔，跟本月平常的日子比算多算少。
        一根横条把「今天」放在「本月单日最高」的刻度上，日均位置打一个刻度点，
@@ -2883,27 +2885,29 @@
       '<div class="ins-rest">' +
       '<div class="ir-line"><span>过往对比</span><b class="' + (mLeft < 0 ? 'is-over' : '') + '">' +
       (mLeft < 0 ? '超支 ' + fmtYuan(-mLeft) : fmtYuan(mLeft)) + '</b></div>' +
-      '<div class="ir-bar" data-tip="' + esc('已花 ' + fmtYuan(mtd) + ' / 近 6 月月均 ' + fmtYuan(monthBudget)) +
+      '<div class="ir-bar" data-tip="' + esc('剩余 ' + fmtYuan(mLeft) + ' / 近 6 月月均 ' + fmtYuan(monthBudget) + ' · 剩 ' + mLeftPct.toFixed(0) + '%') +
       '"><i style="width:' + mLeftPct.toFixed(1) + '%"></i></div>' +
-      '<div class="ir-note">已花 ' + fmtYuan(mtd) + ' · 近 6 月月均 ' + fmtYuan(monthBudget) + '</div>' +
+      '<div class="ir-note">已花 ' + fmtYuan(mtd) + ' · 近 6 月月均 ' + fmtYuan(monthBudget) +
+      ' · 剩 ' + mLeftPct.toFixed(0) + '%</div>' +
       '<div class="ir-line is-now"><span>本月剩余</span><b class="' + (mNow < 0 ? 'is-over' : '') + '">' +
       (mNow < 0 ? '超支 ' + fmtYuan(-mNow) : fmtYuan(mNow)) + '</b></div>' +
-      '<div class="ir-bar is-now" data-tip="' + esc('本月已花 ' + fmtYuan(mExp) + ' / 本月收 ' + fmtYuan(mInc)) +
+      '<div class="ir-bar is-now" data-tip="' + esc('本月剩余 ' + fmtYuan(mNow) + ' / 本月收 ' + fmtYuan(mInc) + ' · 剩 ' + mNowPct.toFixed(0) + '%') +
       '"><i style="width:' + mNowPct.toFixed(1) + '%"></i></div>' +
-      '<div class="ir-note">本月收 ' + fmtYuan(mInc) + ' · 支 ' + fmtYuan(mExp) + '</div>' +
+      '<div class="ir-note">本月收 ' + fmtYuan(mInc) + ' · 支 ' + fmtYuan(mExp) +
+      ' · 剩 ' + mNowPct.toFixed(0) + '%</div>' +
       '<div class="ir-line is-year"><span>年度结余</span><b class="' + (yLeft < 0 ? 'is-over' : '') + '">' +
       (yLeft < 0 ? '超支 ' + fmtYuan(-yLeft) : fmtYuan(yLeft)) + '</b></div>' +
-      '<div class="ir-bar is-year" data-tip="' + esc('今年收 ' + fmtYuan(yInc) + ' / 支 ' + fmtYuan(yExp)) +
+      '<div class="ir-bar is-year" data-tip="' + esc('年度结余 ' + fmtYuan(yLeft) + ' / 今年收 ' + fmtYuan(yInc) + ' · 剩 ' + yLeftPct.toFixed(0) + '%') +
       '"><i style="width:' + yLeftPct.toFixed(1) + '%"></i></div>' +
       '<div class="ir-note">收 ' + compactY(yInc) + ' · 支 ' + compactY(yExp) +
-      ' · 存下 ' + (yInc > 0 ? Math.round((yInc - yExp) / yInc * 100) : 0) + '%</div>' +
+      ' · 存下 ' + yLeftPct.toFixed(0) + '%</div>' +
       '</div>';
 
     return card('近 7 日支出', line7, 0) +
       card('今天花得多吗', cmpCard, 1) +
       card('还剩多少', restCard, 2) +
       card('当日分类构成', catCard, 3) +
-      card('体重记录', weightCard, 4);
+      card('体重记录', weightCard, 4, 'is-weight');
   }
 
   /* 左栏内容随当天分类数变化：先按紧凑排版，仍超高就整体等比缩小，
@@ -5721,6 +5725,15 @@
   function init() {
     /* 私人数据门禁：没连到主人仓库就是空账本；连上了先读完私有仓库
        再启动渲染，否则图表会先按空数据画一遍，再整体重画。 */
+    /* 远端快照在后台补齐时只重画一次，不让首屏再等一趟网络 */
+    if (window.QZPrivate) {
+      window.QZPrivate.onRemote = function (remote) {
+        if (!remote) return;
+        applyDataset(remote);
+        if (state.store) mergeSeedWeights();
+        renderAll();
+      };
+    }
     var ready = (window.BILL_READY && typeof window.BILL_READY.then === 'function')
       ? window.BILL_READY : Promise.resolve(window.BILL_DATA || {});
     Promise.resolve(ready).then(function (d) { applyDataset(d); startApp(); },

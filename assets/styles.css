@@ -3155,3 +3155,70 @@ html[data-theme="dark"] .ir-line.is-year b.is-over { color: #f08a80; }
 
 /* 整页滑动期间棋盘之间不留缝隙：副本本身有底色，滑过时看不出接缝 */
 .cal-board { isolation: isolate; }
+
+/* ==================================================================
+   v1.0.48
+   ------------------------------------------------------------------
+   1. 比例条改成左淡右浓渐变，条长表达「剩余 / 参照」；
+   2. 近 7 日支出折线改七根可点的柱，今天单独标色；
+   3. 最近记录跨天加一道短竖线；
+   4. 体重卡标题压扁，把高度让给迷你折线。
+   ================================================================== */
+
+/* ---- 1. 比例条：左淡右浓；is-now 保住原来的绿→蓝 ---------------- */
+.ir-bar i {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--primary) 24%, var(--surface-3)) 0%, var(--primary) 100%) !important;
+}
+.ir-bar.is-now i {
+  background: linear-gradient(90deg, var(--income), var(--primary)) !important;
+}
+.ir-bar.is-year i {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, #e35c5c 26%, var(--surface-3)) 0%, #e35c5c 100%) !important;
+}
+html[data-theme="dark"] .ir-bar.is-year i {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, #ef6f6f 26%, var(--surface-3)) 0%, #ef6f6f 100%) !important;
+}
+
+/* ---- 2. 近 7 日：柱形，整根可点；今天橙色 + 标签底色 ------------- */
+.ins-wds { gap: 5px; height: 56px; align-items: stretch; }
+.ins-wd {
+  position: relative; flex: 1 1 0; min-width: 0; height: 100%;
+  padding: 0; border: 0; background: none; border-radius: 6px;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ins-wd b {
+  display: block; width: 100%; max-width: 24px; min-height: 4px;
+  border-radius: 5px 5px 2px 2px;
+  background: color-mix(in srgb, var(--primary) 45%, var(--surface));
+  transition: background-color .16s, transform .16s var(--ease); transform-origin: bottom;
+}
+.ins-wd:hover b { background: var(--primary); transform: scaleY(1.05); }
+.ins-wd.is-today b {
+  background: linear-gradient(180deg, #ef8e5b, #d9542f);
+  box-shadow: 0 2px 7px -3px color-mix(in srgb, #d9542f 70%, transparent);
+}
+.ins-wd span { font-size: 9.5px; color: var(--muted); line-height: 1; }
+.ins-wd.is-today span {
+  color: #d9542f; font-weight: 800;
+  padding: 1px 3px; border-radius: 4px;
+  background: color-mix(in srgb, #d9542f 13%, transparent);
+}
+html[data-theme="dark"] .ins-wd.is-today span { color: #ff9c74; }
+
+/* ---- 3. 最近记录：跨天在 38px 空档中间立一道浅竖线 -------------- */
+.rs-item.is-newday { position: relative; margin-left: 38px; }
+.rs-item.is-newday::before {
+  content: ''; position: absolute; left: -21px; top: 7px; bottom: 7px; width: 2px;
+  border-radius: 2px; background: var(--border-strong, var(--border));
+  opacity: .75;
+}
+
+/* ---- 4. 体重卡：标题收成一行小字，折线拿到多出来的高度 ---------- */
+.ins-card.is-weight h4 { margin: 0; font-size: 10.5px; line-height: 14px; }
+.ins-card.is-weight .iw-sparkwrap { margin: 5px 0 2px; }
+.ins-card.is-weight .iw-spark { height: 52px; }
+.ins-card.is-weight .iw-val b { font-size: 22px; }

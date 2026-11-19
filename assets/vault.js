@@ -13,7 +13,9 @@
 
   var NAMES = {
     ledger: 'qingzhang.vault.ledger.v1',
-    cube: 'qingzhang.vault.cube.v1'
+    cube: 'qingzhang.vault.cube.v1',
+    /* 私有账单的加密快照：首屏先读它，网络那趟只做后台校正（v1.0.48） */
+    seed: 'qingzhang.vault.seed.v1'
   };
   var subtle = (window.crypto && window.crypto.subtle) ? window.crypto.subtle : null;
   var keys = {};
