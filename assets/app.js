@@ -5045,13 +5045,16 @@
       : s === 'week' ? $('calWeekGrid') : $('calDayBoard');
   }
 
-  /* 收掉还没走完的翻页：换粒度、换视图、关弹窗时都要先清干净 */
+  /* 收掉还没走完的翻页：换粒度、换视图、关弹窗时都要先清干净。
+     四块棋盘各擦一遍 —— 换粒度那一瞬间，正在动的可能是上一块。 */
   function softReset() {
     if (turnTimer) { clearTimeout(turnTimer); turnTimer = 0; }
     if (wheelQuiet) { clearTimeout(wheelQuiet); wheelQuiet = 0; }
     turnLock = 0; wheelAcc = 0; wheelDir = 0;
-    var el = softTarget();
-    if (el) el.classList.remove('pt-out', 'pt-in');
+    ['calGrid', 'calWeekGrid', 'calDayBoard', 'calYearBoard'].forEach(function (id) {
+      var el = $(id);
+      if (el) el.classList.remove('pt-out', 'pt-in');
+    });
   }
 
   /* 一次翻页：出 → 换内容 → 进。dir > 0 是往后翻（下一月 / 下一周）。 */
@@ -5059,10 +5062,11 @@
     var el = softTarget();
     if (!el) { shiftCalStep(dir); return; }
     if (el.classList.contains('pt-in') || el.classList.contains('pt-out')) {
-      /* 上一段还没收完：直接换内容，动画从新的一段重来，
-         绝不让两层位移叠在同一帧上 */
-      shiftCalStep(dir);
-      return;
+      /* 上一段还没收完：先把它连定时器一起收干净，再从零走一整段 ——
+         留着半截动画会卡在 opacity:0 上 */
+      if (turnTimer) { clearTimeout(turnTimer); turnTimer = 0; }
+      el.classList.remove('pt-out', 'pt-in');
+      void el.offsetWidth;
     }
     var x = (dir > 0 ? -1 : 1) * 22;
     el.style.setProperty('--pt-x', x + 'px');
@@ -5076,7 +5080,7 @@
       turnTimer = setTimeout(function () {
         el.classList.remove('pt-in');
         turnTimer = 0;
-      }, 210);
+      }, 250);
     }, 120);
   }
 
