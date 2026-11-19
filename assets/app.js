@@ -4197,15 +4197,20 @@
     try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* noop */ }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
-    var swap = function () {
-      document.documentElement.setAttribute('data-theme', t);
-      if (!deferCharts) renderCharts(state.view, 'instant');
-      /* 让 iframe 同一帧换色；子页自己会 repaint 行底色与图表 */
-      var f = $('cubeFrame');
-      if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __ledgerTheme: t }, '*'); } catch (e) {} }
-    };
-    if (document.startViewTransition) document.startViewTransition(swap);
-    else swap();
+    var root = document.documentElement;
+    /* v1.0.43：不再走 startViewTransition。
+       那条管线会把旧帧拍成快照再和新帧交叉淡入，浅切成深的那一下整屏先亮起来，
+       就是他说的「闪、刺眼」。现在直接换 token，只在换色的这两帧按住全站过渡
+       （几十个控件各自补间 220ms，屏幕上就是一层从旧配色化过去的抖动）。 */
+    root.classList.add('theme-snap');
+    root.setAttribute('data-theme', t);
+    if (!deferCharts) renderCharts(state.view, 'instant');
+    /* 让 iframe 同一帧换色；子页自己会 repaint 行底色与图表 */
+    var f = $('cubeFrame');
+    if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __ledgerTheme: t }, '*'); } catch (e) {} }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { root.classList.remove('theme-snap'); });
+    });
   }
 
   /* 换肤：光晕已取消。只做一次 token + 图表配色的同步替换，
@@ -4640,18 +4645,40 @@
       state.weightYear = v;
       renderCharts('overview', 'instant');
     });
-    /* v1.0.40：魔方子页在 iframe 里开弹窗时，父页这一层也跟着糊起来 */
+    /* v1.0.40：魔方子页在 iframe 里开弹窗时，父页这一层也跟着糊起来。
+       v1.0.43：这一层改成整屏一张、中间给 iframe 挖洞。
+       子页是透明的（html.is-embed），整屏铺过去会和他自己那张 42% / 7px
+       叠成两层，左右两侧的虚化就深浅不一。洞的位置按 iframe 真实矩形写。 */
     var veil = $('cubeGlobalVeil');
-    if (veil) veil.addEventListener('click', function () {
+    function veilBand() {
+      if (!veil || veil.hidden) return;
+      var f = $('cubeFrame');
+      if (!f) return;
+      var r = f.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      var W = Math.round(window.innerWidth), H = Math.round(window.innerHeight);
+      var x = Math.round(r.left), y = Math.round(r.top);
+      var w = Math.round(r.width), h = Math.round(r.height);
+      /* 外圈顺时针、内圈逆时针：nonzero 规则下内圈就是一个洞 */
+      veil.style.clipPath = 'path("M0 0H' + W + 'V' + H + 'H0Z ' +
+        'M' + x + ' ' + y + 'V' + (y + h) + 'H' + (x + w) + 'V' + y + 'Z")';
+      veil.style.webkitClipPath = veil.style.clipPath;
+    }
+    function cubeCloseFrameModal() {
       var f = $('cubeFrame');
       if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __cubeModalClose: true }, '*'); } catch (e) {} }
-    });
+    }
+    if (veil) {
+      veil.addEventListener('click', function () { cubeCloseFrameModal(); });
+      window.addEventListener('resize', veilBand);
+    }
     window.addEventListener('message', function (e) {
       var d = e && e.data; if (!d || !d.__cubeModal) return;
       var veil = $('cubeGlobalVeil'); if (!veil) return;
       if (d.open) {
         veil.hidden = false;
-        requestAnimationFrame(function () { veil.classList.add('is-on'); });
+        veilBand();
+        requestAnimationFrame(function () { veil.classList.add('is-on'); veilBand(); });
       } else {
         veil.classList.remove('is-on');
         setTimeout(function () { veil.hidden = true; }, 240);
@@ -4661,6 +4688,9 @@
       if (e.key === 'Escape') {
         if (dp.open) { closeDp(); return; }
         if (cmpOpen) { closeCmp(); return; }
+        /* 魔方 / 比赛弹窗在 iframe 里：焦点留在父页时父页先接到这个键，
+           直接转给子页走它的顶层优先路径（确认框 → 编辑弹窗 → 目录弹窗） */
+        if (veil && !veil.hidden) { cubeCloseFrameModal(); return; }
         if (!$('confirmBackdrop').hidden) { closeConfirm(); return; }
         closeModal('esc');
         return;
@@ -4976,16 +5006,13 @@
      两页同屏：旧内容拍快照（ghost）滑出去，真节点装新页滑进来，
      p 到 1 才交割 —— 那一帧新旧完全重合，看不见换页。
      四档方向：月/年/日竖向，周横向。 */
-  var SOFT_SPAN = 300;          /* 滚轮量累计 300px = 一整页；一格 100px ≈ 1/3 页 */
-  var SOFT_W = 16;              /* 弹簧角频率（rad/s）：越小越绵，越大越跟手 */
-  var SOFT_W_TIGHT = 18;        /* 结算段略硬一点，收得干净 */
+  var SOFT_SPAN = 620;          /* 滚轮量累计 620px = 一整页；一格 120px ≈ 0.19 页 */
   var SOFT_IDLE = 150;          /* 停手多久开始结算 */
-  var SOFT_COMMIT = .16;        /* 结算时进度超过这里就交割，否则原路退回 */
+  var SOFT_COMMIT = .18;        /* 结算时进度超过这里就交割，否则原路退回 */
   var wheelLock = 0;
   var soft = {
     on: false, el: null, ghost: null, host: null,
-    p: 0, v: 0, aim: 0, axis: 'y', size: 0, dir: 1, head: null,
-    tight: false, queue: 0
+    p: 0, v: 0, aim: 0, axis: 'y', size: 0, dir: 1, head: null
   };
   var softIdle = 0, softRaf = 0, softKill = 0, softLast = 0;
 
@@ -5009,7 +5036,6 @@
     }
     soft.on = false; soft.el = null; soft.ghost = null; soft.host = null;
     soft.p = 0; soft.v = 0; soft.aim = 0; soft.size = 0; soft.head = null;
-    soft.tight = false; soft.queue = 0;
     softLast = 0;
   }
 
@@ -5087,7 +5113,7 @@
 
     soft.on = true; soft.el = el; soft.ghost = ghost; soft.host = host;
     soft.axis = axis; soft.size = size; soft.dir = dir;
-    soft.p = 0; soft.v = 0; soft.aim = 0; soft.tight = false;
+    soft.p = 0; soft.v = 0; soft.aim = 0;
     el.style.willChange = 'transform';
     softPaint(0);
     var oldHead = headSnap();
@@ -5100,11 +5126,11 @@
   /* 交割：已经滑到底，把 ghost 撤掉，真节点归位 —— 此刻它本就在 0 */
   function softSettle() {
     if (!soft.on) return;
-    var el = soft.el, dir = soft.dir, next = soft.queue || 0;
+    var el = soft.el, dir = soft.dir;
     var ax = soft.axis;
     if (el) { el.style.transition = 'none'; }
     headApply(soft.head);
-    wheelLock = Date.now() + 46;   /* 只挡同一个 notch 的重入，不掐后续滚轮 */
+    wheelLock = Date.now() + 24;   /* 只挡同一个 notch 的重入，不掐后续滚轮 */
     softReset();
     /* 交割后一记很轻的曲线回弹：先越过 4px 再收回来，收在 cubic-bezier 上 */
     if (el && el.animate) {
@@ -5114,8 +5140,6 @@
         : [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(0,' + d + 'px,0)' }, { transform: 'translate3d(0,0,0)' }];
       el.animate(frames, { duration: 340, easing: 'cubic-bezier(.22,1,.36,1)' });
     }
-    /* 快速连滚时多出来的一格：交割完立刻接上下一页，中间不留空档 */
-    if (next > 0 && softStart(dir)) { soft.aim = 1; soft.tight = true; softGlide(); }
   }
 
   /* 退回：p 已经走回 0，把旧页重新渲进真节点，撤掉 ghost */
@@ -5128,87 +5152,60 @@
     softReset();
   }
 
-  /* 弹簧引擎：唯一的运动来源。子步长固定 1/120s 积分，掉帧也不会炸；
-     速度连续 —— 这是「丝滑」的全部秘密，位置每帧前进多少不重要，
-     重要的是每帧的加速度收得住。 */
-  function softGlide() {
-    if (softRaf) return;
+  /* 追随：p 指数逼近目标。
+     v1.0.43 换掉那条临界阻尼弹簧 —— 弹簧每帧要「先加速再收力」，
+     和滚轮一格一格往里塞目标叠在一起时，位置会跑到目标前面去，
+     于是滚轮刚到 100% 页面已经交割、剩下的动量又推着走一遍。
+     指数逼近的好处是只有一条曲线：目标一改就往那儿走，
+     帧间位移单调递减，不越过目标，也就没有「重播」那回事。
+     时间常数 85ms：一格滚轮（0.19 页）大约四帧走完，跟着手走。 */
+  function softFollowTo(goal) {
+    soft.aim = Math.max(0, Math.min(1, goal));
+    if (softRaf) return;                  /* 已经在追，改目标就够了 */
     softLast = 0;
     softRaf = requestAnimationFrame(function step(ts) {
       softRaf = 0;
       if (!soft.on) return;
-      var dt = softLast ? Math.min(34, ts - softLast) / 1000 : 1 / 60;
+      var dt = softLast ? Math.min(48, ts - softLast) : 16;
       softLast = ts;
-      var w = soft.tight ? SOFT_W_TIGHT : SOFT_W;
-      var k = w * w, c = 2 * w;          /* 临界阻尼：不弹、不过冲 */
-      var left = dt;
-      while (left > 0) {
-        var h = Math.min(left, 1 / 120);
-        soft.v += (k * (soft.aim - soft.p) - c * soft.v) * h;
-        soft.p += soft.v * h;
-        left -= h;
-      }
-      if (soft.p >= 1) { soft.p = 1; if (soft.v > 0) soft.v = 0; }
-      else if (soft.p <= 0) { soft.p = 0; if (soft.v < 0) soft.v = 0; }
-
-      /* 到站：位置贴住目标、速度也落下来了，就把 p 吸到目标上再判结果。
-         这一步很关键 —— 只「停住」不「吸附」，p 会永远卡在 0.996 上。 */
-      var arrived = Math.abs(soft.aim - soft.p) < .004 && Math.abs(soft.v) < .12;
-      if (arrived) soft.p = soft.aim;
+      var k = 1 - Math.exp(-dt / 85);
+      soft.p += (soft.aim - soft.p) * k;
+      if (Math.abs(soft.aim - soft.p) < .002) soft.p = soft.aim;
+      if (soft.p >= 1) { soft.p = 1; softPaint(1); softSettle(); return; }
+      if (soft.p <= 0 && soft.aim <= 0) { soft.p = 0; softPaint(0); softRollback(); return; }
       softPaint(soft.p);
-
-      if (soft.p >= 1) { softSettle(); return; }
-      if (soft.p <= 0) { softRollback(); return; }
-      if (arrived) return;               /* 停在半路，等下一个滚轮把它推完 */
+      if (soft.p === soft.aim) return;    /* 追上了，停在这里等下一个滚轮 */
       softRaf = requestAnimationFrame(step);
     });
   }
 
-  /* 滚轮：只改目标，运动交给弹簧；停手 200ms 后结算。
-     一格（100px）≈ 0.28 页，超过 22% 就认这一页 —— 单格也能翻，
-     但翻的过程是几十帧走完的，不是一帧跳过去。 */
+  /* 滚轮：一格 ≈ 0.19 页，画面几帧之内跟到位；停手 150ms 后结算。
+     攒够 18% 才认这一页 —— 轻扫一格也能翻，但翻的过程是滑过去的。 */
   function softWheel(d) {
     var dir = d > 0 ? 1 : -1;
-    var mag = Math.min(150, Math.abs(d));
+    var mag = Math.min(240, Math.abs(d));
     if (mag < .6) return;
     if (soft.on && dir !== soft.dir) {
-      /* 中途换向：按「就近归属」处理 —— 没到一半就原路回上一页，
-         过了一半就把这一页走完。回程要丢掉攒下的连滚，别把人往反方向带 */
-      soft.queue = 0;
-      soft.tight = true;
-      soft.aim = soft.p < .5 ? 0 : 1;
-      softGlide();
+      /* 中途换向：按「就近归属」处理 —— 没滑过一半就原路回上一页 */
+      softFollowTo(soft.p < .5 ? 0 : 1);
       return;
     }
-    /* 这一页已经排满了，再来一格就记在账上，交割后紧接着翻 —— 连滚不丢手感 */
-    if (soft.on && soft.aim >= 1) { soft.queue = Math.min(1, soft.queue + 1); return; }
-    if (!softStart(dir)) { shiftCalStep(dir); return; }
-    /* v1.0.42：上一轮停手结算的弹簧可能还在跑，会和滚轮直接推位置抢同一帧，
-       看起来就是「刚滑就卡」。新滚轮一到先撤掉它，再同步推到光标位置。 */
-    if (softRaf) { cancelAnimationFrame(softRaf); softRaf = 0; }
-    soft.p = Math.min(1, soft.p + mag / SOFT_SPAN);
-    soft.v = 0;
-    soft.aim = soft.p;
-    softPaint(soft.p);
+    if (!soft.on) { if (!softStart(dir)) { shiftCalStep(dir); return; } }
+    /* 目标往上叠：滚得快的人目标叠得远，画面一直追着它走 */
+    softFollowTo(soft.aim + mag / SOFT_SPAN);
     if (softIdle) clearTimeout(softIdle);
     softIdle = setTimeout(function () {
       softIdle = 0;
       if (!soft.on) return;
-      soft.tight = true;                       /* 结算段稍硬一点，收得干净 */
-      /* 走得够远、目标本身够一格（慢弹簧下 p 还没跟上）、或者还在往前冲
-         都算数；只有板子轻扫那种一丁点目标才退回 */
-      soft.aim = (soft.aim >= .3 || soft.p >= SOFT_COMMIT || soft.v > .8) ? 1 : 0;
-      softGlide();
+      softFollowTo(soft.aim >= SOFT_COMMIT ? 1 : 0);
     }, SOFT_IDLE);
   }
 
-  /* 交割到满页：只改目标，运动交给弹簧 —— 从当前速度接着走，不重新起手 */
+  /* 交割到满页：把目标推到 1，剩下的交给追随 */
   function softFinish() {
     if (!soft.on) return;
     if (softIdle) { clearTimeout(softIdle); softIdle = 0; }
-    soft.tight = true;
-    soft.aim = 1;
-    softGlide();
+    softFollowTo(1);
   }
 
   /* 箭头 / ← →：定时曲线推到 1，比滚轮更「有主见」，但不硬切 */
@@ -5216,6 +5213,15 @@
      第二次只重启动画却不推进月份；现在先同步推进，再给新网格补一段短滑入。 */
   function softStep(dir) {
     closeCmp();
+    /* 滚轮那一页还在半路就点了箭头：先把滚轮按「不认」撤回去，
+       再走箭头这一步 —— 否则两套推进叠在一起，会一次跳两页 */
+    if (soft.on) {
+      var back = soft.dir;
+      soft.p = 0; soft.aim = 0; soft.v = 0;
+      softPaint(0);
+      shiftCalStep(-back);
+      softReset();
+    }
     shiftCalStep(dir);
     var el = softTarget(); if (!el) return;
     var cls = dir > 0 ? 'cal-step-next' : 'cal-step-prev';

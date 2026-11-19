@@ -2888,14 +2888,10 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 .ins-rest .ir-bar { margin: 3px 0 1px; }
 .ins-rest .ir-line.is-now { margin-top: 1px; }
 
-/* ---- 16. 深浅切换：只在切换那 520ms 内挂过渡 -------------------- */
-html.theme-fading,
-html.theme-fading *,
-html.theme-fading *::before,
-html.theme-fading *::after {
-  transition: background-color .46s ease, border-color .46s ease,
-              color .46s ease, box-shadow .46s ease !important;
-}
+/* ---- 16. 深浅切换 ------------------------------------------------
+   v1.0.40 这里是「切换那 460ms 内给全站挂一条颜色过渡」，脚本里从来没有
+   挂过 theme-fading，等于一段死规则。v1.0.43 换成 theme-snap（见文件末尾），
+   这一块整段删掉。 */
 
 /* ---- 17. 支出构成的年度筛选 ------------------------------------ */
 .donut-years { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
@@ -3011,8 +3007,76 @@ html.theme-fading *::after {
 .rs-item.is-newday { margin-left: 20px; }
 /* 4. 今年结余比例条改红 */
 .ir-bar.is-year i { background: var(--danger) !important; }
-/* 5. 整页换肤：View Transition 交叉淡入，一次性换完，不闪不逐块 */
-::view-transition-old(root), ::view-transition-new(root) {
-  animation-duration: .28s;
-  animation-timing-function: ease;
+/* 5. 整页换肤（v1.0.42 的 View Transition 版本已撤，见文件末尾 v1.0.43） */
+
+
+/* ==================================================================
+   v1.0.43
+   ------------------------------------------------------------------
+   1. 低位提示（已记下 / 已恢复）：改用左右 auto 边距居中；
+   2. 今年结余比例条：浅一档的红；
+   3. 换肤：不再走 View Transition，靠 theme-snap 一帧换完；
+   4. 魔方蒙层：整屏一张、按 iframe 矩形挖洞，和里面那张同一参数。
+   ================================================================== */
+
+/* ---- 1. 低位提示：靠 margin 居中，不借 transform ----------------
+   v1.0.42 用的是 left:50% + translateX(-50%)，可 toastIn / toastCenterIn
+   这两组关键帧里写的就是 transform —— 动画一跑就把那句平移盖掉，
+   于是提示条按 left:50% 起头、整条偏到右半边。现在改成左右都 0、
+   宽度按内容收、margin-inline:auto：几何上居中，动画怎么改 transform
+   都带不走它。 */
+.toast.is-low {
+  position: fixed; left: 0; right: 0; bottom: 84px; top: auto;
+  margin-inline: auto; width: max-content;
+  max-width: min(440px, calc(100vw - 40px));
+  transform: none;
 }
+/* 「已记下」那张大卡片同样归到这条中轴，再往下让一档 */
+.toast.is-center.is-low {
+  position: fixed; left: 0; right: 0; top: auto; bottom: 46px;
+  margin-inline: auto; width: max-content;
+  max-width: min(460px, calc(100vw - 48px));
+  transform: none;
+  animation-name: toastLowIn;
+}
+.toast.is-center.is-low.is-out { animation-name: toastLowOut; }
+@keyframes toastLowIn {
+  from { opacity: 0; transform: translateY(18px) scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes toastLowOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(12px) scale(.96); }
+}
+
+/* ---- 2. 今年结余：浅一档的红，压在卡片里不刺眼 ------------------ */
+.ir-bar.is-year i { background: #f09199 !important; }
+html[data-theme="dark"] .ir-bar.is-year i { background: #d9737d !important; }
+
+/* ---- 3. 换肤：一帧换完 ------------------------------------------
+   上一版用 document.startViewTransition()：旧帧快照和新帧交叉淡入，
+   切到深色时中间那一下整屏发白，就是「刺眼」。现在不进那条管线，
+   只在换色的这两帧里把全站过渡按住，避免几十个控件各自补间。 */
+html.theme-snap,
+html.theme-snap *,
+html.theme-snap *::before,
+html.theme-snap *::after {
+  transition: none !important;
+  animation-duration: 1ms !important;
+  animation-delay: 0s !important;
+}
+
+/* ---- 4. 魔方蒙层：整屏一张，中间给 iframe 挖个洞 ------------------
+   子页 iframe 是透明的（html.is-embed），整屏蒙层会从底下透过去，
+   等于同一块地方叠了两层 42% + 两层 7px 模糊 —— 左边工作台浅、右边内容深，
+   就是那圈「左右不一样」。现在父页这张用 clip-path 把 iframe 的矩形挖掉，
+   剩下的工作台、上沿、右沿照样被同一张蒙层盖住；iframe 里面由子页铺
+   同一参数的一张。洞的位置由脚本按真实矩形写（两段子路径反向绕，nonzero
+   填充规则下正是个洞），挖掉的那块连命中测试一起让给 iframe。 */
+.cube-global-veil {
+  position: fixed; inset: 0;
+  background: rgba(17, 26, 45, .42);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+}
+html[data-theme="dark"] .cube-global-veil { background: rgba(3, 7, 14, .62); }
