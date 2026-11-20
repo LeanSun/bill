@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.63';
+  var ASSET_V = '1.0.64';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -4640,7 +4640,10 @@
       if (!box) return;
       var want = YEARS.slice();
       var have = [].map.call(box.querySelectorAll('button'), function (b) { return Number(b.getAttribute('data-cy')); });
-      if (want.length === have.length && want.every(function (y, i) { return y === have[i]; })) return;
+      if (want.length === have.length && want.every(function (y, i) { return y === have[i]; })) {
+        box.style.setProperty('--seg-n', String(Math.max(1, want.length)));
+        return;
+      }
       var ind = box.querySelector('.seg-ind');
       box.innerHTML = '';
       if (ind) box.appendChild(ind);
@@ -4652,6 +4655,8 @@
         if (y === state.calendarYear) b.className = 'is-active';
         box.appendChild(b);
       });
+      /* v1.0.64：段数按实际年份写进 --seg-n。默认 3 列会让 5 个年份折成两行。 */
+      box.style.setProperty('--seg-n', String(Math.max(1, want.length)));
     })();
     bindSeg($('calendarYear'), 'data-cy', function (v) {
       state.calendarYear = Number(v);
@@ -5352,7 +5357,7 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 10,
+    v: 12,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
@@ -5387,7 +5392,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 10 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 12 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }

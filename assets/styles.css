@@ -3536,7 +3536,7 @@ html[data-theme="dark"] .side-nav-glide {
 .cal-beam {
   position: absolute !important; inset: 0; z-index: 3; pointer-events: none;
   border-radius: inherit;
-  padding: 1.5px;
+  padding: 2.2px;
   background: conic-gradient(from var(--beam-a, 0deg),
     color-mix(in srgb, var(--primary) 22%, transparent) 0deg,
     color-mix(in srgb, var(--primary) 40%, transparent) 28deg,
@@ -3611,4 +3611,11 @@ html[data-theme="dark"] .cal-cell.is-today { animation-name: todayCellBreathCalD
 /* 支出构成：金额/占比滑块缩窄，和年份控件宽度更协调 */
 .donut-mode.seg { min-width: 0; width: 132px; flex: 0 0 auto; }
 .donut-mode.seg button { font-size: 12px; }
-.donut-controls { flex-wrap: nowrap; }
+.donut-controls { flex-wrap: wrap; justify-content: flex-start; }
+/* 4 栏卡头太窄放不下标题+两组控件：让控件组整行下沉 */
+.chart-card:has(.donut-controls) .card-head { flex-wrap: wrap; align-items: flex-start; }
+.chart-card:has(.donut-controls) .donut-controls { flex: 1 1 100%; margin-top: 6px; }
+
+/* v1.0.64：消费日历年份控件强制单行，段数由 JS 按实际年份写入 --seg-n */
+#calendarYear.seg { flex-wrap: nowrap; white-space: nowrap; grid-auto-flow: column; }
+#calendarYear.seg button { padding-left: 9px; padding-right: 9px; }
