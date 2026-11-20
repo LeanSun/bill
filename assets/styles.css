@@ -3526,9 +3526,11 @@ html[data-theme="dark"] .side-nav-glide {
 
 /* 月历今天格：关掉旧的 conic 流光伪元素，只留 SVG 光带 */
 .cal-cell.is-today::before { display: none !important; content: none !important; }
+/* 周历不要任何流光：关掉历史遗留的 conic 伪元素（左上角那一截就是它） */
+.wk-col.is-today::before, .ym-day.is-today::before { display: none !important; content: none !important; }
 
 .cal-beam {
-  position: absolute; inset: 0; width: 100%; height: 100%;
+  position: absolute !important; inset: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: 3; overflow: visible;
 }
 .cal-beam rect {
@@ -3539,7 +3541,8 @@ html[data-theme="dark"] .side-nav-glide {
 .cal-beam .cal-beam-track { stroke: var(--primary); stroke-width: 2px; }
 .cal-beam .cal-beam-dot {
   stroke: #ffffff; stroke-width: 2.8px; stroke-linecap: round;
-  stroke-dasharray: 11 89;
+  /* 对角两条短线：dash 8 / 间隔 42 -> 100 周长里恰好两段正对（0 与 50），绕圈时你追我赶 */
+  stroke-dasharray: 8 42;
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 85%, transparent));
   animation: calBeamRun 2.8s linear infinite;
 }
