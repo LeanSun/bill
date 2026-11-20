@@ -3635,7 +3635,6 @@ input, button, .rs-amt, .ins-key, .de-stats b { font-variant-numeric: tabular-nu
 .spend-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
 /* 3. 卡片按压反馈：短暂缩一下，松开靠 transition 复原 */
-.card:active, .ins-card:active, .ov-panel:active { transform: scale(.99); }
 
 /* 4. 首屏骨架：门禁解密期间主区给一层柔和 shimmer，ready 后移除 is-booting */
 body.is-booting .main::after {

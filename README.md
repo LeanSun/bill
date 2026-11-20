@@ -774,3 +774,8 @@ node server/server.js
 6. **分段控件键盘导航**。每个 `.seg` 加 tabindex 与左右键切换，focus 可用，reduced-motion 下尤其重要。
 7. **首屏骨架占位**。门禁解密期间 body 带 `is-booting`，主区一层柔和 shimmer，数据就绪在 `startApp()` 移除；另有 3s 兜底超时，异常时也不会一直闪。
 8. **深色边框提亮**。深色下阴影几乎不可见，卡片改用更亮的 `--border-strong` 区分层级，hover 再叠主色。
+
+## v1.0.66 · 修滑块 hover 误跟随 / 取消按压（2026-11-21）
+
+1. **滑块 hover 误跟随 —— 真正的根因**。项目里有两套分段拖拽：`bindSeg`（点按 + elementFromPoint 跟随）和 `enableSegDrag`（WAAPI 软跟随），两者共用 `data-seg-drag` 属性。`enableSegDragAll()` 绑定时把它永久置 `1`，于是 `bindSeg` 的 `pointermove` 守卫 `if (segDrag !== '1') return` 恒通过 —— 刚进页面只要鼠标移到控件上，滑块就跟着走；点一下触发 `pointerup` 置 `0` 才恢复，正好对应用户描述。v1.0.63 加的 `buttons` 守卫没用，因为当时改的是另一套。现在 `bindSeg` 改用独立的 `data-seg-press` 标记，并补 `buttons & 1` 守卫，两套彻底隔离。截图实测：纯 hover（buttons=0）前后 `--seg-i` 都是 1，滑块不动。
+2. **取消卡片按压反馈**。移除 v1.0.65 加的 `.card:active { transform: scale(.99) }`。

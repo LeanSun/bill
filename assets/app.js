@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.65';
+  var ASSET_V = '1.0.66';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3411,20 +3411,25 @@
       var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
       apply(b, true);
     });
+    /* v1.0.66：这套拖拽用独立的 data-seg-press 标记。
+       之前和 enableSegDrag 共用 data-seg-drag，而后者在绑定时把它永久置 1，
+       导致 bindSeg 的 pointermove 守卫恒通过 —— 纯 hover 就跟随滑块，
+       点一下 pointerup 置 0 才恢复。改用独立标记彻底隔离两个系统。 */
     el.addEventListener('pointerdown', function (e) {
       var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
       if (!b) return;
-      el.dataset.segDrag = '1';
+      el.dataset.segPress = '1';
       apply(b, true);
     });
     el.addEventListener('pointermove', function (e) {
-      if (el.dataset.segDrag !== '1') return;
+      if (el.dataset.segPress !== '1') return;
+      if (e.pointerType === 'mouse' && !(e.buttons & 1)) { el.dataset.segPress = '0'; return; }
       var t = document.elementFromPoint(e.clientX, e.clientY);
       var b = t && t.closest ? t.closest('button[' + attr + ']') : null;
       if (b) apply(b, true);
     });
-    document.addEventListener('pointerup', function () { el.dataset.segDrag = '0'; });
-    document.addEventListener('pointercancel', function () { el.dataset.segDrag = '0'; });
+    document.addEventListener('pointerup', function () { el.dataset.segPress = '0'; });
+    document.addEventListener('pointercancel', function () { el.dataset.segPress = '0'; });
   }
   function setSegActive(el, attr, value) {
     if (!el) return;
