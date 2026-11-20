@@ -3653,3 +3653,7 @@ html[data-theme="dark"] .card,
 html[data-theme="dark"] .ins-card,
 html[data-theme="dark"] .ov-panel { border-color: var(--border-strong); }
 html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--primary) 34%, var(--border-strong)); }
+
+/* v1.0.67：支出构成每行追加「占预算 %」小标 */
+.spend-bud { flex: 0 0 auto; font-size: 9.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chart-donut.is-percent .spend-bud { display: none; }

@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.66';
+  var ASSET_V = '1.0.67';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1238,7 +1238,9 @@
     var o = baseOption(p);
     o.color = [p.expense, p.income];
     o.grid = { left: 6, right: 12, top: 40, bottom: 6, containLabel: true };
-    o.legend = { top: 2, right: 2, itemWidth: 10, itemHeight: 10, itemGap: 16, icon: 'roundRect', textStyle: { color: p.text2, fontSize: 11.5, fontFamily: p.font } };
+    o.legend = { top: 2, right: 2, itemWidth: 10, itemHeight: 10, itemGap: 16, icon: 'roundRect',
+      formatter: function (name) { return name === '收入' ? '收入 ↑' : name === '支出' ? '支出 ↓' : name; },
+      textStyle: { color: p.text2, fontSize: 11.5, fontFamily: p.font } };
     o.tooltip = tooltipCommon(p, {
       trigger: 'axis',
       axisPointer: { type: 'shadow', shadowStyle: { color: withAlpha(p.muted, .09) } },
@@ -1414,6 +1416,20 @@
     el.classList.toggle('is-percent', state.donutMode === 'percent');
     if (!data.length) { el.innerHTML = '<div class="spend-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>这一年还没有支出记录</div>'; return; }
     var total = data.reduce(function (sum, d) { return sum + d.value; }, 0);
+    /* v1.0.67：月均预算 = 近 6 个有支出月份的均值，给每行算「占预算 %」 */
+    var budSum = 0, budN = 0, nowD = new Date();
+    for (var bk = 1; bk <= 6; bk++) {
+      var bm = new Date(nowD.getFullYear(), nowD.getMonth() - bk, 1);
+      var bkStr = bm.getFullYear() + '-' + ('0' + (bm.getMonth() + 1)).slice(-2);
+      var bs = 0;
+      scopeRecords().forEach(function (r) {
+        if (r.type !== 'income' && String(r.date || '').slice(0, 7) === bkStr) bs += r.amount;
+      });
+      if (bs > 0) { budSum += bs; budN++; }
+    }
+    var monthBudget = budN ? budSum / budN : 0;
+    var yearFactor = state.donutYear === 'all' ? Math.max(1, YEARS.length) : 1;
+    var budgetBase = monthBudget * 12 * yearFactor;
     var colors = catColors(p);
     var nameIndex = {};
     EXPENSE_CATS.forEach(function (c, i) { nameIndex[c] = i; });
@@ -1426,7 +1442,9 @@
         '<span class="spend-track"><i style="width:' + pct.toFixed(1) + '%;background:' +
         (colors[nameIndex[d.name]] || p.primary) + '"></i></span>' +
         '<span class="spend-amt">' + fmtYuan(d.value) + '</span>' +
-        '<span class="spend-pct">' + pctText(pct) + '</span></button>';
+        '<span class="spend-pct">' + pctText(pct) + '</span>' +
+        (budgetBase > 0 ? '<span class="spend-bud" title="占近6月月均折算预算">' +
+          pctText(d.value / budgetBase * 100) + ' 预算</span>' : '') + '</button>';
     }).join('');
     Array.prototype.forEach.call(el.querySelectorAll('.spend-row'), function (row) {
       row.onclick = function () { jumpToDetail({ reset: true, category: row.getAttribute('data-cat') }); };
