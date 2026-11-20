@@ -3524,45 +3524,39 @@ html[data-theme="dark"] .side-nav-glide {
    4. 暗色底轨提亮一档；prefers-reduced-motion 停成静态描边。
    ================================================================== */
 
-/* 月历今天格：关掉旧的 conic 流光伪元素，只留 SVG 光带 */
+/* 月历今天格：关掉旧的 conic 伪元素，改用独立的无极渐变边框层 */
 .cal-cell.is-today::before { display: none !important; content: none !important; }
-/* 周历不要任何流光：关掉历史遗留的 conic 伪元素（左上角那一截就是它） */
 .wk-col.is-today::before, .ym-day.is-today::before { display: none !important; content: none !important; }
 
+/* v1.0.63 · 无极渐变绕边流光
+   用 conic-gradient 做连续渐变，mask 挖空只留 1.5px 边框环；@property 驱动
+   角度旋转，两条正对的光带（相差 180°）你追我赶。月历格近正方形，conic 均匀。
+   头亮尾暗靠渐变色标连续过渡 —— 没有任何分段拼接。 */
+@property --beam-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .cal-beam {
-  position: absolute !important; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 3; overflow: visible;
+  position: absolute !important; inset: 0; z-index: 3; pointer-events: none;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from var(--beam-a, 0deg),
+    color-mix(in srgb, var(--primary) 22%, transparent) 0deg,
+    color-mix(in srgb, var(--primary) 40%, transparent) 28deg,
+    #ffffff 46deg,
+    color-mix(in srgb, var(--primary) 78%, transparent) 62deg,
+    color-mix(in srgb, var(--primary) 22%, transparent) 92deg,
+    color-mix(in srgb, var(--primary) 22%, transparent) 180deg,
+    color-mix(in srgb, var(--primary) 40%, transparent) 208deg,
+    #ffffff 226deg,
+    color-mix(in srgb, var(--primary) 78%, transparent) 242deg,
+    color-mix(in srgb, var(--primary) 22%, transparent) 272deg,
+    color-mix(in srgb, var(--primary) 22%, transparent) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: beamSpin 3.5s linear infinite;
+  will-change: --beam-a;
 }
-.cal-beam rect {
-  fill: none;
-  x: 1.5px; y: 1.5px; width: calc(100% - 3px); height: calc(100% - 3px);
-  vector-effect: non-scaling-stroke;
-}
-.cal-beam .cal-beam-track { stroke: var(--primary); stroke-width: 2px; }
-.cal-beam .cal-beam-dot {
-  stroke: #ffffff; stroke-linecap: round;
-  /* dash 3 / 间隔 47 -> 周期 50，100 周长里恰好两段正对；三段错位叠成一条拖尾 */
-  stroke-dasharray: 3 47;
-  animation: calBeamRun 3.5s linear infinite;
-}
-/* v1.0.62：头亮尾暗 —— head 在前最亮带光晕，tail1/tail2 依次落后且递减变暗。
-   负 delay 让相位提前：head 最靠路径前方，尾部收在后面，形成渐变拖尾。 */
-.cal-beam .cal-beam-head {
-  stroke-width: 3px; opacity: 1;
-  animation-delay: -.12s;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 92%, transparent));
-}
-.cal-beam .cal-beam-tail1 {
-  stroke-width: 2.5px; opacity: .5;
-  animation-delay: -.06s;
-  filter: none;
-}
-.cal-beam .cal-beam-tail2 {
-  stroke-width: 2px; opacity: .18;
-  animation-delay: 0s;
-  filter: none;
-}
-@keyframes calBeamRun { to { stroke-dashoffset: -100; } }
+@keyframes beamSpin { to { --beam-a: 360deg; } }
 
 /* 方案 A：填充压到极淡近白，让流光成为唯一焦点（仅月历今天格） */
 .cal-cell.is-today {
@@ -3578,26 +3572,43 @@ html[data-theme="dark"] .side-nav-glide {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent);
   }
 }
-
-/* 暗色：底轨提亮一档，填充振幅同步给到看得见 */
-html[data-theme="dark"] .cal-beam .cal-beam-track {
-  stroke: color-mix(in srgb, var(--primary) 72%, #ffffff);
+/* 暗色：光带整体提亮，填充振幅单给一档 */
+html[data-theme="dark"] .cal-beam {
+  background: conic-gradient(from var(--beam-a, 0deg),
+    color-mix(in srgb, var(--primary) 34%, transparent) 0deg,
+    color-mix(in srgb, var(--primary) 55%, transparent) 28deg,
+    #ffffff 46deg,
+    color-mix(in srgb, var(--primary) 90%, transparent) 62deg,
+    color-mix(in srgb, var(--primary) 34%, transparent) 92deg,
+    color-mix(in srgb, var(--primary) 34%, transparent) 180deg,
+    color-mix(in srgb, var(--primary) 55%, transparent) 208deg,
+    #ffffff 226deg,
+    color-mix(in srgb, var(--primary) 90%, transparent) 242deg,
+    color-mix(in srgb, var(--primary) 34%, transparent) 272deg,
+    color-mix(in srgb, var(--primary) 34%, transparent) 360deg);
 }
 html[data-theme="dark"] .cal-cell.is-today { animation-name: todayCellBreathCalDark !important; }
 @keyframes todayCellBreathCalDark {
   0%,100% { background-color: color-mix(in srgb, var(--primary) 7%, var(--surface)); }
   50% { background-color: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
 }
-
-/* 减少动态效果：流光停成静态细描边，呼吸也停 */
+/* 减少动态效果：光带停成静态一圈，呼吸也停 */
 @media (prefers-reduced-motion: reduce) {
-  .cal-beam .cal-beam-tail1, .cal-beam .cal-beam-tail2 { display: none; }
-  .cal-beam .cal-beam-head {
-    animation: none; stroke-dasharray: none;
-    stroke: color-mix(in srgb, var(--primary) 75%, #ffffff); stroke-width: 2px; opacity: 1;
-  }
+  .cal-beam { animation: none; opacity: .62; }
   .cal-cell.is-today {
     animation: none !important;
     background-color: color-mix(in srgb, var(--primary) 13%, var(--surface)) !important;
   }
 }
+
+/* v1.0.63 补充：空状态当日小结 + 缩窄支出构成控件 */
+.de-stats { display: flex; gap: 10px; margin: 6px 0 4px; }
+.de-stats span { display: flex; flex-direction: column; align-items: center; min-width: 84px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.de-stats b { font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums; }
+.de-stats b.is-over { color: var(--danger); }
+.de-stats i { font-size: 10.5px; font-style: normal; color: var(--muted); margin-top: 2px; }
+.day-empty .de-hint { font-size: 12px; }
+/* 支出构成：金额/占比滑块缩窄，和年份控件宽度更协调 */
+.donut-mode.seg { min-width: 0; width: 132px; flex: 0 0 auto; }
+.donut-mode.seg button { font-size: 12px; }
+.donut-controls { flex-wrap: nowrap; }

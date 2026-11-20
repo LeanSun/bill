@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.62';
+  var ASSET_V = '1.0.63';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1375,11 +1375,15 @@
     var sig = state.donutYear + '|' + years.join(',');
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
+    var ys = ['all'].concat(years);
     box.innerHTML = '<span class="seg-ind" aria-hidden="true"></span>' +
-      ['all'].concat(years).map(function (y) {
+      ys.map(function (y) {
         return '<button type="button" data-dy="' + y + '" class="' + (String(state.donutYear) === String(y) ? 'is-active' : '') + '">' +
           (y === 'all' ? '全部' : y) + '</button>';
       }).join('');
+    /* v1.0.63：段数必须按实际年份写进 --seg-n。否则沿用默认 3 列，
+       6 个年份按钮会换行成两行，点一下才被 bindSeg 重设回一行。 */
+    box.style.setProperty('--seg-n', String(ys.length));
     setSegActive(box, 'data-dy', state.donutYear);
   }
   function bindDonutYear() {
@@ -2613,7 +2617,7 @@
       if (key === state.focusDate) cls += ' is-focus';
       /* 先把全部条目都写进去，裁几条、每条多高，交给第二遍按真实高度算 */
       html += '<div class="' + cls + '" data-date="' + key + '" data-other="' + (other ? '1' : '0') + '">' +
-        (!other && key === today ? '<svg class="cal-beam" aria-hidden="true"><rect class="cal-beam-track" pathLength="100"/><rect class="cal-beam-dot cal-beam-tail2" pathLength="100"/><rect class="cal-beam-dot cal-beam-tail1" pathLength="100"/><rect class="cal-beam-dot cal-beam-head" pathLength="100"/></svg>' : '') +
+        (!other && key === today ? '<i class="cal-beam" aria-hidden="true"></i>' : '') +
         '<div class="cal-cell-head"><div class="cal-dayleft"><span class="cal-daynum">' + d.getDate() + '</span>' +
         (d.getDate() === 1 ? '<span class="cal-monthtag">' + (d.getMonth() + 1) + '月</span>' : '') + '</div>' +
         daySumHTML(p, items) + '</div>' +
@@ -2980,7 +2984,43 @@
         '<em class="dlc-total">' + (g === '收入' ? '+' : '−') + fmtYuan(gr.total) + '</em>' +
         '</div>';
     }).join('');
-    if (!catRowsHTML) catRowsHTML = '<div class="day-empty"><strong>这天还没有记录</strong><span>用左侧的表单记下第一笔。</span></div>';
+    if (!catRowsHTML) {
+      /* v1.0.63：空日子也给信息量 —— 本月累计 / 距预算还剩 / 距上次记账几天。
+         口径与「还剩多少」一致：截至当前查看日，近 6 月有支出的月均当预算。 */
+      var dRef = new Date(key + 'T00:00:00');
+      var ym = key.slice(0, 7);
+      var mSum = 0;
+      allRecords().forEach(function (r) {
+        if (r.type !== 'income' && String(r.date || '').slice(0, 7) === ym && String(r.date) <= key) mSum += r.amount;
+      });
+      var bud = 0, budN = 0;
+      for (var bk = 1; bk <= 6; bk++) {
+        var bm = new Date(dRef.getFullYear(), dRef.getMonth() - bk, 1);
+        var bKey = bm.getFullYear() + '-' + ('0' + (bm.getMonth() + 1)).slice(-2);
+        var bs = 0;
+        allRecords().forEach(function (r) {
+          if (r.type !== 'income' && String(r.date || '').slice(0, 7) === bKey) bs += r.amount;
+        });
+        if (bs > 0) { bud += bs; budN++; }
+      }
+      bud = budN ? bud / budN : 0;
+      var remain = Math.round(bud - mSum);
+      var lastGap = -1;
+      allRecords().forEach(function (r) {
+        var dk = String(r.date || '');
+        if (!dk || dk > key) return;
+        var gd = Math.round((new Date(key + 'T00:00:00') - new Date(dk + 'T00:00:00')) / 86400000);
+        if (gd >= 0 && (lastGap < 0 || gd < lastGap)) lastGap = gd;
+      });
+      var gapText = lastGap < 0 ? '还没有记过账' : (lastGap === 0 ? '今天刚记过' : lastGap + ' 天前记过');
+      catRowsHTML = '<div class="day-empty"><strong>这天还没有记录</strong>' +
+        '<div class="de-stats">' +
+        '<span><b>' + fmtYuan(mSum) + '</b><i>本月累计</i></span>' +
+        '<span><b class="' + (remain < 0 ? 'is-over' : '') + '">' + (remain < 0 ? '超 ' + fmtYuan(-remain) : fmtYuan(remain)) + '</b><i>距月均预算</i></span>' +
+        '<span><b>' + gapText + '</b><i>上次记账</i></span>' +
+        '</div>' +
+        '<span class="de-hint">用左侧的表单记下第一笔。</span></div>';
+    }
 
     quickCatManual = false;
     var qIdx = quickType === 'income' ? 1 : 0;
@@ -5684,6 +5724,10 @@
     });
     function onMove(e) {
       if (!act) return;
+      /* v1.0.63：必须真的按着指针才跟随。页面刚加载时若上一手势的 act
+         意外残留（门禁遮罩点击 / 合成事件没有配对的 up），纯 hover 也会
+         驱动滑块，点一下才恢复 —— 这里用 buttons 守卫彻底挡掉。 */
+      if (e.pointerType === 'mouse' && !(e.buttons & 1)) { up(); return; }
       if (!act.moved && Math.abs(e.clientX - act.x) < 4 && Math.abs(e.clientY - act.y) < 4) return;
       if (!act.moved) { act.moved = true; el.classList.add('is-dragging'); }
       target = Math.max(-unit * .12, Math.min(trackW + unit * .12, e.clientX - act.rLeft - pad - unit / 2));
