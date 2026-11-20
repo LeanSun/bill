@@ -673,3 +673,7 @@ node server/server.js
 8. **资源版本推进到 `?v=1.0.48`**，六个脚本/样式与魔方 iframe 同步换 URL，刷新即生效。
 
 改动文件：`index.html`、`cube.html`、`assets/app.js`、`assets/styles.css`、`assets/boot.js`、`assets/vault.js`、`README.md`。
+
+## v1.0.49 · 换版本号破缓存（2026-11-20）
+
+支出构成横向金额排行、最近记录跨天竖线、近 7 日可点柱形（今天单独标色）、体重卡标题压扁这四项在 v1.0.48 已经全部上线并逐项量过。这一版不改功能，只把六个静态资源和魔方 iframe 的查询串从 `?v=1.0.48` 推到 `?v=1.0.49`，同时给 `index.html` / `cube.html` 加 `Cache-Control: no-cache` 元信息 —— 用来替掉可能被旧 URL 占住的缓存副本。若刷新后仍是老图表，先看地址栏是不是 `…/bill/`，再强制刷新一次。
