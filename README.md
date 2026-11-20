@@ -763,3 +763,14 @@ node server/server.js
 1. **流光边框加粗**：conic 边框层 padding 1.5px → 2.2px，今天格的光边更明显。
 2. **消费日历年份强制单行**：`#calendarYear` 的按钮由数据年份动态重建，但没按段数设 `--seg-n`，默认 3 列让 5 个年份折成两行。现在重建与 early-return 两条路径都写入 `--seg-n`，并加 `nowrap / grid-auto-flow:column` 兜底，年份永远一行。
 3. **修支出构成标题竖排回归**：加控件后这张 4 栏卡头放不下标题 + 两组控件，标题被挤成竖排。把控件组下沉到标题下一行（`flex:1 1 100%`），三卡各回 4 栏，标题全部横向。
+
+## v1.0.65 · 年份滑块归位 / 八项 UI 打磨（2026-11-21）
+
+1. **消费日历年份滑块归位**。重建年份按钮时只设了 `--seg-n` 和 is-active，没设 `--seg-i`，滑块默认停第 0 段（2022）而数据是 2026。现在重建与早退两条路径都按 `state.calendarYear` 写 `--seg-i`，滑块和数据默认都在最新年。
+2. **全局数字等宽**。`body` 铺底 `font-variant-numeric: tabular-nums`，金额、读数、榜单对齐。
+3. **空状态线条图标**。空日和空支出列表各加一个线性 SVG（日历 / 钱袋），不再是纯文字虚线框。
+4. **危险色转冷**。浅色 `--danger` 从 `#e11d48` 移到 `#c8102e`，和收入红 `#e04a4a` 拉开。
+5. **卡片按压反馈**。`.card / .ins-card / .ov-panel` 加 `:active { transform: scale(.99) }`，松开靠 transition 复原。
+6. **分段控件键盘导航**。每个 `.seg` 加 tabindex 与左右键切换，focus 可用，reduced-motion 下尤其重要。
+7. **首屏骨架占位**。门禁解密期间 body 带 `is-booting`，主区一层柔和 shimmer，数据就绪在 `startApp()` 移除；另有 3s 兜底超时，异常时也不会一直闪。
+8. **深色边框提亮**。深色下阴影几乎不可见，卡片改用更亮的 `--border-strong` 区分层级，hover 再叠主色。

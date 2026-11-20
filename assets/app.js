@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.64';
+  var ASSET_V = '1.0.65';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1412,7 +1412,7 @@
       if (old) { old.dispose(); delete charts['chartDonut']; }
     } catch (e) { /* 还没建过实例 */ }
     el.classList.toggle('is-percent', state.donutMode === 'percent');
-    if (!data.length) { el.innerHTML = '<div class="spend-empty">这一年还没有支出记录</div>'; return; }
+    if (!data.length) { el.innerHTML = '<div class="spend-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>这一年还没有支出记录</div>'; return; }
     var total = data.reduce(function (sum, d) { return sum + d.value; }, 0);
     var colors = catColors(p);
     var nameIndex = {};
@@ -3013,7 +3013,7 @@
         if (gd >= 0 && (lastGap < 0 || gd < lastGap)) lastGap = gd;
       });
       var gapText = lastGap < 0 ? '还没有记过账' : (lastGap === 0 ? '今天刚记过' : lastGap + ' 天前记过');
-      catRowsHTML = '<div class="day-empty"><strong>这天还没有记录</strong>' +
+      catRowsHTML = '<div class="day-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M9 15h6"/></svg><strong>这天还没有记录</strong>' +
         '<div class="de-stats">' +
         '<span><b>' + fmtYuan(mSum) + '</b><i>本月累计</i></span>' +
         '<span><b class="' + (remain < 0 ? 'is-over' : '') + '">' + (remain < 0 ? '超 ' + fmtYuan(-remain) : fmtYuan(remain)) + '</b><i>距月均预算</i></span>' +
@@ -4642,6 +4642,8 @@
       var have = [].map.call(box.querySelectorAll('button'), function (b) { return Number(b.getAttribute('data-cy')); });
       if (want.length === have.length && want.every(function (y, i) { return y === have[i]; })) {
         box.style.setProperty('--seg-n', String(Math.max(1, want.length)));
+        var ai = want.indexOf(state.calendarYear); if (ai < 0) ai = want.length - 1;
+        box.style.setProperty('--seg-i', String(Math.max(0, ai)));
         return;
       }
       var ind = box.querySelector('.seg-ind');
@@ -4655,8 +4657,11 @@
         if (y === state.calendarYear) b.className = 'is-active';
         box.appendChild(b);
       });
-      /* v1.0.64：段数按实际年份写进 --seg-n。默认 3 列会让 5 个年份折成两行。 */
+      /* v1.0.65：段数与滑块位置都按实际数据写。--seg-i 不设的话滑块默认停在第 0 段
+         （2022），而当前数据是 2026 —— 这就是"滑块和选中对不上"的根因。 */
       box.style.setProperty('--seg-n', String(Math.max(1, want.length)));
+      var act = want.indexOf(state.calendarYear); if (act < 0) act = want.length - 1;
+      box.style.setProperty('--seg-i', String(Math.max(0, act)));
     })();
     bindSeg($('calendarYear'), 'data-cy', function (v) {
       state.calendarYear = Number(v);
@@ -5764,6 +5769,16 @@
       act = null;
       releaseTransform();
     }
+    /* v1.0.65：键盘左右键切换分段，focus 在控件上时可用，reduced-motion 下尤需 */
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      var bs = btns(); if (bs.length < 2) return;
+      var i = activeIdx() + (e.key === 'ArrowRight' ? 1 : -1);
+      i = (i + bs.length) % bs.length;
+      e.preventDefault(); e.stopPropagation();
+      bs[i].focus(); bs[i].click();
+    });
     el.addEventListener('click', function (e) {
       if (!suppress) return;
       suppress = false;
@@ -5799,6 +5814,7 @@
       function () { applyDataset({}); startApp(); });
   }
   function startApp() {
+    document.body.classList.remove('is-booting');
     var pv = window.QZPrivate && window.QZPrivate.status && window.QZPrivate.status();
     if (pv && pv.error) toast('私人数据未载入：' + pv.error + '（当前显示空账本）', 'warn');
     state.store = loadStore();

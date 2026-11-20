@@ -24,8 +24,8 @@
   --expense: #10a06a;
   --expense-soft: rgba(16, 160, 106, .1);
   /* 删除 / 报错等"危险"语义与收支色解耦，避免删除按钮跟着支出变绿 */
-  --danger: #e11d48;
-  --danger-soft: rgba(225, 29, 72, .1);
+  --danger: #c8102e;
+  --danger-soft: rgba(200, 16, 46, .1);
   --amber: #f0a52a;
   --violet: #8b5cf6;
   --sky: #38a9e8;
@@ -3619,3 +3619,38 @@ html[data-theme="dark"] .cal-cell.is-today { animation-name: todayCellBreathCalD
 /* v1.0.64：消费日历年份控件强制单行，段数由 JS 按实际年份写入 --seg-n */
 #calendarYear.seg { flex-wrap: nowrap; white-space: nowrap; grid-auto-flow: column; }
 #calendarYear.seg button { padding-left: 9px; padding-right: 9px; }
+
+/* ==================================================================
+   v1.0.65
+   1. 全局数字等宽；2. 空状态线条图标；3. 卡片按压反馈；
+   4. 首屏骨架占位；5. 深色模式边框提亮区分层级。
+   ================================================================== */
+/* 1. 数字等宽：全局铺底，个别需要比例字体的地方仍可局部覆盖 */
+body { font-variant-numeric: tabular-nums; }
+input, button, .rs-amt, .ins-key, .de-stats b { font-variant-numeric: tabular-nums; }
+
+/* 2. 空状态线条图标 */
+.empty-ico { width: 34px; height: 34px; fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: .7; }
+.day-empty .empty-ico, .spend-empty .empty-ico { margin-bottom: 2px; }
+.spend-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+/* 3. 卡片按压反馈：短暂缩一下，松开靠 transition 复原 */
+.card:active, .ins-card:active, .ov-panel:active { transform: scale(.99); }
+
+/* 4. 首屏骨架：门禁解密期间主区给一层柔和 shimmer，ready 后移除 is-booting */
+body.is-booting .main::after {
+  content: ''; position: absolute; inset: 0; z-index: 50; pointer-events: none;
+  background: linear-gradient(100deg,
+    transparent 20%, color-mix(in srgb, var(--surface-3) 60%, transparent) 42%,
+    color-mix(in srgb, var(--surface-3) 60%, transparent) 58%, transparent 80%);
+  background-size: 200% 100%;
+  animation: bootShimmer 1.4s ease-in-out infinite;
+}
+@keyframes bootShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { body.is-booting .main::after { animation: none; opacity: .4; } }
+
+/* 5. 深色模式：阴影几乎不可见，靠更亮的边框分层级 */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .ins-card,
+html[data-theme="dark"] .ov-panel { border-color: var(--border-strong); }
+html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--primary) 34%, var(--border-strong)); }
