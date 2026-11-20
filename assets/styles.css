@@ -3514,35 +3514,70 @@ html[data-theme="dark"] .side-nav-glide {
     opacity .18s ease !important;
 }
 
+
 /* ==================================================================
-   v1.0.58 · 周历流光沿周长归一化
+   v1.0.59
    ------------------------------------------------------------------
-   周列窄而高，conic-gradient 从中心辐射，亮带只擦过左右窄边中段。
-   改用 SVG rect + pathLength=100：底轨整圈淡色，一道白光点沿周长匀速绕行。
+   1. 流光只在月历：周历撤掉 SVG 光带，恢复纯呼吸；
+   2. 月历今天格改用沿周长归一化的 SVG 光带（pathLength=100）；
+   3. 方案 A 配色：填充压到极淡近白，流光饱和蓝边 + 纯白光点，靠明度分层；
+   4. 暗色底轨提亮一档；prefers-reduced-motion 停成静态描边。
    ================================================================== */
-.wk-col.is-today::before { display: none !important; }   /* 关掉旧的 conic 流光，避免叠两层 */
-.wk-beam {
+
+/* 月历今天格：关掉旧的 conic 流光伪元素，只留 SVG 光带 */
+.cal-cell.is-today::before { display: none !important; content: none !important; }
+
+.cal-beam {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 2; overflow: visible;
+  pointer-events: none; z-index: 3; overflow: visible;
 }
-.wk-beam rect {
+.cal-beam rect {
   fill: none;
   x: 1.5px; y: 1.5px; width: calc(100% - 3px); height: calc(100% - 3px);
   vector-effect: non-scaling-stroke;
 }
-.wk-beam .wk-beam-track {
-  stroke: color-mix(in srgb, var(--primary) 30%, transparent);
-  stroke-width: 2px;
-}
-.wk-beam .wk-beam-dot {
-  stroke: #ffffff;
-  stroke-width: 2.8px; stroke-linecap: round;
+.cal-beam .cal-beam-track { stroke: var(--primary); stroke-width: 2px; }
+.cal-beam .cal-beam-dot {
+  stroke: #ffffff; stroke-width: 2.8px; stroke-linecap: round;
   stroke-dasharray: 11 89;
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 85%, transparent));
-  animation: wkBeamRun 2.8s linear infinite;
+  animation: calBeamRun 2.8s linear infinite;
 }
-html[data-theme="dark"] .wk-beam .wk-beam-track { stroke: color-mix(in srgb, var(--primary) 42%, transparent); }
-@keyframes wkBeamRun { to { stroke-dashoffset: -100; } }
+@keyframes calBeamRun { to { stroke-dashoffset: -100; } }
+
+/* 方案 A：填充压到极淡近白，让流光成为唯一焦点（仅月历今天格） */
+.cal-cell.is-today {
+  animation: todayCellBreathCal 5.2s cubic-bezier(.45,.02,.55,.98) infinite !important;
+}
+@keyframes todayCellBreathCal {
+  0%,100% {
+    background-color: color-mix(in srgb, var(--primary) 5%, var(--surface));
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--primary) 13%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent);
+  }
+}
+
+/* 暗色：底轨提亮一档，填充振幅同步给到看得见 */
+html[data-theme="dark"] .cal-beam .cal-beam-track {
+  stroke: color-mix(in srgb, var(--primary) 72%, #ffffff);
+}
+html[data-theme="dark"] .cal-cell.is-today { animation-name: todayCellBreathCalDark !important; }
+@keyframes todayCellBreathCalDark {
+  0%,100% { background-color: color-mix(in srgb, var(--primary) 7%, var(--surface)); }
+  50% { background-color: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
+}
+
+/* 减少动态效果：流光停成静态细描边，呼吸也停 */
 @media (prefers-reduced-motion: reduce) {
-  .wk-beam .wk-beam-dot { animation: none; stroke-dasharray: none; stroke: color-mix(in srgb, var(--primary) 70%, #fff); stroke-width: 2px; }
+  .cal-beam .cal-beam-dot {
+    animation: none; stroke-dasharray: none;
+    stroke: color-mix(in srgb, var(--primary) 75%, #ffffff); stroke-width: 2px;
+  }
+  .cal-cell.is-today {
+    animation: none !important;
+    background-color: color-mix(in srgb, var(--primary) 13%, var(--surface)) !important;
+  }
 }
