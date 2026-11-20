@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.53';
+  var ASSET_V = '1.0.54';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3242,7 +3242,7 @@
   /* v1.0.28：侧栏高亮是一块会走的底色，不是每项各自的背景。
      快速连点时先从 computed transform 读出当前位置冻住，再奔向新目标，
      所以不会闪回起点；缓动尾段带一点回弹。文字和图标始终不参与位移。 */
-  var sideGlideState = null;
+  var sideGlideState = null, sideGlideAnim = null;
   function moveSideGlide(animate) {
     var nav = document.querySelector('.sidebar .nav'), g = document.getElementById('sideNavGlide');
     if (!nav || !g) return;
@@ -3250,7 +3250,9 @@
     if (!btn) { g.style.opacity = '0'; return; }
     var to = { x: btn.offsetLeft, y: btn.offsetTop, w: btn.offsetWidth, h: btn.offsetHeight };
     g.style.opacity = '1';
-    if (!animate || !sideGlideState) {
+    if (sideGlideAnim) { try { sideGlideAnim.cancel(); } catch (e) {} sideGlideAnim = null; }
+    if (!animate || !sideGlideState ||
+        (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
       g.style.transform = 'translate3d(' + to.x + 'px,' + to.y + 'px,0)';
       g.style.width = to.w + 'px'; g.style.height = to.h + 'px';
       sideGlideState = to; return;
@@ -3262,15 +3264,26 @@
       if (m) { var v = m[1].split(',').map(Number); curX = v[4]; curY = v[5]; }
       curW = parseFloat(cs.width) || curW; curH = parseFloat(cs.height) || curH;
     } catch (e) { /* noop */ }
-    g.style.transition = 'none';
-    g.style.width = curW + 'px'; g.style.height = curH + 'px';
-    g.style.transform = 'translate3d(' + curX + 'px,' + curY + 'px,0)';
-    void g.offsetWidth;
-    g.style.transition = '';
-    g.style.width = to.w + 'px'; g.style.height = to.h + 'px';
-    g.style.transform = 'translate3d(' + to.x + 'px,' + to.y + 'px,0)';
+    var dx = to.x - curX, dy = to.y - curY;
+    var alongX = Math.abs(dx) >= Math.abs(dy);
+    /* 中段沿移动方向拉长、垂直方向收窄；到位那一段回到目标尺寸并弹性收敛 */
+    var midW = alongX ? Math.max(curW, to.w) * 1.16 : Math.min(curW, to.w) * .94;
+    var midH = alongX ? Math.min(curH, to.h) * .94 : Math.max(curH, to.h) * 1.16;
+    var midX = curX + dx * .46, midY = curY + dy * .46;
+    var tf = function (x, y) { return 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)'; };
+    sideGlideAnim = g.animate([
+      { transform: tf(curX, curY), width: curW.toFixed(1) + 'px', height: curH.toFixed(1) + 'px', offset: 0 },
+      { transform: tf(midX, midY), width: midW.toFixed(1) + 'px', height: midH.toFixed(1) + 'px', offset: .44 },
+      { transform: tf(to.x, to.y), width: to.w + 'px', height: to.h + 'px', offset: 1 }
+    ], { duration: 560, easing: 'cubic-bezier(.22, 1.24, .36, 1)' });
+    sideGlideAnim.onfinish = function () {
+      g.style.transform = tf(to.x, to.y);
+      g.style.width = to.w + 'px'; g.style.height = to.h + 'px';
+      sideGlideAnim = null;
+    };
     sideGlideState = to;
   }
+
   function setView(view, cubeTab) {
     if (!VIEW_META[view]) return;
     /* 切页先把自定义下拉收掉：面板挂在 body 上，视图换了它不会自己消失 */
@@ -4559,6 +4572,36 @@
     if (form) form.addEventListener('submit', addReimb);
   }
 
+  /* v1.0.54：卡片跟随光标的柔和光斑 + 最多 3.6° 的 3D 倾斜。
+     只绑一次事件委托；指针离开卡片立刻把内联 transform 交还给 CSS。 */
+  function bindCardTilt() {
+    if (!window.matchMedia || !matchMedia('(hover: hover) and (pointer: fine)').matches ||
+        matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var active = null;
+    function reset(card) {
+      if (!card) return;
+      card.style.transform = '';
+      card.style.removeProperty('--mx');
+      card.style.removeProperty('--my');
+    }
+    document.addEventListener('pointermove', function (e) {
+      var card = e.target && e.target.closest ? e.target.closest('.card') : null;
+      if (card !== active) { if (active) reset(active); active = card; }
+      if (!card) return;
+      var r = card.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      var px = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+      var py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+      card.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+      card.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+      var ry = (px - .5) * 7.2, rx = (.5 - py) * 7.2;
+      card.style.transform = 'perspective(1100px) rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg)';
+    }, { passive: true });
+    document.addEventListener('pointerout', function (e) {
+      if (active && (!e.relatedTarget || !active.contains(e.relatedTarget))) { reset(active); active = null; }
+    });
+  }
+
   function bindEvents() {
     window.addEventListener('resize', function () { moveSideGlide(false); });
     var navs = document.querySelectorAll('.nav-item');
@@ -5759,6 +5802,7 @@
 
     buildSelectOptions();
     bindEvents();
+    bindCardTilt();
     bindFilterCollapse();
     bindCubeFrame();
     bindDatePicker();
