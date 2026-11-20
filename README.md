@@ -739,3 +739,8 @@ node server/server.js
 1. **日期数字回到框内**。`.cal-cell.is-today>*{position:relative}` 这条老规则把插进来的 SVG 光带也匹配了，`position:absolute` 被盖成 relative，SVG 参与文档流转而占了一整行，把日期顶到蓝框下方。给 `.cal-beam` 加 `position:absolute!important` 后，日期徽章回到格子左上角。
 2. **周历左上角残留清除**。v1.0.59 删 v1.58 规则时把 `.wk-col.is-today::before{display:none}` 一起删掉了，历史 conic 伪元素复活，在窄列左上角露出一截蓝线。恢复 `display:none!important`，今天列现在干净的淡蓝填充 + 实心日号。
 3. **对角双线追赶绕边**。单段光带（`11 89`，一圈一段）改成对角两段（`8 42`，周期 50，一圈恰好 0/50 两段正对），绕圈时两条短线一前一后互相追赶，而不是一条线转。
+
+## v1.0.61 · 结余跟随当前日 / 下拉分类色（2026-11-21）
+
+1. **「还剩多少」跟随当前查看日**。`dayInsightsHTML` 的 `d0` 本来就取当前锚点日期，但本月收支、年度结余是整月 / 整年全量，同月内翻日数字不动，看着像写死到今天。现在两处 `forEach` 都加了 `dk > dayKey` 截止条件，改成「截至当前查看日」累计：翻日到 11/05 和 11/19、或翻到 10 月，三行都会跟着变；脚注补上「截至 M/D」让口径可见。日期用 `dateKey` 字符串比较，不依赖时区。
+2. **分类下拉恢复颜色填充**。根因：`optionPaint()` 把分类色写在原生 `<option>` 的 `data-c` 上，原生 select 已隐身，而自绘面板 `ui-select.js` 造 option 按钮时只读 `textContent`，颜色没被搬过去，展开就是一片白。现在造按钮时读 `data-c` 写进 `--opt-ink` 并加 `has-tint`，CSS 用 `color-mix` 派生同色淡底、文字色和圆点，hover / active / selected 三态都跟着分类色走；非分类下拉没有 `data-c`，不受影响。

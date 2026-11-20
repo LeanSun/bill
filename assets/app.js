@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.60';
+  var ASSET_V = '1.0.61';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2743,17 +2743,20 @@
     monthBudget = monthN ? monthBudget / monthN : (mtd > 0 ? mtd / Math.max(1, elapsed) * dim : 0);
     /* 当前年结余 = 当年已入账收入 − 当年支出，就是这一年真正赚下的钱。
        旧口径拿往年支出均值当"年预算"，算出来只是"花超没超"，不是结余，已废弃。 */
+    /* v1.0.61：三行都按「截至当前查看日」累计，翻日 / 翻月都会跟着变，
+       不再是写死到今天整月整年的数。用 dateKey 字符串比较，不依赖时区。 */
+    var dayKey = dateKey(d0);
     var yYear = String(d0.getFullYear()), yInc = 0, yExp = 0;
     allRecords().forEach(function (r) {
-      if (String(r.date).slice(0, 4) !== yYear) return;
+      var dk = String(r.date || '');
+      if (dk.slice(0, 4) !== yYear || dk > dayKey) return;
       if (r.type === 'income') yInc += r.amount; else yExp += r.amount;
     });
-    /* v1.0.40：新「本月剩余」= 本月收入 − 本月支出；
-       老那一条改名「过往对比」，仍拿近 6 月月均当参照，两者不混。 */
     var mKey = yYear + '-' + ('0' + (d0.getMonth() + 1)).slice(-2);
     var mInc = 0, mExp = 0;
     allRecords().forEach(function (r) {
-      if (String(r.date || '').slice(0, 7) !== mKey) return;
+      var dk = String(r.date || '');
+      if (dk.slice(0, 7) !== mKey || dk > dayKey) return;
       if (r.type === 'income') mInc += r.amount; else mExp += r.amount;
     });
     var mNow = round(mInc - mExp);
@@ -2887,13 +2890,15 @@
       (mNow < 0 ? '超支 ' + fmtYuan(-mNow) : fmtYuan(mNow)) + '</b></div>' +
       '<div class="ir-bar is-now" data-tip="' + esc('本月剩余 ' + fmtYuan(mNow) + ' / 本月收 ' + fmtYuan(mInc) + ' · 剩 ' + mNowPct.toFixed(0) + '%') +
       '"><i style="width:' + mNowPct.toFixed(1) + '%"></i></div>' +
-      '<div class="ir-note">本月收 ' + fmtYuan(mInc) + ' · 支 ' + fmtYuan(mExp) +
+      '<div class="ir-note">截至 ' + (d0.getMonth() + 1) + '/' + d0.getDate() +
+      ' · 收 ' + fmtYuan(mInc) + ' · 支 ' + fmtYuan(mExp) +
       ' · 剩 ' + mNowPct.toFixed(0) + '%</div>' +
       '<div class="ir-line is-year"><span>年度结余</span><b class="' + (yLeft < 0 ? 'is-over' : '') + '">' +
       (yLeft < 0 ? '超支 ' + fmtYuan(-yLeft) : fmtYuan(yLeft)) + '</b></div>' +
       '<div class="ir-bar is-year" data-tip="' + esc('年度结余 ' + fmtYuan(yLeft) + ' / 今年收 ' + fmtYuan(yInc) + ' · 剩 ' + yLeftPct.toFixed(0) + '%') +
       '"><i style="width:' + yLeftPct.toFixed(1) + '%"></i></div>' +
-      '<div class="ir-note">收 ' + compactY(yInc) + ' · 支 ' + compactY(yExp) +
+      '<div class="ir-note">截至 ' + (d0.getMonth() + 1) + '/' + d0.getDate() +
+      ' · 收 ' + compactY(yInc) + ' · 支 ' + compactY(yExp) +
       ' · 存下 ' + yLeftPct.toFixed(0) + '%</div>' +
       '</div>';
 

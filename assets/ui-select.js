@@ -274,6 +274,13 @@
       b.setAttribute('role', 'option');
       b.setAttribute('aria-selected', o.selected ? 'true' : 'false');
       if (o.selected) b.classList.add('is-selected');
+      /* v1.0.61：optionPaint() 把分类色写在原生 option 的 data-c 上，
+         自绘面板要把它搬过来染成同色淡底，否则下拉展开是一片白。 */
+      var oc = o.getAttribute && o.getAttribute('data-c');
+      if (oc) {
+        b.style.setProperty('--opt-ink', oc);
+        b.classList.add('has-tint');
+      }
       b.textContent = o.textContent;
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('mousemove', function () { setActive(i, false); });

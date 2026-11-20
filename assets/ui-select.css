@@ -270,3 +270,24 @@ html[data-density="cube"] .field .ui-sel-caret { width: 16px; height: 16px; flex
   appearance: none !important;
 }
 .ui-sel-trigger .ui-sel-input:focus { box-shadow: none !important; }
+
+/* v1.0.61：分类下拉的 option 带分类色淡底，跟随 optionPaint() 的 data-c。
+   不用内联 background，交给 CSS 用 color-mix 派生浅底，深浅主题都稳。 */
+.ui-sel-option.has-tint {
+  color: color-mix(in srgb, var(--opt-ink) 78%, var(--ui-ink));
+}
+.ui-sel-option.has-tint::before {
+  background: var(--opt-ink);
+  opacity: .62;
+}
+.ui-sel-option.has-tint:hover:not(.is-active) {
+  background: color-mix(in srgb, var(--opt-ink) 12%, var(--ui-surface2, transparent));
+}
+.ui-sel-option.has-tint.is-active {
+  background: color-mix(in srgb, var(--opt-ink) 22%, transparent);
+  color: var(--opt-ink);
+  font-weight: 750;
+}
+.ui-sel-option.has-tint.is-selected::before {
+  background: var(--opt-ink); opacity: 1;
+}
