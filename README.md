@@ -697,3 +697,7 @@ node server/server.js
 1. **跨天分隔柱终于可见**。样式上一直有，但画在 `.rs-item::before`（`left:-22px`）上，而胶囊自身 `overflow:hidden` 把溢出部分整整裁掉了。现在只给新一天那一颗放开溢出（`overflow:visible!important`），浅蓝圆角小柱才真正落在两条之间的空档里。
 2. **最近记录 9 → 8 条**：`sortedDesc(allRecords()).slice(0, 8)`。
 3. **切页自动收下拉**。自定义 `UISelect` 的面板挂在 `document.body` 上（`position:fixed`），只靠 outside-click 收不干净：点到导航切页后面板还浮着。现在 `setView()` 与魔方页 `switchTab()` 一进来就调 `UISelect.close()`。
+
+## v1.0.52 · 分隔线纯装饰（2026-11-20）
+
+跨天分隔线原来是 `<button class="rs-item">` 的 `::before` 伪元素，点在那一小截上等于点了按钮本身，会跳到后一天。现在渲染时在新一天前插入独立的 `<i class="rs-sep" aria-hidden="true">`，`pointer-events:none`，线只负责分隔，不接收点击。最近记录保持 8 条。

@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.51';
+  var ASSET_V = '1.0.52';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2313,7 +2313,9 @@
             /* 133×36 两行装：上行备注，下行「日期 · 金额」。备注因此不用被
                金额和日期挤成一团省略号，五颗并排也是齐的。 */
             var c = catColor(p, r.category);
-            return '<button type="button" class="rs-item' + (newDay ? ' is-newday' : '') + '" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
+            /* 分隔线是独立装饰元素，不是按钮的伪元素 —— 点在线上不会跳到后一天 */
+            return (newDay ? '<i class="rs-sep" aria-hidden="true"></i>' : '') +
+              '<button type="button" class="rs-item" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
               esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '')) + '">' +
               '<i class="rs-dot"></i>' +
               '<span class="rs-body">' +

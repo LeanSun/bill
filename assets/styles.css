@@ -3308,3 +3308,20 @@ html[data-theme="dark"] .ins-rest .ir-bar.is-year i {
     color-mix(in srgb, var(--primary) 32%, var(--surface)) 0%,
     color-mix(in srgb, var(--primary) 62%, var(--surface)) 100%) !important;
 }
+
+/* ==================================================================
+   v1.0.52
+   ------------------------------------------------------------------
+   跨天分隔线从按钮伪元素改成独立装饰节点：点在线上不再触发后一天的跳转。
+   ================================================================== */
+.rs-sep {
+  flex: 0 0 18px; width: 18px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;               /* 不参与命中测试，纯装饰 */
+}
+.rs-sep::before {
+  content: ''; width: 2px; height: 20px; border-radius: 2px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--primary) 22%, var(--surface)) 0%,
+    color-mix(in srgb, var(--primary) 55%, var(--surface)) 100%);
+}
