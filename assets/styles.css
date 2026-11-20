@@ -3439,3 +3439,77 @@ html[data-theme="dark"] .side-nav-glide {
     inset 0 1px 0 rgba(255, 255, 255, .3),
     0 7px 18px -10px rgba(var(--neon), .6);
 }
+
+/* ==================================================================
+   v1.0.56
+   ------------------------------------------------------------------
+   1. 修流光：v1.0.34 有一条 display:none!important 压住 ::before，
+      流光从没显示过，只剩 ::after 的呼吸填充。这里按同特异性后置覆盖。
+   2. 侧栏滑块去玻璃：改筛选栏同款淡色平底 + 细描边 + 轻投影。
+   ================================================================== */
+
+/* ---- 1. 恢复今日格流光，并避开 .cal-cell 的 overflow:hidden ------ */
+.cal-cell.is-today::before,
+.wk-col.is-today::before {
+  display: block !important;
+  content: '' !important;
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  padding: 1.5px; border-radius: inherit;
+  background: conic-gradient(from var(--beam-a, 0deg),
+    transparent 0deg 214deg,
+    color-mix(in srgb, var(--primary) 48%, transparent) 268deg,
+    #ffffff 316deg,
+    color-mix(in srgb, var(--primary) 92%, transparent) 338deg,
+    color-mix(in srgb, var(--primary) 36%, transparent) 356deg,
+    transparent 360deg) !important;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) !important;
+  -webkit-mask-composite: xor !important;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) !important;
+  mask-composite: exclude !important;
+  animation: beamSpin 3.4s linear infinite !important;
+}
+.cal-cell.is-today::after,
+.wk-col.is-today::after { opacity: .28 !important; }
+
+/* ---- 2. 侧栏：筛选栏同款平底细边，无玻璃无高光 ------------------ */
+.side-nav-glide {
+  background: color-mix(in srgb, var(--primary) 11%, var(--surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border)) !important;
+  border-radius: 9px !important;
+  box-shadow: 0 2px 7px -3px color-mix(in srgb, var(--primary) 32%, transparent) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-theme="dark"] .side-nav-glide {
+  background: color-mix(in srgb, var(--primary) 17%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--primary) 46%, var(--border)) !important;
+  box-shadow: none !important;
+}
+
+/* ==================================================================
+   v1.0.57
+   ------------------------------------------------------------------
+   1. 流光加宽加亮：原来的亮带只有 146deg 且带透明度，截图里几乎看不见。
+   2. 侧栏滑块动画回到筛选栏同款 CSS 平移（JS 已去掉 WAAPI 拉伸）。
+   ================================================================== */
+.cal-cell.is-today::before,
+.wk-col.is-today::before {
+  padding: 2px !important;
+  background: conic-gradient(from var(--beam-a, 0deg),
+    color-mix(in srgb, var(--primary) 30%, transparent) 0deg,
+    #ffffff 42deg,
+    var(--primary) 92deg,
+    color-mix(in srgb, var(--primary) 30%, transparent) 148deg,
+    color-mix(in srgb, var(--primary) 30%, transparent) 208deg,
+    #ffffff 252deg,
+    var(--primary) 304deg,
+    color-mix(in srgb, var(--primary) 30%, transparent) 360deg) !important;
+  animation: beamSpin 2.8s linear infinite !important;
+}
+.side-nav-glide {
+  transition:
+    transform .42s cubic-bezier(.22, 1, .36, 1),
+    width .42s cubic-bezier(.22, 1, .36, 1),
+    height .42s cubic-bezier(.22, 1, .36, 1),
+    opacity .18s ease !important;
+}
