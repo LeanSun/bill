@@ -3298,3 +3298,13 @@ html[data-theme="dark"] .ins-wd.is-today span { color: #ff9c74; }
 html[data-theme="dark"] .ins-rest .ir-bar.is-year i {
   background: linear-gradient(90deg, var(--amber), var(--income)) !important;
 }
+
+/* v1.0.51：跨天分隔柱此前被 .rs-item 的 overflow:hidden 裁掉了。
+   放开新一天那一颗的溢出，让 ::before 真正落在两颗之间的空档里。 */
+.rs-item.is-newday { overflow: visible !important; }
+.rs-item.is-newday::before {
+  left: -22px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--primary) 32%, var(--surface)) 0%,
+    color-mix(in srgb, var(--primary) 62%, var(--surface)) 100%) !important;
+}

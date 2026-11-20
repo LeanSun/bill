@@ -691,3 +691,9 @@ node server/server.js
 9. 资源版本推进到 `?v=1.0.50`。
 
 改动文件：`index.html`、`cube.html`、`assets/app.js`、`assets/styles.css`、`README.md`。
+
+## v1.0.51 · 分隔柱 / 最近 8 条 / 下拉收起（2026-11-20）
+
+1. **跨天分隔柱终于可见**。样式上一直有，但画在 `.rs-item::before`（`left:-22px`）上，而胶囊自身 `overflow:hidden` 把溢出部分整整裁掉了。现在只给新一天那一颗放开溢出（`overflow:visible!important`），浅蓝圆角小柱才真正落在两条之间的空档里。
+2. **最近记录 9 → 8 条**：`sortedDesc(allRecords()).slice(0, 8)`。
+3. **切页自动收下拉**。自定义 `UISelect` 的面板挂在 `document.body` 上（`position:fixed`），只靠 outside-click 收不干净：点到导航切页后面板还浮着。现在 `setView()` 与魔方页 `switchTab()` 一进来就调 `UISelect.close()`。

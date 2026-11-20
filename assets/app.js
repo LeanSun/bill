@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.50';
+  var ASSET_V = '1.0.51';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2300,7 +2300,7 @@
       var showRecent = (cat === 'all');
       strip.hidden = !showRecent;
       if (showRecent) {
-        var recs = sortedDesc(allRecords()).slice(0, 9);
+        var recs = sortedDesc(allRecords()).slice(0, 8);
         var rsig = recs.map(function (r) {
           return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type, catColor(p, r.category)].join('|');
         }).join('~');
@@ -3258,6 +3258,8 @@
   }
   function setView(view, cubeTab) {
     if (!VIEW_META[view]) return;
+    /* 切页先把自定义下拉收掉：面板挂在 body 上，视图换了它不会自己消失 */
+    if (window.UISelect) { try { window.UISelect.close(); } catch (e) {} }
     if (view !== 'cube') {
       var veil = $('cubeGlobalVeil');
       if (veil) { veil.classList.remove('is-on'); veil.hidden = true; }
