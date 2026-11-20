@@ -3513,3 +3513,36 @@ html[data-theme="dark"] .side-nav-glide {
     height .42s cubic-bezier(.22, 1, .36, 1),
     opacity .18s ease !important;
 }
+
+/* ==================================================================
+   v1.0.58 · 周历流光沿周长归一化
+   ------------------------------------------------------------------
+   周列窄而高，conic-gradient 从中心辐射，亮带只擦过左右窄边中段。
+   改用 SVG rect + pathLength=100：底轨整圈淡色，一道白光点沿周长匀速绕行。
+   ================================================================== */
+.wk-col.is-today::before { display: none !important; }   /* 关掉旧的 conic 流光，避免叠两层 */
+.wk-beam {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 2; overflow: visible;
+}
+.wk-beam rect {
+  fill: none;
+  x: 1.5px; y: 1.5px; width: calc(100% - 3px); height: calc(100% - 3px);
+  vector-effect: non-scaling-stroke;
+}
+.wk-beam .wk-beam-track {
+  stroke: color-mix(in srgb, var(--primary) 30%, transparent);
+  stroke-width: 2px;
+}
+.wk-beam .wk-beam-dot {
+  stroke: #ffffff;
+  stroke-width: 2.8px; stroke-linecap: round;
+  stroke-dasharray: 11 89;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 85%, transparent));
+  animation: wkBeamRun 2.8s linear infinite;
+}
+html[data-theme="dark"] .wk-beam .wk-beam-track { stroke: color-mix(in srgb, var(--primary) 42%, transparent); }
+@keyframes wkBeamRun { to { stroke-dashoffset: -100; } }
+@media (prefers-reduced-motion: reduce) {
+  .wk-beam .wk-beam-dot { animation: none; stroke-dasharray: none; stroke: color-mix(in srgb, var(--primary) 70%, #fff); stroke-width: 2px; }
+}

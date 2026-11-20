@@ -721,3 +721,9 @@ node server/server.js
 
 1. **今日格流光真正可见**。v1.0.34 有一条 `display:none!important` 直接压住了 `::before`，所以之前只看到 `::after` 的呼吸填充，边缘流光从没显示。v1.0.56 用同特异性后置规则恢复 `display:block!important`，并把 `inset` 收到 0 避开格子的 `overflow:hidden`。v1.0.57 再把亮带从 146° 扩到整圈：边缘全程有 30% 主色底，两个白色亮点（`42° / 252°`）沿边绕圈，`2.8s` 一圈。截图在 `1.4s / 3.5s` 两个时间点像素不同，确认在动。
 2. **侧栏胶囊改成筛选栏同款**。去掉玻璃模糊和内嵌高光，改淡紫平底 `color-mix(primary 11%, surface)` + 细描边 `34%` + 轻投影，和顶部「全部」筛选一致；动画从 WAAPI 拉伸回弹换回筛选栏同款纯 CSS 平移（`.42s`）。
+
+## v1.0.58 · 周历流光铺满整圈（2026-11-21）
+
+周列是窄长竖条（宽约为高的 1/6），`conic-gradient` 从元素中心按角度辐射，白色亮点固定在 42°/252°，只擦过左右两条窄边的中段，长边几乎扫不到 —— 看起来就是「只有一小块」。
+
+改成 SVG `rect` + `pathLength=100`：把整圈周长归一化为 100 个单位，底轨 `stroke` 淡色铺满四边，一道白色短光段（`stroke-dasharray:11 89`）用 `stroke-dashoffset` 匀速绕完整圈。配 `vector-effect:non-scaling-stroke` 保证线宽不随拉伸变形。任意长宽比都均匀，`prefers-reduced-motion` 下停止动画改静态描边。日历格仍是 conic 方案（近正方形，覆盖正常）。

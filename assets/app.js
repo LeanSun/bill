@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.57';
+  var ASSET_V = '1.0.58';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2643,7 +2643,10 @@
       var cls = 'wk-col';
       if (key === today) cls += ' is-today';
       if (i >= 5) cls += ' is-weekend';
+      /* v1.0.58：周列是窄长条，conic-gradient 按中心辐射，亮点只落在窄边中段。
+         换成沿周长归一化的 SVG 光带（pathLength=100），任意长宽比都均匀绕整圈。 */
       html += '<div class="' + cls + '" data-date="' + key + '">' +
+        (key === today ? '<svg class="wk-beam" aria-hidden="true"><rect class="wk-beam-track" pathLength="100"/><rect class="wk-beam-dot" pathLength="100"/></svg>' : '') +
         '<div class="wk-head">' +
         '<div class="wk-head-top"><span class="wk-dow">' + WEEKDAYS[i] + '</span>' +
         '<b class="wk-day">' + d.getDate() + '</b></div>' +
