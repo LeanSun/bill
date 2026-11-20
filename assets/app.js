@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.52';
+  var ASSET_V = '1.0.53';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -49,7 +49,8 @@
   var WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
   var WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   var MONTH_CN = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-  var hasEcharts = (typeof window.echarts !== 'undefined');
+  /* echarts 用 defer 延后解析，真实可用性在 init() 里再判定 */
+  var hasEcharts = false;
   /* 图表重绘模式：'animate' 首次入场有生长动画，'instant' 主题切换时原地换色不重放动画 */
   var RENDER_MODE = 'animate';
 
@@ -180,6 +181,7 @@
     newId: '',
     newUntil: 0,
     donutYear: 'all',
+    donutMode: 'amount',   /* 支出构成：金额 / 占比 */
     weightYear: 'all',
     store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     catColors: {},
@@ -1386,9 +1388,15 @@
       renderCharts('overview', 'instant');
     });
   }
+  function bindDonutMode() {
+    bindSeg($('donutMode'), 'data-dm', function (v) {
+      state.donutMode = v;
+      renderCharts('overview', 'instant');
+    });
+  }
 
-  /* 支出构成：v1.0.50 不再交给 ECharts 画环形图 —— 直接排成 HTML 金额榜。
-     每一行「序号 · 分类 · 条 · 金额 · 占比」，金额写全，点一行跳该分类明细。 */
+  /* 支出构成：HTML 金额榜。右上角「金额 / 占比」切换两种读法，
+     条目本身仍可点，跳到对应分类的日历明细。 */
   function renderDonut(p) {
     fillDonutYears();
     var data = catTotals(scopeRecords().filter(function (r) {
@@ -1399,6 +1407,7 @@
       var old = charts['chartDonut'];
       if (old) { old.dispose(); delete charts['chartDonut']; }
     } catch (e) { /* 还没建过实例 */ }
+    el.classList.toggle('is-percent', state.donutMode === 'percent');
     if (!data.length) { el.innerHTML = '<div class="spend-empty">这一年还没有支出记录</div>'; return; }
     var total = data.reduce(function (sum, d) { return sum + d.value; }, 0);
     var colors = catColors(p);
@@ -1407,7 +1416,7 @@
     el.innerHTML = data.map(function (d, i) {
       var pct = total ? d.value / total * 100 : 0;
       return '<button type="button" class="spend-row" data-cat="' + esc(d.name) + '"' +
-        ' title="点这一行看「' + esc(d.name) + '」明细">' +
+        ' title="' + esc(d.name + ' ' + fmtYuan(d.value) + ' · ' + pctText(pct) + '，点击看明细') + '">' +
         '<span class="spend-rank">' + (i + 1) + '</span>' +
         '<span class="spend-name">' + esc(d.name) + '</span>' +
         '<span class="spend-track"><i style="width:' + pct.toFixed(1) + '%;background:' +
@@ -2684,8 +2693,10 @@
       var k = dateKey(d);
       return { k: k, v: round(byDate[k] || 0), d: d };
     }
-    function card(title, body, idx, extra) {
-      return '<div class="ins-card' + (extra ? ' ' + extra : '') + '" style="--i:' + idx + '"><h4>' + title + '</h4>' +
+    /* 统一骨架：标题 + 关键读数同一行，图表独占下方整块高度 */
+    function card(title, body, idx, extra, key) {
+      return '<div class="ins-card' + (extra ? ' ' + extra : '') + '" style="--i:' + idx + '">' +
+        '<div class="ins-top"><h4>' + title + '</h4>' + (key || '') + '</div>' +
         '<div class="ins-body">' + body + '</div></div>';
     }
 
@@ -2775,12 +2786,11 @@
     var avgPct = Math.max(0, Math.min(100, monthDaily / scaleMax * 100));
     var timesAvg = monthDaily > 0 ? de / monthDaily : 0;
     var todayTone = de > monthDaily * 1.05 ? 'is-up' : (de < monthDaily * .95 ? 'is-down' : '');
+    var cmpKey = '<span class="ins-key ' + todayTone + '">' +
+      (monthDaily > 0 ? timesAvg.toFixed(1) + '×' : '—') + '</span>';
     var cmpCard =
       '<div class="ins-today">' +
-      '<div class="it-top">' +
-      '<b class="it-ratio ' + todayTone + '">' + (monthDaily > 0 ? timesAvg.toFixed(1) + '×' : '—') + '</b>' +
-      '<span class="it-cap">今天 ' + fmtYuan(de) + '<br>日均 ' + fmtYuan(monthDaily) + '</span>' +
-      '</div>' +
+      '<div class="it-capline">今天 ' + fmtYuan(de) + ' · 日均 ' + fmtYuan(monthDaily) + '</div>' +
       '<div class="it-bar" data-tip="' + esc('今天 ' + fmtYuan(de) + ' · 本月日均 ' + fmtYuan(monthDaily) +
         ' · 本月单日最高 ' + fmtYuan(mPeak.v)) + '">' +
       '<i style="width:' + todayPct.toFixed(1) + '%"></i>' +
@@ -2806,7 +2816,7 @@
     var legend = catList.slice(0, 3).map(function (c) {
       var pct = catTotal > 0 ? catSum[c] / catTotal * 100 : 0;
       return '<span><i style="background:' + catFill(p, catColor(p, c)) + '"></i>' + esc(c) +
-        '<b>' + pct.toFixed(0) + '%</b></span>';
+        '<b>' + fmtBig(catSum[c]) + ' · ' + pct.toFixed(0) + '%</b></span>';
     }).join('');
     var catCard = catList.length
       ? '<div class="ins-stack">' + stack + '</div><div class="ins-legend">' + legend + '</div>'
@@ -2844,17 +2854,17 @@
         }).join('') + '</div>'
       : '';
     var dCls = Math.abs(delta) < .05 ? 'is-flat' : (delta > 0 ? 'is-up' : 'is-down');
+    var weightDelta = Math.abs(delta) >= .05
+      ? '<em class="iw-delta ' + dCls + '">' + (delta > 0 ? '▲' : '▼') + ' ' + Math.abs(delta).toFixed(1) + '</em>'
+      : '<em class="iw-delta is-flat">—</em>';
+    var weightKey = wkeys.length
+      ? '<span class="ins-key">' + show.toFixed(1) + '<i>kg</i></span>' + weightDelta
+      : '';
     var weightCard = wkeys.length
       ? '<div class="ins-weight" data-focus-weight="1" title="点这里跳到体重输入框">' +
-        '<div class="iw-top"><div class="iw-val"><b>' + show.toFixed(1) + '</b><i>kg</i></div>' +
-        '<div class="iw-meta"><span class="iw-when">' + wWhen + '</span>' +
-        (Math.abs(delta) >= .05
-          ? '<em class="iw-delta ' + dCls + '">' + (delta > 0 ? '▲' : '▼') + ' ' + Math.abs(delta).toFixed(1) + '</em>'
-          : '<em class="iw-delta is-flat">—</em>') +
-        '</div></div>' +
         wSeq +
-        '<div class="iw-foot"><span>最近 ' + wLast.length + ' 次</span>' +
-        '<span>' + wlo.toFixed(1) + ' – ' + whi.toFixed(1) + ' kg</span></div>' +
+        '<div class="iw-foot"><span>' + wWhen + '</span>' +
+        '<span>最近 ' + wLast.length + ' 次 · ' + wlo.toFixed(1) + '–' + whi.toFixed(1) + '</span></div>' +
         '</div>'
       : '<div class="iw-empty" data-focus-weight="1"><b>还没记过体重</b><span>点这里记第一条</span></div>';
 
@@ -2886,11 +2896,14 @@
       ' · 存下 ' + yLeftPct.toFixed(0) + '%</div>' +
       '</div>';
 
-    return card('近 7 日支出', line7, 0) +
-      card('今天花得多吗', cmpCard, 1) +
-      card('还剩多少', restCard, 2) +
-      card('当日分类构成', catCard, 3) +
-      card('体重记录', weightCard, 4, 'is-weight');
+    return card('近 7 日支出', line7, 0, '',
+        '<span class="ins-key">' + fmtYuan(de) + '</span>') +
+      card('今天花得多吗', cmpCard, 1, '', cmpKey) +
+      card('还剩多少', restCard, 2, '',
+        '<span class="ins-key' + (mNow < 0 ? ' is-over' : '') + '">' + fmtYuan(mNow) + '</span>') +
+      card('当日分类构成', catCard, 3, '',
+        '<span class="ins-key">' + fmtYuan(catTotal) + '</span>') +
+      card('体重记录', weightCard, 4, 'is-weight', weightKey);
   }
 
   /* 左栏内容随当天分类数变化：先按紧凑排版，仍超高就整体等比缩小，
@@ -4667,6 +4680,7 @@
     backdropDismiss($('confirmBackdrop'), closeConfirm);
     if ($('undoBtn')) $('undoBtn').addEventListener('click', doUndo);
     bindDonutYear();
+    bindDonutMode();
     bindSeg($('weightYear'), 'data-wy', function (v) {
       state.weightYear = v;
       renderCharts('overview', 'instant');
@@ -5291,13 +5305,13 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 9,
+    v: 10,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
       'salary', 'reimb'],
     spans: {
-      kpi: [12, 3], calheat: [12, 7], trend: [5, 6], donut: [3, 6], balance: [4, 6],
+      kpi: [12, 3], calheat: [12, 7], trend: [4, 6], donut: [4, 6], balance: [4, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
       cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
@@ -5326,7 +5340,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 9 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 10 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -5711,6 +5725,7 @@
   }
 
   function init() {
+    hasEcharts = (typeof window.echarts !== 'undefined');
     /* 私人数据门禁：没连到主人仓库就是空账本；连上了先读完私有仓库
        再启动渲染，否则图表会先按空数据画一遍，再整体重画。 */
     /* 远端快照在后台补齐时只重画一次，不让首屏再等一趟网络 */

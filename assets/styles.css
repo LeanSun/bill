@@ -24,8 +24,8 @@
   --expense: #10a06a;
   --expense-soft: rgba(16, 160, 106, .1);
   /* 删除 / 报错等"危险"语义与收支色解耦，避免删除按钮跟着支出变绿 */
-  --danger: #e5484d;
-  --danger-soft: rgba(229, 72, 77, .1);
+  --danger: #e11d48;
+  --danger-soft: rgba(225, 29, 72, .1);
   --amber: #f0a52a;
   --violet: #8b5cf6;
   --sky: #38a9e8;
@@ -33,11 +33,11 @@
   --weekend-ink: #ff8ba7;
   /* 分类色板：这套值就是「恢复默认」回到的颜色，改这里等于改出厂配色。
      深浅两套同值 —— 配色自定义写的是同一个 :root 变量，两套主题本来就同色 */
-  --cat-food: #ffc000;
-  --cat-daily: #490033;
-  --cat-travel: #264465;
-  --cat-wear: #8b5cf6;
-  --cat-fun: #0000e4;
+  --cat-food: #ba7517;
+  --cat-daily: #7f77dd;
+  --cat-travel: #378add;
+  --cat-wear: #d4537e;
+  --cat-fun: #1d9e75;
   --neon: 74, 108, 247;
   /* 今日格子的呼吸强度：深色底吃色，同一组百分比在暗色下会淡掉，故分主题给值 */
   --breath-lo: 6%;
@@ -77,18 +77,18 @@ html[data-theme="dark"] {
   --income-soft: rgba(255, 114, 109, .14);
   --expense: #2ec98f;
   --expense-soft: rgba(46, 201, 143, .14);
-  --danger: #ff726d;
-  --danger-soft: rgba(255, 114, 109, .14);
+  --danger: #ff6b8a;
+  --danger-soft: rgba(255, 107, 138, .14);
   --amber: #f5b544;
   --violet: #a78bfa;
   --sky: #55baf0;
   --weekend-ink: #ffa1b8;
   /* 深色底沿用同一套分类色：自定义配色本来就两端共用一份值 */
-  --cat-food: #ffc000;
-  --cat-daily: #490033;
-  --cat-travel: #264465;
-  --cat-wear: #8b5cf6;
-  --cat-fun: #0000e4;
+  --cat-food: #ef9f27;
+  --cat-daily: #afa9ec;
+  --cat-travel: #85b7eb;
+  --cat-wear: #ed93b1;
+  --cat-fun: #5dcaa5;
   --breath-lo: 13%;
   --breath-hi: 27%;
   --breath-ring-lo: .38;
@@ -3325,3 +3325,63 @@ html[data-theme="dark"] .ins-rest .ir-bar.is-year i {
     color-mix(in srgb, var(--primary) 22%, var(--surface)) 0%,
     color-mix(in srgb, var(--primary) 55%, var(--surface)) 100%);
 }
+
+/* ==================================================================
+   v1.0.53
+   ------------------------------------------------------------------
+   1. 分类色压到同一明度带，危险色与收入红拉开；
+   2. 支出构成加「金额 / 占比」切换；
+   3. 关于这一天五张卡统一「标题 + 关键读数 / 图表」骨架；
+   4. 最近记录保持单行，压缩胶囊宽让 8 条尽量塞进屏宽；
+   5. echarts 延后解析，判定移到 init，减少首屏阻塞。
+   ================================================================== */
+
+/* ---- 2. 支出构成：金额 / 占比切换 ------------------------------- */
+.donut-mode { margin-left: 6px; }
+.chart-donut.is-percent .spend-amt { display: none; }
+.chart-donut:not(.is-percent) .spend-pct { display: none; }
+.chart-donut.is-percent .spend-pct {
+  min-width: 52px; font-size: 12px; font-weight: 700; color: var(--text);
+}
+.chart-donut.is-percent .spend-track { flex-basis: 46%; }
+
+/* ---- 3. 卡片统一骨架 ------------------------------------------- */
+.ins-card h4 { margin: 0; }
+.ins-top {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 6px; flex: 0 0 auto; min-width: 0;
+}
+.ins-top h4 {
+  font-size: 11.5px; font-weight: 700; color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ins-key {
+  flex: 0 0 auto; max-width: 62%; font-size: 14px; font-weight: 750;
+  color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.ins-key i { font-style: normal; font-size: 9.5px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.ins-key.is-up { color: var(--income); }
+.ins-key.is-down { color: var(--expense); }
+.ins-key.is-over { color: var(--danger); }
+.it-capline { font-size: 10px; color: var(--muted); margin-bottom: 5px; line-height: 1.2; }
+.ins-body { justify-content: flex-start; }
+.ins-wds { flex: 1 1 auto; }
+.iw-foot { flex: 0 0 auto; }
+.ins-legend b { font-variant-numeric: tabular-nums; }
+
+/* ---- 4. 最近记录：保持单行，压缩胶囊让 8 条尽量全露 ------------ */
+.rs-list { gap: 5px; }
+.rs-item {
+  flex: 0 1 118px; width: 118px; min-width: 104px;
+  padding: 0 7px; gap: 5px;
+}
+.rs-note { font-size: 10.5px; }
+.rs-day { font-size: 9.5px; }
+.rs-amt { font-size: 10px; }
+.rs-sep { flex: 0 0 12px; width: 12px; }
+
+/* 支出构成卡片加宽后，两个分段控件收进同一组，窄屏自动换行 */
+.donut-controls { display: flex; flex: 0 0 auto; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.donut-mode { margin-left: 0; }
+.chart-card .donut-controls + * { clear: both; }
