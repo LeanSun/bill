@@ -744,3 +744,8 @@ node server/server.js
 
 1. **「还剩多少」跟随当前查看日**。`dayInsightsHTML` 的 `d0` 本来就取当前锚点日期，但本月收支、年度结余是整月 / 整年全量，同月内翻日数字不动，看着像写死到今天。现在两处 `forEach` 都加了 `dk > dayKey` 截止条件，改成「截至当前查看日」累计：翻日到 11/05 和 11/19、或翻到 10 月，三行都会跟着变；脚注补上「截至 M/D」让口径可见。日期用 `dateKey` 字符串比较，不依赖时区。
 2. **分类下拉恢复颜色填充**。根因：`optionPaint()` 把分类色写在原生 `<option>` 的 `data-c` 上，原生 select 已隐身，而自绘面板 `ui-select.js` 造 option 按钮时只读 `textContent`，颜色没被搬过去，展开就是一片白。现在造按钮时读 `data-c` 写进 `--opt-ink` 并加 `has-tint`，CSS 用 `color-mix` 派生同色淡底、文字色和圆点，hover / active / selected 三态都跟着分类色走；非分类下拉没有 `data-c`，不受影响。
+
+## v1.0.62 · 上下翻页 / 流光头亮尾暗（2026-11-21）
+
+1. **日历翻页统一上下**。`turnVertical()` 原来只对年历 / 月历返回 true，周历 / 日视图横着拨。现在恒返回 true，月 / 周 / 日 / 年一律竖着推，方向一致。
+2. **绕边流光放慢 + 渐变拖尾**。一圈 2.8s → 3.5s。单段光（dash 8）拆成三段错位叠加：`cal-beam-head`（宽 3、白、不透明、带光晕）在最前，`tail1`（宽 2.5、50%）、`tail2`（宽 2、18%）依次落后变暗，靠不同负 `animation-delay` 错开相位，形成头亮尾暗的渐变拖尾；对角两段仍正对（dasharray 3/47，周期 50，`pathLength=100`）。`prefers-reduced-motion` 下只留静态 head。

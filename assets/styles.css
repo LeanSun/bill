@@ -3540,11 +3540,27 @@ html[data-theme="dark"] .side-nav-glide {
 }
 .cal-beam .cal-beam-track { stroke: var(--primary); stroke-width: 2px; }
 .cal-beam .cal-beam-dot {
-  stroke: #ffffff; stroke-width: 2.8px; stroke-linecap: round;
-  /* 对角两条短线：dash 8 / 间隔 42 -> 100 周长里恰好两段正对（0 与 50），绕圈时你追我赶 */
-  stroke-dasharray: 8 42;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 85%, transparent));
-  animation: calBeamRun 2.8s linear infinite;
+  stroke: #ffffff; stroke-linecap: round;
+  /* dash 3 / 间隔 47 -> 周期 50，100 周长里恰好两段正对；三段错位叠成一条拖尾 */
+  stroke-dasharray: 3 47;
+  animation: calBeamRun 3.5s linear infinite;
+}
+/* v1.0.62：头亮尾暗 —— head 在前最亮带光晕，tail1/tail2 依次落后且递减变暗。
+   负 delay 让相位提前：head 最靠路径前方，尾部收在后面，形成渐变拖尾。 */
+.cal-beam .cal-beam-head {
+  stroke-width: 3px; opacity: 1;
+  animation-delay: -.12s;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 92%, transparent));
+}
+.cal-beam .cal-beam-tail1 {
+  stroke-width: 2.5px; opacity: .5;
+  animation-delay: -.06s;
+  filter: none;
+}
+.cal-beam .cal-beam-tail2 {
+  stroke-width: 2px; opacity: .18;
+  animation-delay: 0s;
+  filter: none;
 }
 @keyframes calBeamRun { to { stroke-dashoffset: -100; } }
 
@@ -3575,9 +3591,10 @@ html[data-theme="dark"] .cal-cell.is-today { animation-name: todayCellBreathCalD
 
 /* 减少动态效果：流光停成静态细描边，呼吸也停 */
 @media (prefers-reduced-motion: reduce) {
-  .cal-beam .cal-beam-dot {
+  .cal-beam .cal-beam-tail1, .cal-beam .cal-beam-tail2 { display: none; }
+  .cal-beam .cal-beam-head {
     animation: none; stroke-dasharray: none;
-    stroke: color-mix(in srgb, var(--primary) 75%, #ffffff); stroke-width: 2px;
+    stroke: color-mix(in srgb, var(--primary) 75%, #ffffff); stroke-width: 2px; opacity: 1;
   }
   .cal-cell.is-today {
     animation: none !important;

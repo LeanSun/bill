@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.61';
+  var ASSET_V = '1.0.62';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2613,7 +2613,7 @@
       if (key === state.focusDate) cls += ' is-focus';
       /* 先把全部条目都写进去，裁几条、每条多高，交给第二遍按真实高度算 */
       html += '<div class="' + cls + '" data-date="' + key + '" data-other="' + (other ? '1' : '0') + '">' +
-        (!other && key === today ? '<svg class="cal-beam" aria-hidden="true"><rect class="cal-beam-track" pathLength="100"/><rect class="cal-beam-dot" pathLength="100"/></svg>' : '') +
+        (!other && key === today ? '<svg class="cal-beam" aria-hidden="true"><rect class="cal-beam-track" pathLength="100"/><rect class="cal-beam-dot cal-beam-tail2" pathLength="100"/><rect class="cal-beam-dot cal-beam-tail1" pathLength="100"/><rect class="cal-beam-dot cal-beam-head" pathLength="100"/></svg>' : '') +
         '<div class="cal-cell-head"><div class="cal-dayleft"><span class="cal-daynum">' + d.getDate() + '</span>' +
         (d.getDate() === 1 ? '<span class="cal-monthtag">' + (d.getMonth() + 1) + '月</span>' : '') + '</div>' +
         daySumHTML(p, items) + '</div>' +
@@ -5087,9 +5087,10 @@
 
   /* 一次翻页：旧页整块推出去，新页从另一头滑进来。
      dir > 0 是往后翻（下一月 / 下一周）。轴按粒度分：
-     年历 / 月历竖着推，周历 / 天横着拨。 */
+     所有粒度一律竖着推）。 */
   function turnVertical() {
-    return state.scale === 'year' || state.scale === 'month';
+    /* v1.0.62：日历翻页统一走上下 —— 月 / 周 / 日 / 年一致，不再横竖混用 */
+    return true;
   }
 
   function pageTurn(dir) {
