@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.49';
+  var ASSET_V = '1.0.50';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -722,7 +722,8 @@
     o.type = r.type === 'income' ? 'income' : 'expense';
     var rawCat = String(r.category || '娱乐');
     o.category = CAT_RENAME[rawCat] || rawCat;
-    o.note = canonNote(r.note) || (o.type === 'income' ? '收入' : o.category);
+    /* 原样保留用户输入的名目；别名只用于搜索 / 分类，不改存下来的字 */
+    o.note = String(r.note == null ? '' : r.note).trim() || (o.type === 'income' ? '收入' : o.category);
     /* 手选了子类就用手选的，否则按名字自动识别——旧账没有 sub 字段，自动走识别 */
     o.subExplicit = !!(r.sub && subCatNames(o.category).indexOf(r.sub) !== -1);
     o.sub = o.subExplicit ? r.sub : guessSub(o.category, o.note);
@@ -1386,50 +1387,37 @@
     });
   }
 
-  /* 支出构成：v1.0.48 从环形图换成横向排行条。
-     环形图只给百分比、金额要靠悬浮猜；现在每一行「分类 — 条 — 金额 · 占比」，
-     排序后一眼看出钱花在哪，点一行依旧跳到该分类明细。 */
+  /* 支出构成：v1.0.50 不再交给 ECharts 画环形图 —— 直接排成 HTML 金额榜。
+     每一行「序号 · 分类 · 条 · 金额 · 占比」，金额写全，点一行跳该分类明细。 */
   function renderDonut(p) {
     fillDonutYears();
     var data = catTotals(scopeRecords().filter(function (r) {
       return state.donutYear === 'all' || String(r.year) === String(state.donutYear);
     })).filter(function (d) { return d.value > 0; }).sort(function (a, b) { return b.value - a.value; });
+    var el = $('chartDonut'); if (!el) return;
+    try {
+      var old = charts['chartDonut'];
+      if (old) { old.dispose(); delete charts['chartDonut']; }
+    } catch (e) { /* 还没建过实例 */ }
+    if (!data.length) { el.innerHTML = '<div class="spend-empty">这一年还没有支出记录</div>'; return; }
     var total = data.reduce(function (sum, d) { return sum + d.value; }, 0);
     var colors = catColors(p);
     var nameIndex = {};
     EXPENSE_CATS.forEach(function (c, i) { nameIndex[c] = i; });
-    var o = baseOption(p);
-    o.grid = { left: 2, right: 92, top: 6, bottom: 2, containLabel: true };
-    o.tooltip = tooltipCommon(p, {
-      trigger: 'item',
-      formatter: function (d) {
-        return d.marker + d.name + '<br/><b>' + fmtYuan(d.value) + '</b> · ' + pctText(total ? d.value / total * 100 : 0) +
-          '<br/>点这一行看明细';
-      }
+    el.innerHTML = data.map(function (d, i) {
+      var pct = total ? d.value / total * 100 : 0;
+      return '<button type="button" class="spend-row" data-cat="' + esc(d.name) + '"' +
+        ' title="点这一行看「' + esc(d.name) + '」明细">' +
+        '<span class="spend-rank">' + (i + 1) + '</span>' +
+        '<span class="spend-name">' + esc(d.name) + '</span>' +
+        '<span class="spend-track"><i style="width:' + pct.toFixed(1) + '%;background:' +
+        (colors[nameIndex[d.name]] || p.primary) + '"></i></span>' +
+        '<span class="spend-amt">' + fmtYuan(d.value) + '</span>' +
+        '<span class="spend-pct">' + pctText(pct) + '</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.spend-row'), function (row) {
+      row.onclick = function () { jumpToDetail({ reset: true, category: row.getAttribute('data-cat') }); };
     });
-    o.xAxis = { type: 'value', show: false, min: 0, max: total || 1 };
-    o.yAxis = {
-      type: 'category', inverse: true, data: data.map(function (d) { return d.name; }),
-      axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { color: p.text2, fontSize: 11.5, fontWeight: 650, fontFamily: p.font, margin: 8 }
-    };
-    o.series = [{
-      type: 'bar', barWidth: 10, barCategoryGap: '38%',
-      data: data.map(function (d) {
-        return {
-          name: d.name, value: d.value,
-          itemStyle: { color: colors[nameIndex[d.name]] || p.primary, borderRadius: [0, 6, 6, 0] }
-        };
-      }),
-      label: {
-        show: true, position: 'right', distance: 7,
-        formatter: function (d) { return fmtBig(d.value) + '  ' + pctText(total ? d.value / total * 100 : 0); },
-        color: p.text2, fontSize: 11, fontWeight: 650, fontFamily: p.font
-      },
-      emphasis: { itemStyle: { opacity: .82 } }
-    }];
-    setOpt('chartDonut', o);
-    bindClick('chartDonut', function (params) { if (params.name) jumpToDetail({ reset: true, category: params.name }); });
   }
 
   /* 结余变化：月度净额柱 + 累计结余曲线（双轴），一图看流速与存量 */
@@ -1931,7 +1919,7 @@
       { kind: 'cubeprice', gram: 'line', rows: yearRows(cubes, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'cubes', key: 'year' },
       { kind: 'compyear', gram: 'year', rows: yearRows(comps, true), fmt: cnt('场'), axisFmt: function (v) { return v; }, tab: 'competitions', key: 'year' },
       { kind: 'compprov', gram: 'rank', rows: rankRows(comps, function (x) { return x.province || '未填写'; }), fmt: cnt('场'), tab: 'competitions', key: 'province' },
-      { kind: 'compprice', gram: 'year', rows: yearRows(comps, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'competitions', key: 'year' }
+      { kind: 'compprice', gram: 'line', rows: yearRows(comps, false), fmt: cubeMoneyShort, axisFmt: yuanAxis, tab: 'competitions', key: 'year' }
     ];
     var fallback = function (sp) {
       var host = document.querySelector('[data-cube-list="' + sp.kind + '"]'); if (!host) return;
@@ -1964,7 +1952,9 @@
       chart.off('click');
       chart.on('click', function (params) {
         var name = params && params.name; if (!name) return;
-        var filter = { tab: sp.tab }; filter[sp.key] = String(name); jumpCube(filter);
+        var val = String(name);
+        if (sp.kind === 'compprov' && (val === '未填写' || val === '未识别省份')) val = '__unknown__';
+        var filter = { tab: sp.tab }; filter[sp.key] = val; jumpCube(filter);
       });
     });
   }
@@ -2331,7 +2321,7 @@
               '<span class="rs-meta">' +
               '<b class="rs-day">' + esc(String(r.date || '').slice(5)) + '</b>' +
               '<em class="rs-amt ' + (inc ? 'is-inc' : 'is-exp') + '">' + (inc ? '+' : '-') +
-              esc(fmtTiny(r.amount)) + '</em>' +
+              esc(fmtYuan(r.amount).slice(1)) + '</em>' +
               '</span></span></button>';
           }).join('') : '<span class="rs-none">还没有记录</span>';
         }
@@ -2837,29 +2827,20 @@
     if (cur && prev) delta = cur - prev;
     else if (!cur && wkeys.length > 1) delta = Number(w[lastKey]) - Number(w[wkeys[wkeys.length - 2]]);
     var wWhen = cur ? '今日' : (lastKey ? '最近一次 · ' + lastKey.slice(5).replace('-', '/') : '');
-    var wLast = wkeys.slice(-7).map(function (k) { return Number(w[k]); });
+    /* 不画折线：最近 7 次直接列成「数值 / 小柱 / 日期」，一眼能读出每次是多少 */
+    var last7 = wkeys.slice(-7).map(function (k) { return { k: k, v: Number(w[k]) }; });
+    var wLast = last7.map(function (x) { return x.v; });
     var wlo = wLast.length ? Math.min.apply(null, wLast) : 0;
     var whi = wLast.length ? Math.max.apply(null, wLast) : 1;
-    /* 7 个点摊在 4 — 156 之间，纵向留 6 — 26，尾部圆点不贴边 */
-    var wpts = wLast.map(function (v, i) {
-      var px = 4 + i * (152 / Math.max(1, wLast.length - 1));
-      var py = 26 - ((v - wlo) / Math.max(.1, whi - wlo)) * 20;
-      return [px.toFixed(1), py.toFixed(1)];
-    });
-    var wSpark = '';
-    if (wLast.length > 1) {
-      var poly = wpts.map(function (q) { return q.join(','); }).join(' ');
-      var tail = wpts[wpts.length - 1];
-      wSpark = '<div class="iw-sparkwrap">' +
-        '<svg class="iw-spark" viewBox="0 0 160 36" preserveAspectRatio="none" aria-hidden="true">' +
-        '<polygon points="' + poly + ' 156,36 4,36"/>' +
-        '<polyline points="' + poly + '"/>' +
-        '</svg>' +
-        /* 末端那颗点是 HTML 画圆的：SVG 横向拉满会把圆压成椭圆 */
-        '<i class="iw-dot" style="left:' + (Number(tail[0]) / 160 * 100).toFixed(2) +
-        '%;top:' + (Number(tail[1]) / 36 * 100).toFixed(2) + '%"></i>' +
-        '</div>';
-    }
+    var wSeq = last7.length
+      ? '<div class="iw-seq">' + last7.map(function (x, i) {
+          var pct = 12 + ((x.v - wlo) / Math.max(.1, whi - wlo)) * 76;
+          return '<div class="iw-seq-item' + (i === last7.length - 1 ? ' is-last' : '') + '">' +
+            '<b>' + x.v.toFixed(1) + '</b>' +
+            '<i style="height:' + pct.toFixed(1) + '%"></i>' +
+            '<span>' + esc(String(x.k).slice(5).replace('-', '/')) + '</span></div>';
+        }).join('') + '</div>'
+      : '';
     var dCls = Math.abs(delta) < .05 ? 'is-flat' : (delta > 0 ? 'is-up' : 'is-down');
     var weightCard = wkeys.length
       ? '<div class="ins-weight" data-focus-weight="1" title="点这里跳到体重输入框">' +
@@ -2869,7 +2850,7 @@
           ? '<em class="iw-delta ' + dCls + '">' + (delta > 0 ? '▲' : '▼') + ' ' + Math.abs(delta).toFixed(1) + '</em>'
           : '<em class="iw-delta is-flat">—</em>') +
         '</div></div>' +
-        wSpark +
+        wSeq +
         '<div class="iw-foot"><span>最近 ' + wLast.length + ' 次</span>' +
         '<span>' + wlo.toFixed(1) + ' – ' + whi.toFixed(1) + ' kg</span></div>' +
         '</div>'
@@ -3225,7 +3206,9 @@
       var t = e.target && e.target.closest ? e.target.closest('.cm-row') : null;
       if (!t) return;
       var filter = { tab: t.getAttribute('data-cube-jump') };
-      filter[t.getAttribute('data-cube-key')] = t.getAttribute('data-v') || '';
+      var pv = t.getAttribute('data-v') || '';
+      if (pv === '未填写' || pv === '未识别省份') pv = '__unknown__';
+      filter[t.getAttribute('data-cube-key')] = pv;
       jumpCube(filter);
     });
     var b = $('cubeOpenBtn');
@@ -3962,7 +3945,7 @@
       id: v.editingId || ('u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
       date: v.date, type: v.type === 'income' ? 'income' : 'expense',
       category: v.category || (v.type === 'income' ? '收入' : '娱乐'),
-      note: canonNote(rawNote),
+      note: rawNote,
       amount: round(amount)
     };
     /* 子类：选了就用选的，留空交给关键词匹配 */
@@ -5041,8 +5024,9 @@
      新内容先渲染在屏幕外，然后两层同一时长、同一条缓动、同时平移一整页高度
      （年历 / 月历竖着推，周历 / 天横着推）。中途没有任何透明度变化、
      没有内容交换的瞬间，所以不存在闪。 */
-  var TURN_MS = 420;            /* 一整页滑完的时长，期间不再接新的翻页 */
-  var TURN_EASE = 'cubic-bezier(.4,0,.2,1)';
+  var TURN_MS = 460;            /* 一整页滑完的时长，期间不再接新的翻页 */
+  /* 尾段过冲一点再收回：看着就是滑到位后轻轻弹一下，不是硬停 */
+  var TURN_EASE = 'cubic-bezier(.22, 1.12, .36, 1)';
   var WHEEL_TRIGGER = 80;       /* 滚轮攒够这么多像素算一格 */
   var turnLock = 0, turnTimer = 0, ptGhost = null;
   var wheelAcc = 0, wheelDir = 0, wheelQuiet = 0;

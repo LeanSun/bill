@@ -3222,3 +3222,79 @@ html[data-theme="dark"] .ins-wd.is-today span { color: #ff9c74; }
 .ins-card.is-weight .iw-sparkwrap { margin: 5px 0 2px; }
 .ins-card.is-weight .iw-spark { height: 52px; }
 .ins-card.is-weight .iw-val b { font-size: 22px; }
+
+/* ==================================================================
+   v1.0.50
+   ------------------------------------------------------------------
+   1. 最近记录：跨天分隔做成浅蓝圆角小柱，金额一律两位小数；
+   2. 体重卡：去掉折线，改最近 7 次的数值 + 日期；
+   3. 支出构成：ECharts 画布换成 HTML 金额榜；
+   4. 关于这一天 · 年度结余：条子换成储蓄率同款橙→红渐变。
+   ================================================================== */
+
+/* ---- 1. 跨天分隔：像分段控件那样一枚浅蓝圆角小柱 ---------------- */
+.rs-item.is-newday::before {
+  content: ''; position: absolute; left: -22px; top: 6px; bottom: 6px; width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--primary) 24%, var(--surface)) 0%,
+    color-mix(in srgb, var(--primary) 58%, var(--surface)) 100%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+/* ---- 2. 体重卡：数值 / 小柱 / 日期，不再有折线 ------------------ */
+.iw-seq { display: flex; align-items: stretch; gap: 4px; margin: 6px 0 3px; height: 58px; }
+.iw-seq-item {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; gap: 2px;
+}
+.iw-seq-item b {
+  font-size: 9px; font-weight: 750; line-height: 1; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.iw-seq-item i {
+  display: block; width: 100%; max-width: 15px; min-height: 3px;
+  border-radius: 4px 4px 1px 1px;
+  background: color-mix(in srgb, var(--primary) 34%, var(--surface));
+}
+.iw-seq-item.is-last i { background: var(--primary); }
+.iw-seq-item.is-last b { color: var(--primary); }
+.iw-seq-item span { font-size: 8.5px; line-height: 1; color: var(--muted); white-space: nowrap; }
+
+/* ---- 3. 支出构成：HTML 金额榜，不用画布 ------------------------ */
+.chart.chart-donut {
+  height: auto !important; min-height: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.spend-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px;
+  padding: 4px 7px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface-2); color: var(--text-2);
+  font-size: 11px; text-align: left;
+}
+.spend-row:hover { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); background: var(--surface); }
+.spend-rank {
+  flex: 0 0 16px; width: 16px; height: 16px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-3); color: var(--muted); font-size: 9px; font-weight: 750;
+}
+.spend-name { flex: 0 0 40px; width: 40px; font-weight: 700; white-space: nowrap; }
+.spend-track {
+  flex: 1 1 auto; min-width: 20px; height: 8px; border-radius: 5px;
+  background: var(--surface-3); overflow: hidden;
+}
+.spend-track i { display: block; height: 100%; border-radius: 5px; }
+.spend-amt {
+  flex: 0 0 auto; min-width: 76px; text-align: right;
+  font-weight: 750; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.spend-pct { flex: 0 0 40px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.spend-empty { padding: 24px 0; text-align: center; color: var(--muted); font-size: 11.5px; }
+
+/* ---- 4. 关于这一天 · 年度结余：储蓄率同款橙→红 ----------------- */
+.ins-rest .ir-bar.is-year i {
+  background: linear-gradient(90deg, var(--amber), var(--income)) !important;
+}
+html[data-theme="dark"] .ins-rest .ir-bar.is-year i {
+  background: linear-gradient(90deg, var(--amber), var(--income)) !important;
+}
