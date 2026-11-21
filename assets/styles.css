@@ -3657,3 +3657,12 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 /* v1.0.67：支出构成每行追加「占预算 %」小标 */
 .spend-bud { flex: 0 0 auto; font-size: 9.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chart-donut.is-percent .spend-bud { display: none; }
+
+/* v1.0.68：重置筛选按钮（⟳）加长 —— 从 36px 方钮改成带文字的长胶囊 */
+.ct-right #resetFilters {
+  width: auto; flex: 0 0 auto; min-width: 78px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 0 12px; border-radius: 9px;
+}
+.ct-right #resetFilters svg { width: 15px; height: 15px; flex: 0 0 15px; }
+.ct-right #resetFilters .reset-label { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
