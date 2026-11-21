@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.73';
+  var ASSET_V = '1.0.74';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3086,9 +3086,9 @@
       weightHTML +
       '</div>' +
       '</aside>' +
-      '<div class="day-list">' +
+      '<div class="day-list' + (isToday ? ' is-today' : '') + '">' +
       '<div class="day-list-head">' +
-      '<div><h3>当日明细</h3><span>' + key + ' · 共 ' + items.length + ' 笔 · ' + order.length + ' 类</span></div>' +
+      '<div><h3>当日明细' + (isToday ? '<span class="dl-today">今天</span>' : '') + '</h3><span>' + key + ' · 共 ' + items.length + ' 笔 · ' + order.length + ' 类</span></div>' +
       '<div class="dlh-sum"><span>支出 <b class="c-expense">' + fmtYuan(de) + '</b></span>' +
       '<span>收入 <b class="c-income">' + fmtYuan(di) + '</b></span></div>' +
       '</div>' +
