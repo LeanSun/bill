@@ -3787,22 +3787,23 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
    ----------------------------------------------------------------
    左栏粉底 = 周末（中性日期属性），这一栏的蓝 = 今天（「你正在看此刻」）。
    两套色各管一件事，今天恰好是周末时左粉右蓝并排也不混淆。
-   浅色 v2：纯色平铺太含蓄，改成左侧浓、向右淡出的渐变 + 顶部渐隐色带，
-   和左竖条构成 L 形框角，视线自然落到标题区，又不会糊成一整块蓝。
+   v1.0.76：用户反馈「只是加重了边框，背景填充颜色不够」—— 原先左端
+   13% 混白几乎看不出。这次把整栏底色浓度整体提上去（不只左端），
+   保持左浓右淡的方向感，但右端也留得住颜色。
    ================================================================== */
 .day-list.is-today {
   position: relative;
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--primary) 13%, var(--surface)) 0%,
-    color-mix(in srgb, var(--primary) 7%, var(--surface)) 46%,
-    color-mix(in srgb, var(--primary) 2.5%, var(--surface)) 100%);
+    color-mix(in srgb, var(--primary) 26%, var(--surface)) 0%,
+    color-mix(in srgb, var(--primary) 17%, var(--surface)) 46%,
+    color-mix(in srgb, var(--primary) 8%, var(--surface)) 100%);
   box-shadow: inset 4px 0 0 color-mix(in srgb, var(--primary) 72%, transparent);
 }
 html[data-theme="dark"] .day-list.is-today {
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--primary) 20%, var(--surface)) 0%,
-    color-mix(in srgb, var(--primary) 12%, var(--surface)) 46%,
-    color-mix(in srgb, var(--primary) 6%, var(--surface)) 100%);
+    color-mix(in srgb, var(--primary) 34%, var(--surface)) 0%,
+    color-mix(in srgb, var(--primary) 24%, var(--surface)) 46%,
+    color-mix(in srgb, var(--primary) 13%, var(--surface)) 100%);
   box-shadow: inset 4px 0 0 color-mix(in srgb, var(--primary) 78%, transparent);
 }
 /* 顶部那条渐隐色带：从左角射出，和左竖条接成一个 L 形框角 */

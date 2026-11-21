@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.75';
+  var ASSET_V = '1.0.76';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1146,6 +1146,16 @@
     }
     var same = t.getFullYear() === state.calMonth.year && t.getMonth() + 1 === state.calMonth.month;
     return same ? dateKey(t) : dateKey(new Date(state.calMonth.year, state.calMonth.month - 1, 1));
+  }
+  /* v1.0.76：进入日历默认就是「今天」的天页面。
+     统一收口到这个函数：导航点日历、首次加载都走它；顶部「回到今天」按钮也复用。
+     深链（jumpToDay / jumpToDetail）会自己指定日期，不走这里，避免被覆盖。 */
+  function gotoToday() {
+    var d = new Date();
+    setAnchor(d);
+    state.scale = 'day';
+    state.focusDate = '';
+    setSegActive($('scaleSeg'), 'data-scale', 'day');
   }
   function setScale(s) {
     softReset();                        /* 翻到一半换粒度：先把动画收干净 */
@@ -4714,8 +4724,11 @@
     for (var i = 0; i < navs.length; i++) {
       navs[i].addEventListener('click', function () {
         var tab = this.dataset.cubeTab;
+        var v = this.dataset.view;
+        /* 每次点「日历」都回到今天的天页面；其它视图照常切 */
+        if (!tab && v === 'calendar') gotoToday();
         if (tab) jumpCube({ tab: tab });
-        else setView(this.dataset.view);
+        else setView(v);
       });
     }
 
@@ -4913,9 +4926,7 @@
     if ($('calPrev')) $('calPrev').addEventListener('click', function () { softStep(-1); });
     if ($('calNext')) $('calNext').addEventListener('click', function () { softStep(1); });
     if ($('calToday')) $('calToday').addEventListener('click', function () {
-      var d = new Date();
-      setAnchor(d);
-      state.focusDate = '';
+      gotoToday();
       renderBoard(); renderCharts('calendar');
     });
     /* 工具条里不再重复放一个"记一笔"：顶栏那个一直都在，
@@ -5949,6 +5960,8 @@
     /* 默认打开日历；地址栏带深链（含旧的 #/analysis）则优先深链 */
     var initialRoute = parseRoute() || 'calendar';
     bindRoute();
+    /* 首屏就是日历、且地址栏没有深链时，直接落到今天的天页面 */
+    if (initialRoute === 'calendar' && !parseRoute()) gotoToday();
     setView(initialRoute);
 
     /* 门禁没过：整块内容换成「未解锁」，不给看也不给记 */
