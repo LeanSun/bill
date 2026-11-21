@@ -3787,35 +3787,20 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
    ----------------------------------------------------------------
    左栏粉底 = 周末（中性日期属性），这一栏的蓝 = 今天（「你正在看此刻」）。
    两套色各管一件事，今天恰好是周末时左粉右蓝并排也不混淆。
-   v1.0.76：用户反馈「只是加重了边框，背景填充颜色不够」—— 原先左端
-   13% 混白几乎看不出。这次把整栏底色浓度整体提上去（不只左端），
-   保持左浓右淡的方向感，但右端也留得住颜色。
+   v1.0.77：只保留背景渐变填充 —— 去掉左侧竖条、顶部色带、分隔线染色。
+   用户要的是「背景颜色填充」，边框类装饰不要。
    ================================================================== */
 .day-list.is-today {
-  position: relative;
   background: linear-gradient(90deg,
     color-mix(in srgb, var(--primary) 26%, var(--surface)) 0%,
     color-mix(in srgb, var(--primary) 17%, var(--surface)) 46%,
     color-mix(in srgb, var(--primary) 8%, var(--surface)) 100%);
-  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--primary) 72%, transparent);
 }
 html[data-theme="dark"] .day-list.is-today {
   background: linear-gradient(90deg,
     color-mix(in srgb, var(--primary) 34%, var(--surface)) 0%,
     color-mix(in srgb, var(--primary) 24%, var(--surface)) 46%,
     color-mix(in srgb, var(--primary) 13%, var(--surface)) 100%);
-  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--primary) 78%, transparent);
-}
-/* 顶部那条渐隐色带：从左角射出，和左竖条接成一个 L 形框角 */
-.day-list.is-today .day-list-head { position: relative; border-bottom-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
-.day-list.is-today .day-list-head::before {
-  content: '';
-  position: absolute; top: -16px; left: -16px; right: -16px; height: 3px;
-  background: linear-gradient(90deg,
-    var(--primary) 0%,
-    color-mix(in srgb, var(--primary) 62%, transparent) 42%,
-    transparent 100%);
-  pointer-events: none;
 }
 /* 标题旁的小徽章，和左栏日期卡的「今天」同一套视觉，只是缩一档 */
 .dl-today {
