@@ -3757,3 +3757,27 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
   .pay-hero .ph-net { font-size: 22px; }
   .ph-meter { flex-basis: 110px; }
 }
+
+/* ==================================================================
+   v1.0.73 · 天页「是不是今天」的状态徽章
+   ----------------------------------------------------------------
+   原来天页只有日期本身和「回到今天」按钮，按钮永远是同一个样子，
+   看不出当前是否已经在今天。徽章贴着星期胶囊放，语义上就是日期的一部分。
+   ================================================================== */
+.ds-head-l { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ds-when {
+  display: inline-flex; align-items: center; height: 21px; padding: 0 8px;
+  border-radius: 20px; font-size: 10.5px; font-weight: 700; letter-spacing: .03em;
+  color: var(--text-2); background: color-mix(in srgb, var(--text-2) 13%, var(--surface));
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+/* 今天：主色实心，在淡粉周末底上够跳，但仍是全站同一个蓝，不另起一套颜色 */
+.ds-when.is-today {
+  color: #fff; background: var(--primary);
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--primary) 62%, transparent);
+}
+/* 窄栏时不让「昨天 / 3 天前」把年月挤出头部 */
+@media (max-width: 1180px) {
+  .ds-head-l { gap: 4px; }
+  .ds-when { padding: 0 6px; font-size: 10px; }
+}

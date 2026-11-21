@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.72';
+  var ASSET_V = '1.0.73';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3059,10 +3059,22 @@
 
     var d = new Date(key + 'T00:00:00');
     var isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    /* v1.0.73：这一页是不是今天，要在日期上直接看得见。
+       是今天给实心「今天」，不是就给「昨天 / 3 天前 / 明天」这种相对说法，
+       这样既说明「不是今天」，也顺带告诉你差多远，不用再去点顶部按钮确认。 */
+    var todayKey = todayStr();
+    var dayDiff = Math.round((new Date(key + 'T00:00:00') - new Date(todayKey + 'T00:00:00')) / 86400000);
+    var isToday = key === todayKey;
+    var whenText = isToday ? '今天'
+      : dayDiff === -1 ? '昨天' : dayDiff === 1 ? '明天'
+      : dayDiff < 0 ? (-dayDiff) + ' 天前' : dayDiff + ' 天后';
     box.innerHTML =
       '<aside class="day-side' + (isWeekend ? ' is-weekend' : '') + '">' +
       '<div class="ds-inner">' +
-      '<div class="ds-head"><span class="ds-dow">' + WEEK_CN[d.getDay()] + '</span>' +
+      '<div class="ds-head"><div class="ds-head-l">' +
+      '<span class="ds-dow">' + WEEK_CN[d.getDay()] + '</span>' +
+      '<span class="ds-when' + (isToday ? ' is-today' : '') + '">' + whenText + '</span>' +
+      '</div>' +
       '<span class="ds-ym">' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月</span></div>' +
       '<div class="ds-big"><b>' + d.getDate() + '</b><i>日</i></div>' +
       '<div class="ds-net" style="--ds:' + (Math.abs(net) < .005 ? p.muted : net > 0 ? p.income : p.expense) + '">' +
