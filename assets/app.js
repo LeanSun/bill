@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.71';
+  var ASSET_V = '1.0.72';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -474,17 +474,22 @@
     if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
     var num = function (v, def) { var n = Number(v); return isFinite(n) ? n : def; };
     var out = {
-      base: num(o.base, 8477), wage: num(o.wage, 6400),
-      perf: num(o.perf, 2425), subsidy: num(o.subsidy, 550), gap: num(o.gap, 32.075),
+      /* 透传结构版本：老数据 v 为空，交给 payOrDefaults 决定要不要搬家。
+         这里绝不能擅自补成 2，否则旧版 base=8477 会被当成用户自定义值留住。 */
+      v: Number(o.v) === 2 ? 2 : 0,
+      base: num(o.base, 8476.51), wage: num(o.wage, 6400),
+      subsidy: num(o.subsidy, 550), tax: num(o.tax, 8.91), unionFee: num(o.unionFee, 32),
       rows: [], reimb: []
     };
     if (Array.isArray(o.rows)) {
       o.rows.slice(0, 24).forEach(function (r) {
         if (!r || !r.name) return;
+        var name = String(r.name).slice(0, 24);
         out.rows.push({
-          name: String(r.name).slice(0, 24),
+          name: name,
           p: Math.max(0, Math.min(100, num(r.p, 0))),
-          c: Math.max(0, Math.min(100, num(r.c, 0)))
+          c: Math.max(0, Math.min(100, num(r.c, 0))),
+          r: r.r === 'yuan' || r.r === 'cent' ? r.r : (/公积金/.test(name) ? 'yuan' : 'cent')
         });
       });
     }
@@ -4333,31 +4338,63 @@
      一条一条加、一条一条删，顶部给合计。 */
   var PAY_KEY = 'qingzhang.pay.v1';
   var pay = null;
+  /* 出厂数字全部来自 2026 年 10 月工资条（上海口径）：
+     应发 = 基本工资 6,400 + 交通津贴 550 = 6,950
+     五险一金个人 1,653.03 + 个税 8.91 + 工会费 32.00 = 1,693.94
+     实发 5,256.06 —— 三组数字首尾闭合，不再靠「差距」这个补丁去凑。
+     v:2 是结构版本号，用来把旧版（perf / gap）数据平滑搬过来。 */
   function payDefaults() {
     return {
-      base: 8477, wage: 6400, perf: 2425, subsidy: 550, gap: 32.075,
+      v: 2,
+      base: 8476.51, wage: 6400, subsidy: 550, tax: 8.91, unionFee: 32,
       rows: [
-        { name: '养老金', p: 8, c: 0 },
-        { name: '公积金', p: 7, c: 7 },
-        { name: '医保金', p: 2, c: 8.08 },
-        { name: '失业保险', p: 0.5, c: 0 },
-        { name: '补充公积金', p: 2, c: 2 }
+        { name: '养老保险', p: 8, c: 16, r: 'cent' },
+        { name: '医疗保险', p: 2, c: 9, r: 'cent' },
+        { name: '失业保险', p: 0.5, c: 0.5, r: 'cent' },
+        { name: '住房公积金', p: 7, c: 7, r: 'yuan' },
+        { name: '补充公积金', p: 2, c: 2, r: 'yuan' }
       ],
       reimb: []
     };
+  }
+  /* 取整口径：社保按分记账，公积金按「元以下四舍五入」。
+     这就是医保 169.5302 记 169.53、补充公积金同一个数记 170 的原因。 */
+  function payRound(v, mode) {
+    return mode === 'yuan' ? Math.round(v) : Math.round(v * 100) / 100;
   }
   /* 把一份（可能缺字段的）pay 洗成能直接渲染的形状：缺的用出厂值补，
      rows 空着就回落到五行，金额 / 日期不合规的条目丢掉。 */
   function payOrDefaults(o) {
     var d = payDefaults();
     if (!o || typeof o !== 'object') return d;
-    ['base', 'wage', 'perf', 'subsidy', 'gap'].forEach(function (k) {
+    var isV2 = Number(o.v) === 2;
+    /* 老版只存了 base / wage / perf / subsidy / gap：perf 从来没参与过计算，
+       gap 是当年「对不上的差额」，现已查明是工会费。这两项直接作废，
+       金额字段只搬 base / wage / subsidy —— 用户改过的值要留住。 */
+    ['base', 'wage', 'subsidy'].forEach(function (k) {
       var v = Number(o[k]);
-      if (isFinite(v)) d[k] = v;
+      /* 旧版出厂基数写的是四舍五入的 8477，不是用户改的，换成工资条上的 8476.51 */
+      if (!isFinite(v)) return;
+      if (k === 'base' && !isV2 && v === 8477) return;
+      d[k] = v;
     });
-    if (Array.isArray(o.rows) && o.rows.length) {
+    if (isV2) {
+      ['tax', 'unionFee'].forEach(function (k) {
+        var v = Number(o[k]);
+        if (isFinite(v)) d[k] = v;
+      });
+    }
+    /* 旧版那五行比例本身是错的（养老单位 0%、医保单位 8.08%），
+       与其搬过来不如整组换成工资条核定的口径 —— 只在 v:2 时沿用用户的自定义 */
+    if (isV2 && Array.isArray(o.rows) && o.rows.length) {
       var rows = o.rows.filter(function (r) { return r && r.name; }).map(function (r) {
-        return { name: String(r.name), p: Number(r.p) || 0, c: Number(r.c) || 0 };
+        var name = String(r.name).slice(0, 24);
+        return {
+          name: name,
+          p: Math.max(0, Math.min(100, Number(r.p) || 0)),
+          c: Math.max(0, Math.min(100, Number(r.c) || 0)),
+          r: r.r === 'yuan' || r.r === 'cent' ? r.r : (/公积金/.test(name) ? 'yuan' : 'cent')
+        };
       });
       if (rows.length) d.rows = rows;
     }
@@ -4391,7 +4428,9 @@
     try { localStorage.removeItem(PAY_KEY); } catch (e) { /* noop */ }
     if (!state.store) return;
     state.store.pay = cleanPay({
-      base: pay.base, wage: pay.wage, perf: pay.perf, subsidy: pay.subsidy, gap: pay.gap,
+      v: 2,
+      base: pay.base, wage: pay.wage, subsidy: pay.subsidy,
+      tax: pay.tax, unionFee: pay.unionFee,
       rows: pay.rows, reimb: pay.reimb
     });
     saveStore();
@@ -4404,61 +4443,124 @@
   function buildPayRows() {
     var box = $('payRows');
     if (!box) return;
-    box.innerHTML = pay.rows.map(function (r, i) {
+    /* 五行五险一金 —— 比例可改；单位比例是上海 2026 口径
+       （养老 16% / 医疗 9% 含生育 / 失业 0.5% / 公积金 7% + 补充 2%）。
+       下面两条是代扣项：个税走累计预扣、工会费按工资 5‰，都没有「单位比例」。 */
+    var html = pay.rows.map(function (r, i) {
       return '<tr data-row="' + i + '">' +
         '<th>' + esc(r.name) + '</th>' +
         /* 比例格里再包一层：td 一旦改成 flex 就不再是表格单元格，列宽会塌 */
         '<td class="pay-rate-cell"><div class="pay-rate">' +
-        '<label><input type="number" data-i="' + i + '" data-k="p" step="0.01" min="0" value="' + r.p + '" aria-label="' + esc(r.name) + '个人比例"><i>%</i></label>' +
-        '<label><input type="number" data-i="' + i + '" data-k="c" step="0.01" min="0" value="' + r.c + '" aria-label="' + esc(r.name) + '公司比例"><i>%</i></label>' +
+        '<label><input type="number" data-i="' + i + '" data-k="p" step="0.01" min="0" max="100" value="' + r.p + '" aria-label="' + esc(r.name) + '个人比例"><i>%</i></label>' +
+        '<label><input type="number" data-i="' + i + '" data-k="c" step="0.01" min="0" max="100" value="' + r.c + '" aria-label="' + esc(r.name) + '单位比例"><i>%</i></label>' +
         '</div></td>' +
         '<td class="pay-ip" data-cell="ip">—</td>' +
         '<td class="pay-ic" data-cell="ic">—</td>' +
         '<td class="pay-sum" data-cell="sum">—</td>' +
         '</tr>';
     }).join('');
+
+    html +=
+      '<tr class="pay-sub"><th>五险一金</th>' +
+        '<td class="pay-rate-cell" data-cell="rateSum">—</td>' +
+        '<td data-cell="subIp">—</td><td data-cell="subIc">—</td><td data-cell="subSum">—</td></tr>' +
+      '<tr class="pay-extra"><th>个人所得税</th>' +
+        '<td class="pay-rate-cell"><i class="pay-tag">累计预扣</i></td>' +
+        '<td data-cell="taxIp">—</td><td class="pay-nil">—</td><td class="pay-nil">—</td></tr>' +
+      '<tr class="pay-extra"><th>工会会费</th>' +
+        '<td class="pay-rate-cell"><i class="pay-tag">工资 5‰</i></td>' +
+        '<td data-cell="unionIp">—</td><td class="pay-nil">—</td><td class="pay-nil">—</td></tr>' +
+      '<tr class="pay-total"><th>扣除合计</th>' +
+        '<td class="pay-rate-cell" data-cell="totalRate">—</td>' +
+        '<td data-cell="totalIp">—</td><td class="pay-nil">—</td><td class="pay-nil">—</td></tr>';
+
+    box.innerHTML = html;
   }
   function payFillInputs() {
     if ($('payBase')) $('payBase').value = pay.base;
     if ($('payWage')) $('payWage').value = pay.wage;
-    if ($('payPerf')) $('payPerf').value = pay.perf;
     if ($('paySubsidy')) $('paySubsidy').value = pay.subsidy;
-    if ($('payGap')) $('payGap').value = pay.gap;
+    if ($('payTax')) $('payTax').value = pay.tax;
+    if ($('payUnion')) $('payUnion').value = pay.unionFee;
   }
   /* 只刷数字格，不重建 DOM —— 边打字边算，焦点不会被抢走 */
   function renderPayNumbers() {
     var base = payVal('payBase', pay.base);
-    var ip = 0, ic = 0;
+    var ip = 0, ic = 0, fundIp = 0, fundIc = 0, rateP = 0, rateC = 0;
+
     pay.rows.forEach(function (r, i) {
       var tr = document.querySelector('#payRows tr[data-row="' + i + '"]');
       if (!tr) return;
-      var a = base * r.p / 100, b = base * r.c / 100;
-      ip += a; ic += b;
-      tr.querySelector('[data-cell="ip"]').textContent = a ? fmtYuan(a) : '—';
-      tr.querySelector('[data-cell="ic"]').textContent = b ? fmtYuan(b) : '—';
-      tr.querySelector('[data-cell="sum"]').textContent = fmtYuan(a + b);
+      var a = payRound(base * r.p / 100, r.r);
+      var b = payRound(base * r.c / 100, r.r);
+      ip += a; ic += b; rateP += Number(r.p) || 0; rateC += Number(r.c) || 0;
+      if (r.name.indexOf('公积金') >= 0) { fundIp += a; fundIc += b; }
+      var setCell = function (k, v) {
+        var el = tr.querySelector('[data-cell="' + k + '"]');
+        if (el) el.textContent = fmtYuan(v);
+      };
+      setCell('ip', a);
+      setCell('ic', b);
+      setCell('sum', a + b);
     });
+
     var wage = payVal('payWage', pay.wage);
-    var gap = payVal('payGap', pay.gap);
-    var gross = wage - ip;
-    var net = gross - gap;
-    /* 合计不再挤在表格最后一行（六列宽里数字会被截断），
-       单独做一条三格摘要：个人 / 公司 / 应发，再加上实发那一格横幅。 */
-    var foot = $('payFoot');
-    if (foot) {
-      foot.innerHTML =
-        '<div class="ps-cell"><span>个人合计</span><b class="is-exp">' + fmtYuan(ip) + '</b></div>' +
-        '<div class="ps-cell"><span>公司合计</span><b>' + fmtYuan(ic) + '</b></div>' +
-        '<div class="ps-cell"><span>缴费共计</span><b>' + fmtYuan(ip + ic) + '</b></div>' +
-        '<div class="ps-cell is-gross"><span>应发</span><b>' + fmtYuan(gross) + '</b><i>工资 − 个人缴费</i></div>' +
-        '<div class="ps-cell is-net"><span>实发</span><b>' + fmtYuan(net) + '</b>' +
-        '<i>应发 − 差距 ' + fmtYuan(gap) + ' · 绩效 ' + fmtYuan(payVal('payPerf', pay.perf)) +
-        ' · 补贴 ' + fmtYuan(payVal('paySubsidy', pay.subsidy)) + '</i></div>';
+    var subsidy = payVal('paySubsidy', pay.subsidy);
+    var tax = payVal('payTax', pay.tax);
+    var unionFee = payVal('payUnion', pay.unionFee);
+
+    /* 三个数首尾闭合：应发 = 工资 + 津贴；扣除 = 五险一金 + 个税 + 工会费；
+       到手 = 应发 − 扣除。旧版把「应发」算成「工资 − 个人缴费」，方向就是反的。 */
+    var gross = wage + subsidy;
+    var cut = ip + tax + unionFee;
+    var net = gross - cut;
+
+    var fill = function (cell, v) {
+      var el = document.querySelector('#payRows [data-cell="' + cell + '"]');
+      if (el) el.textContent = v;
+    };
+    fill('rateSum', (Math.round(rateP * 10) / 10) + '% / ' + (Math.round(rateC * 10) / 10) + '%');
+    fill('subIp', fmtYuan(ip));
+    fill('subIc', fmtYuan(ic));
+    fill('subSum', fmtYuan(ip + ic));
+    fill('taxIp', fmtYuan(tax));
+    fill('unionIp', fmtYuan(unionFee));
+    fill('totalRate', gross ? '占应发 ' + (cut / gross * 100).toFixed(2) + '%' : '—');
+    fill('totalIp', fmtYuan(cut));
+
+    /* 到手拆成两笔到账：工资扣五险一金与工会费，个税从津贴里代扣 —— 与银行流水一致 */
+    var pay1 = wage - ip - unionFee;
+    var pay2 = subsidy - tax;
+    var netEl = $('payNet');
+    if (netEl) netEl.textContent = fmtYuan(net);
+    if ($('payGross')) $('payGross').textContent = fmtYuan(gross);
+    if ($('payCut')) $('payCut').textContent = fmtYuan(cut);
+    if ($('payBarFill')) $('payBarFill').style.width = (gross > 0 ? Math.max(0, Math.min(100, net / gross * 100)) : 0).toFixed(2) + '%';
+    if ($('payPct')) $('payPct').textContent = gross > 0 ? (net / gross * 100).toFixed(2) + '%' : '—';
+    if ($('paySplit')) {
+      $('paySplit').innerHTML =
+        '<span><i>工资</i><b>' + fmtYuan(pay1) + '</b></span>' +
+        '<span><i>津贴</i><b>' + fmtYuan(pay2) + '</b></span>';
     }
-    /* 卡头只留一句结论：每月到底到手多少 */
+
+    /* 公积金是唯一「单位缴的钱也进你账户」的部分，单独拎出来说 */
+    var fund = fundIp + fundIc;
+    if ($('payFund')) {
+      $('payFund').innerHTML = fund
+        ? '<i>公积金账户每月入账</i><b>' + fmtYuan(fund) + '</b>' +
+          '<em>单位 ' + fmtYuan(fundIc) + ' + 个人 ' + fmtYuan(fundIp) + ' · 一年 ' + fmtYuan(fund * 12) + '</em>'
+        : '';
+    }
+    if ($('payNote')) {
+      $('payNote').textContent = base > gross + 0.01
+        ? '缴费基数 ' + fmtYuan(base) + ' 按上年度月平均工资性收入核定，高于当月应发 ' + fmtYuan(gross) +
+          '，所以扣款看起来比按工资算的更多。'
+        : '按基数 ' + fmtYuan(base) + ' 计缴，比例改动会立刻重算；公积金按元取整、社保按分记账。';
+    }
+    /* 卡头给年度视角：到手总量与公积金年入账 */
     var sub = $('paySub');
     if (sub) {
-      sub.textContent = '每年合计 ' + fmtYuan(net * 12) + ' · 本月到手 ' + fmtYuan(net);
+      sub.textContent = '每年到手约 ' + fmtYuan(net * 12) + ' · 公积金年入账 ' + fmtYuan(fund * 12);
     }
   }
   function sortReimb() {
@@ -4544,9 +4646,9 @@
         if (pay.rows[i]) pay.rows[i][k] = Number(t.value) || 0;
       } else if (t.id === 'payBase') pay.base = Number(t.value) || 0;
       else if (t.id === 'payWage') pay.wage = Number(t.value) || 0;
-      else if (t.id === 'payPerf') pay.perf = Number(t.value) || 0;
       else if (t.id === 'paySubsidy') pay.subsidy = Number(t.value) || 0;
-      else if (t.id === 'payGap') pay.gap = Number(t.value) || 0;
+      else if (t.id === 'payTax') pay.tax = Number(t.value) || 0;
+      else if (t.id === 'payUnion') pay.unionFee = Number(t.value) || 0;
       savePay();
       renderPayNumbers();
     });

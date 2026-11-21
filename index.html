@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#f5f7fa" data-page-node-id="YNZhYru6j3RsrXDah5InT4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%234a6cf7'/%3E%3Crect x='8' y='21' width='6' height='12' rx='2.5' fill='white' opacity='.55'/%3E%3Crect x='17' y='13' width='6' height='20' rx='2.5' fill='white' opacity='.8'/%3E%3Crect x='26' y='7' width='6' height='26' rx='2.5' fill='white'/%3E%3C/svg%3E" data-page-node-id="ljD9H3EvTZuStNxnHHhOfD">
 <title>轻账 · 收支看板</title>
-<link rel="stylesheet" href="assets/ui-select.css?v=1.0.71">
-<link rel="stylesheet" href="assets/styles.css?v=1.0.71" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
+<link rel="stylesheet" href="assets/ui-select.css?v=1.0.72">
+<link rel="stylesheet" href="assets/styles.css?v=1.0.72" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
 </head>
 <body class="is-booting" data-page-node-id="tMyPJ5SSZhJcCq6bXrfJH7">
 <script>setTimeout(function(){document.body.classList.remove("is-booting")},3000)</script>
@@ -300,23 +300,39 @@
             <div class="cm-list" data-cube-list="compprice"></div>
           </article>
           <article class="card chart-card span-2 pay-card" style="--i:7" data-oid="salary">
-            <div class="card-head">
-              <div><h3>社保</h3><p id="paySub">基数、比例、工资都能改，改完立刻重算</p></div>
-              <button type="button" class="btn btn-ghost pay-reset" id="payReset" title="恢复成原始那组数字">恢复默认</button>
+            <div class="card-head pay-head">
+              <div><h3>社保与个税</h3><p id="paySub">基数、比例、工资都能改，改完立刻重算</p></div>
+              <button type="button" class="btn btn-ghost pay-reset" id="payReset" title="恢复成工资条那组数字">恢复默认</button>
             </div>
             <div class="pay-calc">
+              <div class="pay-hero">
+                <div class="ph-top">
+                  <span class="ph-k">本月到手</span>
+                  <div class="ph-meter" title="到手占应发的比例">
+                    <span class="ph-track" aria-hidden="true"><i class="ph-fill" id="payBarFill"></i></span>
+                    <em id="payPct">0%</em>
+                  </div>
+                </div>
+                <b class="ph-net" id="payNet">¥0.00</b>
+                <div class="ph-split" id="paySplit"></div>
+                <div class="ph-base">
+                  <span>应发 <b id="payGross">¥0.00</b></span>
+                  <span>扣除 <b id="payCut">¥0.00</b></span>
+                </div>
+              </div>
               <div class="pay-fields">
-                <label><span>缴费基数</span><input type="number" id="payBase" step="1" min="0" autocomplete="off"></label>
-                <label><span>工资</span><input type="number" id="payWage" step="0.01" min="0" autocomplete="off"></label>
-                <label><span>绩效</span><input type="number" id="payPerf" step="0.01" min="0" autocomplete="off"></label>
-                <label><span>补贴</span><input type="number" id="paySubsidy" step="0.01" min="0" autocomplete="off"></label>
-                <label><span>差距</span><input type="number" id="payGap" step="0.001" autocomplete="off"></label>
+                <label><span>缴费基数</span><input type="number" id="payBase" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>基本工资</span><input type="number" id="payWage" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>交通津贴</span><input type="number" id="paySubsidy" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>个人所得税</span><input type="number" id="payTax" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>工会会费</span><input type="number" id="payUnion" step="0.01" min="0" autocomplete="off"></label>
               </div>
               <table class="pay-table">
-                <thead><tr><th>项目</th><th>比例<i>个人 / 公司</i></th><th>个人缴费</th><th>公司缴费</th><th>共计</th></tr></thead>
+                <thead><tr><th>项目</th><th>比例<i>个人 / 单位</i></th><th>个人</th><th>单位</th><th>合计</th></tr></thead>
                 <tbody id="payRows"></tbody>
               </table>
-              <div class="pay-summary" id="payFoot"></div>
+              <div class="pay-fund" id="payFund"></div>
+              <p class="pay-note" id="payNote"></p>
             </div>
           </article>
 
@@ -663,13 +679,13 @@
   </div>
 </div>
 
-<script src="assets/echarts.min.js?v=1.0.71" defer></script>
-<script src="assets/vault.js?v=1.0.71"></script>
-<script src="assets/boot.js?v=1.0.71"></script>
-<script src="assets/ui-select.js?v=1.0.71"></script>
-<script src="assets/app.js?v=1.0.71"></script>
+<script src="assets/echarts.min.js?v=1.0.72" defer></script>
+<script src="assets/vault.js?v=1.0.72"></script>
+<script src="assets/boot.js?v=1.0.72"></script>
+<script src="assets/ui-select.js?v=1.0.72"></script>
+<script src="assets/app.js?v=1.0.72"></script>
 <script>window.addEventListener("load",function(){try{UISelect.init()}catch(e){}});</script>
-<script src="assets/sync.js?v=1.0.71"></script>
+<script src="assets/sync.js?v=1.0.72"></script>
 <script>
 /* 离线加速：静态资源走本地缓存，页面本身始终取最新（详见 sw.js 顶部说明） */
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

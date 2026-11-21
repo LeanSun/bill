@@ -1869,7 +1869,7 @@ body.modal-cell .amount-input input { height: 54px; font-size: 23px; }
 .pay-table tbody tr:hover { background: var(--surface-2); }
 .pay-table thead th:nth-child(2) { text-align: center; }
 .pay-rate-cell { padding-top: 4px; padding-bottom: 4px; }
-.pay-rate { display: flex; gap: 6px; justify-content: center; align-items: center; }
+.pay-rate { display: flex; gap: 13px; justify-content: center; align-items: center; }
 .pay-rate label { display: inline-flex; align-items: center; gap: 3px; }
 .pay-rate input {
   width: 58px; height: 30px; text-align: right; padding: 0 7px;
@@ -1880,37 +1880,6 @@ body.modal-cell .amount-input input { height: 54px; font-size: 23px; }
 .pay-rate i { font-style: normal; font-size: 11px; color: var(--muted); }
 .pay-ip, .pay-sum { font-weight: 700; }
 .pay-ic { color: var(--muted); font-weight: 600; }
-/* 摘要条：三格缴费 + 应发 / 实发两条宽格 */
-.pay-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
-.pay-summary .ps-cell {
-  grid-column: span 2; min-width: 0;
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 9px 12px; border-radius: 11px;
-  background: var(--surface-2); border: 1px solid var(--border);
-}
-.pay-summary .ps-cell span { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
-.pay-summary .ps-cell b {
-  font-size: 16px; font-weight: 780; letter-spacing: -.025em; color: var(--text);
-  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pay-summary .ps-cell b.is-exp { color: var(--expense); }
-.pay-summary .ps-cell i { font-style: normal; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pay-summary .ps-cell.is-gross,
-.pay-summary .ps-cell.is-net { grid-column: span 3; }
-.pay-summary .ps-cell.is-gross b { font-size: 19px; }
-.pay-summary .ps-cell.is-net {
-  background: color-mix(in srgb, var(--income) 9%, var(--surface));
-  border-color: color-mix(in srgb, var(--income) 30%, var(--border));
-}
-.pay-summary .ps-cell.is-net b { font-size: 22px; color: var(--income); }
-@media (max-width: 900px) {
-  .pay-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pay-summary .ps-cell,
-  .pay-summary .ps-cell.is-gross,
-  .pay-summary .ps-cell.is-net { grid-column: span 1; }
-  .pay-summary .ps-cell.is-net { grid-column: 1 / -1; }
-}
-
 /* ---------- 报销费用 ---------- */
 .reimb-card { min-height: 0; overflow: auto; }
 .reimb-total { display: flex; align-items: baseline; gap: 8px; }
@@ -1972,18 +1941,6 @@ body.modal-cell .amount-input input { height: 54px; font-size: 23px; }
 }
 
 @media (max-width: 940px) {
-  .pay-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-  .pay-fields input { font-size: 15px; }
-  .pay-fields label { padding: 7px 9px 6px; }
-  .pay-calc { overflow-x: auto; padding-bottom: 2px; }
-  .pay-table th, .pay-table td { padding: 7px 6px; font-size: 12px; }
-  .pay-table tbody th, .pay-table tfoot th { font-size: 12.5px; }
-  .pay-rate { gap: 3px; }
-  .pay-rate input { width: 40px; height: 26px; padding: 0 4px; font-size: 11.5px; }
-  .pay-rate i { display: none; }
-  .pay-table thead th i { display: none; }
-  .pay-gross td b, .pay-net td b { font-size: 18px; }
-  #paySub::after { content: ' · 表格可左右滑动'; }
   .pay-reimb-add { grid-template-columns: 1fr 1fr; }
   .pay-reimb-list li { grid-template-columns: minmax(0, 1fr) auto 30px; row-gap: 6px; }
   .pr-date { grid-column: 1 / -1; grid-row: 2; }
@@ -3679,4 +3636,124 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
   .donut-head > .donut-mode { flex: 0 0 auto; order: 4; margin-left: auto; }
   .donut-head > .donut-years.seg button,
   .donut-head > .donut-mode.seg button { padding-left: 7px; padding-right: 7px; font-size: 11px; }
+}
+
+/* ==================================================================
+   v1.0.72 · 社保卡重做（口径对齐 2026-10 工资条）
+   ----------------------------------------------------------------
+   核心变化：三组数字首尾闭合 —— 应发 = 工资 + 津贴，
+   扣除 = 五险一金 + 个税 + 工会费，到手 = 应发 − 扣除。
+   旧版「应发 = 工资 − 个人缴费」方向是反的，且靠 gap 补丁凑数。
+   ================================================================== */
+.pay-head { align-items: flex-start; }
+.pay-head > div { min-width: 0; }
+
+/* ---------- 到手区：标签 + 进度，大数，两笔到账，应发/扣除脚注 ---------- */
+.pay-hero {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 13px 15px 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.ph-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ph-k { font-size: 11px; color: var(--muted); letter-spacing: .2px; }
+.ph-meter { display: flex; align-items: center; gap: 8px; flex: 0 1 200px; min-width: 90px; }
+.ph-track {
+  flex: 1; height: 6px; border-radius: 99px; overflow: hidden;
+  background: color-mix(in srgb, var(--expense) 46%, var(--surface-3));
+}
+.ph-fill {
+  display: block; height: 100%; width: 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary-2), var(--primary));
+  transition: width .38s cubic-bezier(.22, 1, .36, 1);
+}
+.ph-meter em {
+  font-style: normal; font-size: 11px; font-weight: 650;
+  color: var(--primary); font-variant-numeric: tabular-nums;
+}
+.pay-hero .ph-net {
+  margin-top: 1px;
+  font-size: 27px; font-weight: 720; line-height: 1.15;
+  letter-spacing: -.5px; color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.ph-split { display: flex; flex-wrap: wrap; gap: 3px 14px; margin-top: 3px; }
+.ph-split span { display: inline-flex; align-items: baseline; gap: 4px; }
+.ph-split i { font-style: normal; font-size: 10.5px; color: var(--muted); }
+.ph-split b { font-size: 12px; font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.ph-base {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 9px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px; color: var(--muted);
+}
+.ph-base b { margin-left: 4px; font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* ---------- 明细表：小计 / 代扣 / 合计三档视觉 ---------- */
+.pay-table tbody tr.pay-sub { background: var(--surface-3); }
+.pay-table tbody tr.pay-sub th,
+.pay-table tbody tr.pay-sub td { font-weight: 650; }
+.pay-table tbody tr.pay-sub .pay-rate-cell { font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pay-table tbody tr.pay-extra th { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.pay-table tbody tr.pay-extra td { color: var(--text-2); }
+.pay-table tbody tr.pay-total { border-top: 1px solid var(--border-strong); }
+.pay-table tbody tr.pay-total th,
+.pay-table tbody tr.pay-total td { font-weight: 700; }
+.pay-table tbody tr.pay-total td[data-cell="totalIp"] { color: var(--expense); }
+.pay-table tbody tr.pay-total .pay-rate-cell { font-size: 11px; font-weight: 500; color: var(--text-2); }
+.pay-table .pay-nil { color: var(--muted); opacity: .45; }
+.pay-tag {
+  display: inline-block; padding: 1px 6px; border-radius: 5px;
+  font-style: normal; font-size: 10.5px; font-weight: 600;
+  color: var(--text-2); background: var(--surface-3); white-space: nowrap;
+}
+
+/* ---------- 公积金入账条：唯一「单位的钱也进你账户」的部分 ---------- */
+.pay-fund {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px;
+  padding: 10px 13px; border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+.pay-fund i { font-style: normal; font-size: 11.5px; color: var(--text-2); }
+.pay-fund b { font-size: 17px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+.pay-fund em { font-style: normal; font-size: 11px; color: var(--muted); }
+
+.pay-note {
+  margin: 0; padding-left: 10px;
+  border-left: 2px solid var(--border-strong);
+  font-size: 12px; line-height: 1.65; color: var(--text-2);
+}
+
+/* 社保卡只占半屏，用视口断点会判断错（视口 1100 时卡片其实只有 404px）。
+   改成容器查询：按卡片自身宽度降级，视口多宽都不影响。 */
+.pay-card { container-type: inline-size; container-name: paycard; }
+@container paycard (max-width: 560px) {
+  .pay-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .pay-fields input { font-size: 14.5px; }
+  .pay-table th, .pay-table td { padding-left: 4px; padding-right: 4px; }
+  /* 五列塞不下：先砍「合计」，个人和单位各自还在，看得出谁交了多少 */
+  .pay-table th:nth-child(1), .pay-table td:nth-child(1) { width: 29%; }
+  .pay-table th:nth-child(2), .pay-table td:nth-child(2) { width: 33%; }
+  .pay-table th:nth-child(3), .pay-table td:nth-child(3) { width: 19%; }
+  .pay-table th:nth-child(4), .pay-table td:nth-child(4) { width: 19%; }
+  .pay-table th:nth-child(5), .pay-table td:nth-child(5) { display: none; }
+  .pay-rate { gap: 7px; }
+  .pay-rate input { width: 40px; padding: 0 5px; font-size: 12px; }
+  .pay-rate i { font-size: 10px; }
+  .pay-hero .ph-net { font-size: 24px; }
+  .ph-meter { flex-basis: 140px; }
+}
+@container paycard (max-width: 430px) {
+  .pay-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* 再窄一档：只留「个人」——自己扣了多少才是主线，单位缴的看下面公积金条 */
+  .pay-table th:nth-child(1), .pay-table td:nth-child(1) { width: 34%; }
+  .pay-table th:nth-child(2), .pay-table td:nth-child(2) { width: 36%; }
+  .pay-table th:nth-child(3), .pay-table td:nth-child(3) { width: 30%; }
+  .pay-table th:nth-child(4), .pay-table td:nth-child(4) { display: none; }
+  .pay-table tbody th { font-size: 12.5px; }
+  .pay-hero .ph-net { font-size: 22px; }
+  .ph-meter { flex-basis: 110px; }
 }
