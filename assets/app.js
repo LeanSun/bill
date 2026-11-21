@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.70';
+  var ASSET_V = '1.0.71';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2030,17 +2030,29 @@
   }
 
   function renderCharts(view, mode) {
-    if (view === 'overview') renderCubeOverview();
+    if (view === 'overview') {
+      try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
+    }
     if (!hasEcharts) return;
     var prevMode = RENDER_MODE;
     if (mode) RENDER_MODE = mode;
     var p = palette();
     if (view === 'overview') {
-      /* 合并页：预算条三图 + 消费日历 / 分类走势 / 高频项目 */
-      renderTrend(p); renderDonut(p); renderBalance(p); renderWeight(p);
-      renderCalendar(p); renderStack(p); renderTop(p);
+      /* 合并页：预算条三图 + 消费日历 / 分类走势 / 高频项目。
+         逐张隔离：某一张画失败（例如 echarts 少打包了某个组件）不该
+         把后面几张一起带走 —— v1.0.70 裁 echarts 时漏了 calendar 组件，
+         renderCalendar 一抛错，renderStack / renderTop 整片跟着消失。 */
+      var jobs = [renderTrend, renderDonut, renderBalance, renderWeight, renderCalendar, renderStack, renderTop];
+      for (var i = 0; i < jobs.length; i++) {
+        try { jobs[i](p); } catch (e) { warnChart(jobs[i], e); }
+      }
     }
     RENDER_MODE = prevMode;
+  }
+  function warnChart(fn, e) {
+    if (window.console && console.warn) {
+      console.warn('[chart]', (fn && fn.name) || 'unknown', e && e.message ? e.message : e);
+    }
   }
 
   /* ---------------- 数字动效 ---------------- */

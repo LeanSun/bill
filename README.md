@@ -821,3 +821,29 @@ node server/server.js
 6. **预期效果**：首次访问 50s+ → 约 35s（echarts 省下的部分）；**之后每次**静态资源全部命中本地缓存，只剩页面本身走网络，约 3~6s。彻底解决仍需换托管，方案与实测数据见本节第 1 条。
 7. **回滚方式**：删掉 `index.html` 底部的注册块并清空浏览器站点数据即可退回 v1.0.69 行为；echarts 单文件可从 git 历史取回。
 
+## v1.0.71 · 图表修复 / 支出构成头部重排（2026-11-21）
+
+v1.0.70 按需裁剪 echarts 时漏了组件，本次修复并调整支出构成的头部排布。
+
+1. **根因：漏打包 `CalendarComponent`**。消费日历不是普通热力图，它用的是 **calendar 坐标系**（`o.calendar = {...}` + `series[0].coordinateSystem = 'calendar'`，见 `renderCalendar`）。v1.0.70 只打包了 `HeatmapChart`，没带 `CalendarComponent`，日历画不出来。
+2. **为什么「好多图」一起消失**。`renderCharts` 原本是顺序调用、**没有任何错误隔离**：
+   ```js
+   renderTrend(p); renderDonut(p); renderBalance(p); renderWeight(p);
+   renderCalendar(p); renderStack(p); renderTop(p);
+   ```
+   `renderCalendar` 抛错后，排在它后面的 `renderStack`（分类走势）、`renderTop`（高频项目 TOP 10）根本不会执行 —— 一张图坏，拖垮一片。
+3. **加固**：`renderCharts` 改成逐张 `try/catch`，单张失败只 `console.warn`，不影响其余；`renderCubeOverview` 也一并隔离。
+4. **验证方式（这次不靠猜）**：造了 240 条跨 2022—2026 的 mock 流水，注入 `window.BILL_READY` 绕开门禁，用无头 Chrome 实测：
+   ```
+   chartTrend=332x248  chartBalance=332x250  chartWeight=429x192
+   chartCalendar=1105x306  chartStack=332x192  chartTop=236x192
+   errs=[]
+   ```
+   六张图全部出 canvas，零运行时错误。
+5. **支出构成头部重排**。原结构是「标题组 + 两组筛选」，但 `.donut-controls` 被 `flex: 1 1 100%` 顶成整行，年份和金额/占比一起掉到第二行。按需求改成两行网格：
+   - 第一行：`支出构成`（左） + 年份 `全部/2026/…/2022`（右）
+   - 第二行：`点击分类看日历`（左） + `金额 | 占比`（右）
+   `grid-template-columns: minmax(96px, 1fr) minmax(0, max-content)`：标题保底 96px，年份再多也不会把标题压成省略号；放不下时年份在自身内部横向滚动（`justify-content: flex-start`，否则溢出会跑到左边把「全部」裁掉）。≤1240px 退回 flex 换行排布。
+6. **副标题缩短**：「点击分类跳到日历查看」→「点击分类看日历」，并允许折两行。左列被年份占掉后只剩一百来像素，原文案必然被截成「点击分类…」。
+7. **实测宽度**：1920 下年份六枚完整一行、标题与金额/占比各就各位；1366 下标题完整、年份需滑动看最后一枚；1024 下自动退回换行堆叠，不再出现标题被压没。
+

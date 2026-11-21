@@ -3615,3 +3615,68 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 }
 .ct-right #resetFilters svg { width: 15px; height: 15px; flex: 0 0 15px; }
 .ct-right #resetFilters .reset-label { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+
+/* ==================================================================
+   v1.0.71 · 支出构成标题行重排
+   ----------------------------------------------------------------
+   原来是「标题组 + 两组筛选并排」，但 .donut-controls 被
+   flex:1 1 100% 顶成整行，年份和金额/占比一起掉到第二行。
+   改成两行网格：年份回到第一行标题右侧，金额/占比独占第二行右侧。
+   ================================================================== */
+.chart-card:has(.donut-head) .card-head.donut-head {
+  display: grid;
+  /* 第一列保底 72px：年份再多也不能把标题压成一个省略号；
+     第二列上限取内容宽，超出时由 .donut-years 自己横向滚动 */
+  grid-template-columns: minmax(96px, 1fr) minmax(0, max-content);
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 7px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.donut-head > h3 {
+  grid-column: 1; grid-row: 1; margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.donut-head > p {
+  grid-column: 1; grid-row: 2; margin: 0;
+  line-height: 1.35;
+  /* 年份控件占掉右半边后，左列只剩一百来像素：允许折两行，别硬截断 */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.donut-head > .donut-years {
+  grid-column: 2; grid-row: 1; justify-self: end;
+  margin: 0; min-width: 0; max-width: 100%;
+  /* 默认是 flex-end，空间不够时溢出会跑到左边、把「全部」裁掉。
+     改成从左排：宁可右边超出（能横向滑），也别丢掉第一个按钮 */
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.donut-head > .donut-years::-webkit-scrollbar { display: none; }
+.donut-head > .donut-mode {
+  grid-column: 2; grid-row: 2; justify-self: end;
+  margin: 0;
+}
+/* 窄屏：三列挤在一起时，右侧年份控件会把 1fr 那列压到近乎为 0，
+   标题跟着被裁没。此时退回换行排布，宁可掉到下一行也不压死标题。 */
+@media (max-width: 1240px) {
+  .chart-card:has(.donut-head) .card-head.donut-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 6px;
+  }
+  .donut-head > h3 { flex: 0 0 auto; }
+  .donut-head > .donut-years {
+    flex: 1 1 auto; margin-left: auto;
+    justify-content: flex-end;
+  }
+  .donut-head > p { flex: 1 1 auto; min-width: 0; order: 3; }
+  .donut-head > .donut-mode { flex: 0 0 auto; order: 4; margin-left: auto; }
+  .donut-head > .donut-years.seg button,
+  .donut-head > .donut-mode.seg button { padding-left: 7px; padding-right: 7px; font-size: 11px; }
+}
