@@ -792,3 +792,12 @@ node server/server.js
 ## v1.0.68 · 重置筛选按钮加长（2026-11-21）
 
 顶部筛选栏那枚循环箭头按钮（`#resetFilters`，重置筛选）从 36×36 的方形图标钮改成带「重置」文字的长胶囊（约 78px 宽），图标缩到 15px 与文字并排。现在它和搜索框、「全部/支/收」分段控件处在同一视觉档位，不再是角落里一个难认的小图标。导出按钮保持原样方钮，两者职责一眼可分。
+
+## v1.0.69 · 代码审查与死代码清理（2026-11-21）
+
+全站静态审查 + 浏览器实测后的清理，无功能改动：
+
+1. **JS 死函数**：`app.js` 删除 7 个全库零引用函数（`countSubCats`/`fmtTiny`/`gradH`/`guessCat`/`subTotals`/`subcatOf`/`weekdayTotals`）；`cube.html` 删除 5 个零引用单行函数（`clearCompEvents`/`clearCubeTypes`/`glideEaseOut`/`openDatePicker`/`syncDatePicker`）。删除前逐一全库交叉核对零引用，删后 `node --check` 与浏览器截图双验。
+2. **CSS 死规则**：今天格 `::after` 被 v1.0.35 的 `display:none!important` 彻底干掉，删除此前 v1.0.32/33/34 累积的 4 块失效规则（含 `neonBreath`、`todayBreathe` 两个无人引用的 keyframes）；删除被后置渐变 `!important` 覆盖的年度结余纯色规则 2 条。约 2.5KB。
+3. **实测结论**：两页注入错误捕获后 `__ERRS` 为空，无运行时异常；日历页与魔方页 DOM 完整、渲染正常。布局版本 v12 两处一致，60 个内联事件处理函数全部有定义。
+4. **保守保留**：cube.html 里另有 11 个零引用函数因与 IIFE / 同行结构交织，删除风险大于收益，本次保留；CSS 里跨媒体查询的重复选择器不盲删。

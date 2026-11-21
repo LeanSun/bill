@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.68';
+  var ASSET_V = '1.0.69';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -155,11 +155,6 @@
     list.forEach(function (n) { if (out.indexOf(n) === -1) out.push(n); });
     return out;
   }
-  function countSubCats() {
-    var n = 0;
-    ALL_CATS.forEach(function (c) { n += subCatNames(c).length; });
-    return n;
-  }
 
   /* ---------------- 状态 ---------------- */
   var state = {
@@ -219,11 +214,6 @@
 
   /* 最近记录条里的金额：三位数以内保留一位小数，别把 20.8 四舍五入成 21；
      上千才走整数 + 千位分隔，窄条里也放得下 */
-  function fmtTiny(n) {
-    var v = Number(n) || 0;
-    if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('zh-CN');
-    return String(Math.round(v * 10) / 10);
-  }
   /* 占比文案：小于 10% 留一位小数，其余取整，避免 40.04% 这种噪音 */
   function pctText(v) {
     var x = Number(v) || 0;
@@ -278,9 +268,6 @@
   }
   function gradV(top, bottom) {
     return new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: top }, { offset: 1, color: bottom }]);
-  }
-  function gradH(left, right) {
-    return new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: left }, { offset: 1, color: right }]);
   }
   function debounce(fn, ms) {
     var t = null;
@@ -650,7 +637,6 @@
     }
     return list.length ? list[0].name : '其它';
   }
-  function subcatOf(r) { return r.sub || guessSub(r.category, r.note); }
 
   /* 内容 → 一级分类。两条线索按顺序用：
      ① 你自己记过的同一个名目，按历史里归到最多的那一类（最贴近你的习惯）；
@@ -688,16 +674,6 @@
       });
     });
     return { cat: best, len: bestLen };
-  }
-  function guessCat(text, type) {
-    var s2 = expandText(String(text || '').trim());
-    if (!s2) return '';
-    var known = hintMap()[String(text).trim()];
-    if (known) {
-      if (type === 'income' && known === '收入') return '收入';
-      if (type !== 'income' && known !== '收入') return known;
-    }
-    return matchCat(s2, type === 'income' ? INCOME_CATS : EXPENSE_CATS).cat;
   }
   /* 内容 → 收支方向 + 分类，一次算完。
      支出表和收入表各算一遍，谁的关键词更长就听谁的；平手时按支出走
@@ -806,28 +782,6 @@
       map[r.category] = (map[r.category] || 0) + r.amount;
     });
     return EXPENSE_CATS.map(function (c) { return { name: c, value: round(map[c] || 0) }; });
-  }
-  function subTotals(records, cat) {
-    var names = subCatNames(cat);
-    var map = {};
-    names.forEach(function (n) { map[n] = 0; });
-    records.forEach(function (r) {
-      if (r.category !== cat) return;
-      map[r.sub] = (map[r.sub] || 0) + r.amount;
-    });
-    return names.map(function (n) { return { name: n, value: round(map[n] || 0) }; })
-      .filter(function (d) { return d.value > 0; })
-      .sort(function (a, b) { return b.value - a.value; });
-  }
-  function weekdayTotals(records) {
-    var arr = [0, 0, 0, 0, 0, 0, 0];
-    records.forEach(function (r) {
-      if (r.type !== 'expense') return;
-      var d = new Date(r.date + 'T00:00:00');
-      if (isNaN(d.getTime())) return;
-      arr[(d.getDay() + 6) % 7] += r.amount;
-    });
-    return WEEKDAYS.map(function (n, i) { return { name: n, value: round(arr[i]) }; });
   }
   function topItems(records, n) {
     var map = {}, cats = {};

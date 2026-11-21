@@ -578,22 +578,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
    外观上等于没做。这一版只闪一个伪元素的 opacity —— 纯合成层动画，必生效。 */
 .cal-cell.is-today { background: color-mix(in srgb, var(--primary) 9%, var(--surface)); z-index: 1; isolation: isolate; }
 .wk-col.is-today, .ym-day.is-today { isolation: isolate; }
-/* 今天只做颜色填充 + 呼吸，不加任何描边/描光圈 */
-.cal-cell.is-today::after,
-.wk-col.is-today::after,
-.ym-day.is-today::after {
-  content: ""; position: absolute; inset: 0; z-index: -1;
-  border-radius: inherit; pointer-events: none;
-  background: radial-gradient(120% 130% at 50% 0%, rgba(var(--neon), .20), transparent 64%);
-  opacity: .18;
-  animation: neonBreath 4.6s ease-in-out infinite;
-  will-change: opacity;
-}
-@keyframes neonBreath { 0%, 100% { opacity: .14; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .cal-cell.is-today::after, .wk-col.is-today::after, .ym-day.is-today::after { animation: none; opacity: .5; }
-}
-.cal-cell.is-today:hover { background: color-mix(in srgb, var(--primary) 15%, var(--surface)); box-shadow: none; }
+
 html[data-theme="dark"] .cal-cell.is-today:hover { background: color-mix(in srgb, var(--primary) 26%, var(--surface)); box-shadow: none; }
 .cal-cell.is-today.is-focus { box-shadow: inset 0 0 0 2px var(--primary); }
 
@@ -2351,19 +2336,7 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 @media (prefers-reduced-motion: reduce) {
   .cal-jump-next, .cal-jump-prev { animation: none !important; }
 }
-.cal-cell.is-today::after,
-.wk-col.is-today::after,
-.ym-day.is-today::after {
-  animation: none !important;
-  opacity: .72 !important;
-  background: radial-gradient(120% 130% at 50% 0%, rgba(var(--neon), .22), transparent 68%) !important;
-}
-.cal-cell.is-today .cal-daynum { position: relative; }
-.cal-cell.is-today .cal-daynum::after {
-  content: ""; position: absolute; left: 50%; bottom: -5px;
-  width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
-  background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
-}
+
 .view.is-active .card,
 .view.is-active .lubcard,
 .view.is-active .cb-panel { animation: rise .58s var(--ease) backwards; }
@@ -2380,36 +2353,14 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
    这里只管副本别抢指针、别被选中。淡出淡入那套关键帧已经不用了。 */
 .pt-ghost { pointer-events: none !important; user-select: none; }
 .wk-col.is-today, .ym-day.is-today { position: relative; }
-.wk-col.is-today::before, .ym-day.is-today::before {
-  content: ""; position: absolute; left: 50%; bottom: 5px;
-  width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
-  background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
-  pointer-events: none; z-index: 2;
-}
+
 #overview .cube-mini-card { padding: 16px !important; }
 #overview .cube-mini-card .card-head { padding: 2px 4px 10px !important; }
 
 /* ================= v1.0.34：今日呼吸灯 / 统计卡标题留白修正 ================= */
 
 /* ---- 1. 今日提示：取消渐变光晕与小圆点，改成整格底色柔和呼吸 ---- */
-.cal-cell.is-today::after,
-.wk-col.is-today::after,
-.ym-day.is-today::after{
-  content:""!important;position:absolute!important;inset:0!important;z-index:0!important;
-  border-radius:inherit!important;pointer-events:none!important;
-  background:color-mix(in srgb, var(--primary) 26%, transparent)!important;
-  opacity:.5!important;animation:todayBreathe 3.4s ease-in-out infinite!important;
-  will-change:opacity;
-}
-/* 小圆点彻底移除（v1.0.33 的 ::before 与 cal-daynum 的 ::after） */
-.cal-cell.is-today::before,
-.wk-col.is-today::before,
-.ym-day.is-today::before,
-.cal-cell.is-today .cal-daynum::after{display:none!important;content:none!important}
-@keyframes todayBreathe{0%,100%{opacity:.12}50%{opacity:.72}}
-@media (prefers-reduced-motion: reduce){
-  .cal-cell.is-today::after,.wk-col.is-today::after,.ym-day.is-today::after{animation:none!important;opacity:.4!important}
-}
+
 /* 让格内内容浮在呼吸底色之上；数字徽标去掉外发光 */
 .cal-cell.is-today>*,.wk-col.is-today>*,.ym-day.is-today>*{position:relative;z-index:1}
 .cal-cell.is-today .cal-daynum{box-shadow:none!important}
@@ -3145,8 +3096,6 @@ html[data-theme="dark"] .cube-global-veil { background: rgba(3, 7, 14, .62); }
    ================================================================== */
 
 /* ---- 1. 年度结余：条和金额同一种红 ------------------------------ */
-.ir-bar.is-year i { background: #e35c5c !important; }
-html[data-theme="dark"] .ir-bar.is-year i { background: #ef6f6f !important; }
 .ir-line.is-year b { color: #e35c5c; }
 html[data-theme="dark"] .ir-line.is-year b { color: #ef6f6f; }
 /* 超支仍要比「存下多少」更扎眼一档 */
