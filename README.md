@@ -812,6 +812,7 @@ node server/server.js
    - 带 `?v=` 的资源（js/css）→ **缓存优先**。版本号变了 URL 就变，天然不会读到旧文件，这也是项目原有的版本号机制第一次真正被用上。
    - 页面导航 → **网络优先，失败才回退缓存**。刻意不给它设超时，宁可多等几秒也绝不让「改了版本号却看到旧页面」重演；断网时仍能打开记账。
    - 其余同源资源（无版本号）→ **先给缓存，后台顺手更新**。
+   另设了 6MB 单条上限，并显式跳过 `cube-history.js`：那份 18MB 的魔方历史快照只在实际点开时直连下载，不进缓存，免得白白占掉配额。
    注册代码在 `index.html` 底部，只在 `https:` 下启用，本地 `file://` 打开不受影响。
 3. **echarts 按需裁剪**。全站只用了 `line` / `bar` / `heatmap` 三种图（`dataset` 与 `title` 组件零引用，已核对），于是用 esbuild 只打包这三种图 + `Grid/Tooltip/Legend/MarkLine/DataZoom/VisualMap/AxisPointer/Graphic` 八个组件 + Canvas 渲染器：**1007KB → 611KB**，gzip 后 **326KB → 203KB**，省下约 123KB 传输（约 12 秒）。
    验证方式：无头 Chrome 渲染三种图 + 渐变 + `visualMap` 色条，输出 `RESULT=PASS`；`echarts.graphic.LinearGradient`、`getInstanceByDom`、`resize` 均保留。

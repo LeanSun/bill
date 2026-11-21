@@ -12,6 +12,10 @@
    ============================================================ */
 var PREFIX = 'qz-';
 var CACHE = 'qz-v1';
+/* 超过这个体积就不进缓存：魔方历史快照有 18MB，塞进来只会挤占配额 */
+var MAX_ENTRY = 6 * 1024 * 1024;
+/* 明确不缓存的资源 */
+var SKIP = ['cube-history'];
 
 self.addEventListener('install', function () {
   self.skipWaiting();
@@ -31,6 +35,8 @@ self.addEventListener('activate', function (e) {
 
 function save(cache, req, res) {
   if (!res || !res.ok || res.status !== 200) return;
+  var len = parseInt(res.headers && res.headers.get('content-length'), 10);
+  if (len > MAX_ENTRY) return;
   try { cache.put(req, res); } catch (err) { /* 配额满了就放弃，不影响页面 */ }
 }
 
@@ -70,6 +76,11 @@ self.addEventListener('fetch', function (e) {
   var url;
   try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== self.location.origin) return;
+
+  /* 大件（历史快照）直接放行，不进缓存 */
+  for (var i = 0; i < SKIP.length; i++) {
+    if (url.pathname.indexOf(SKIP[i]) !== -1) return;
+  }
 
   /* 页面：网络优先，失败才用缓存 */
   if (req.mode === 'navigate') {
