@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.96';
+  var ASSET_V = '1.0.97';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -48,6 +48,9 @@
   var CAT_RENAME = { '居住': '日常', '其它': '娱乐' };
   var WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
   var WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  /* 星期牌下面那行小字。中文两字放在一块竖牌里偏空，补一行英文缩写当纹理 ——
+     它不承担信息，只是让 56×62 的牌面看起来是「排过的」而不是「漏了内容」。 */
+  var WEEK_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   var MONTH_CN = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
   /* echarts 用 defer 延后解析，真实可用性在 init() 里再判定 */
   var hasEcharts = false;
@@ -166,6 +169,10 @@
     anchorDate: '',
     focusDate: '',
     trendScope: 'both',
+    /* v1.0.97：趋势图按范围看。'12m' = 近 12 个月（滚动），或某个年份。
+       近 12 个月固定只有 12 根柱，柱顶才放得下具体数字 —— 之前一次铺
+       23 个自然月，横轴挤得只剩几个刻度，柱子上更放不下数，只能靠悬浮读。 */
+    trendRange: '12m',
     calendarYear: Y_LAST,
     filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all' },
     editingId: null,
@@ -1230,20 +1237,23 @@
   }
 
   /* ---------------- 图表：总览 ---------------- */
-  /* ---------------- 月度收支小结（v1.0.90） ----------------
-     趋势图只占三分之一宽度（383px），23 个月压进去横轴只剩「25/01、25/07」
-     几个刻度，柱子高低能看个形状，具体数字和「这个月比上个月怎么样」全读
-     不出来。所以在这张图上面补一行硬数字：支出 / 收入 / 结余。
+  /* ---------------- 月度收支小结（v1.0.90 / v1.0.97） ----------------
+     趋势图只占一部分宽度，横轴月份多了就只剩几个刻度，柱子高低能看出形状，
+     具体数字和「这个月比上个月怎么样」全读不出来。所以在这张图上面补一行
+     硬数字：支出 / 收入 / 结余。
      当月是不完整的，所以环比拿**上月同一个日号**之前的部分来比 —— 否则每月
-     初打开都是「暴跌 90%」，这种对比还不如没有。 */
-  function renderTrendSum(p, rows) {
+     初打开都是「暴跌 90%」，这种对比还不如没有。
+     v1.0.97：范围切到「某一年」时，这一行改成那年的合计，对比换成「较上年
+     同期」（今年只比到本月，往年比整年）。 */
+  function renderTrendSum(p, rows, avgExp) {
     var box = $('trendSum');
     if (!box) return;
     if (!rows || !rows.length) { box.hidden = true; box.innerHTML = ''; return; }
     box.hidden = false;
 
-    var last = rows[rows.length - 1];
     var now = new Date();
+    var isYear = String(state.trendRange) !== '12m';
+    var last = rows[rows.length - 1];
     var isCur = last.year === now.getFullYear() && last.month === now.getMonth() + 1;
     var cut = isCur ? now.getDate() : 31;
     var prev = rows.length > 1 ? rows[rows.length - 2] : null;
@@ -1251,20 +1261,6 @@
     function moneyText(v) {
       var n = Math.round(Number(v) || 0);
       return (n < 0 ? '−¥' : '¥') + Math.abs(n).toLocaleString('zh-CN');
-    }
-
-    /* 上月同期：同一个月、日号 <= 当前日号的那部分 */
-    var pE = null, pI = null;
-    if (prev) {
-      var pe = 0, pi = 0, any = false;
-      scopeRecords().forEach(function (r) {
-        if (r.year !== prev.year || r.month !== prev.month) return;
-        var d = Number(String(r.date || '').slice(8, 10)) || 31;
-        if (d > cut) return;
-        any = true;
-        if (r.type === 'income') pi += r.amount; else pe += r.amount;
-      });
-      if (any) { pE = round(pe); pI = round(pi); }
     }
 
     function delta(cur, base) {
@@ -1280,25 +1276,64 @@
         (d > 0 ? '↑' : '↓') + Math.abs(d).toFixed(1) + '%</em>';
     }
 
+    var curE, curI, curB, pE = null, pI = null, capText, cmpText, tipPrefix;
+
+    if (isYear) {
+      /* 年份范围：合计这一年的 12 个月 */
+      var y = rows[0].year;
+      curE = 0; curI = 0;
+      rows.forEach(function (r) { curE += r.expense; curI += r.income; });
+      curE = round(curE); curI = round(curI); curB = round(curI - curE);
+      var upto = (y === now.getFullYear()) ? now.getMonth() + 1 : 12;
+      var pe = 0, pi = 0, any = false;
+      scopeRecords().forEach(function (r) {
+        if (r.year !== y - 1 || r.month > upto) return;
+        any = true;
+        if (r.type === 'income') pi += r.amount; else pe += r.amount;
+      });
+      if (any) { pE = round(pe); pI = round(pi); }
+      capText = y + ' 年合计' + (upto < 12 ? ' · 截至 ' + upto + ' 月' : '');
+      cmpText = (pE === null ? '' : '较 ' + (y - 1) + ' 年同期');
+      tipPrefix = y + ' 年';
+    } else {
+      curE = last.expense; curI = last.income; curB = last.balance;
+      if (prev) {
+        var pe2 = 0, pi2 = 0, any2 = false;
+        scopeRecords().forEach(function (r) {
+          if (r.year !== prev.year || r.month !== prev.month) return;
+          var d = Number(String(r.date || '').slice(8, 10)) || 31;
+          if (d > cut) return;
+          any2 = true;
+          if (r.type === 'income') pi2 += r.amount; else pe2 += r.amount;
+        });
+        if (any2) { pE = round(pe2); pI = round(pi2); }
+      }
+      capText = last.month + ' 月' + (isCur ? ' · 截至 ' + now.getDate() + ' 日' : '');
+      cmpText = prev ? '较上月同期' : '';
+      tipPrefix = '本月';
+    }
+
     var pB = (pE === null || pI === null) ? null : round(pI - pE);
+    /* 图上那条虚线没有字，把「月均」写在这里 —— 看图时眼睛先扫这一行 */
+    var avgNote = (state.trendScope !== 'income' && avgExp > 0)
+      ? ' · 月均 ' + moneyText(avgExp) : '';
 
     box.innerHTML =
-      '<div class="ts-cap"><span>' + last.month + ' 月' +
-        (isCur ? ' · 截至 ' + now.getDate() + ' 日' : '') + '</span>' +
-        '<em>' + (prev ? '较上月同期' : '') + '</em></div>' +
+      '<div class="ts-cap"><span>' + capText + avgNote + '</span>' +
+        '<em>' + cmpText + '</em></div>' +
       '<div class="ts-row">' +
-        '<div class="ts-cell" title="本月支出' + (pE === null ? '' : '，上月同期 ' + moneyText(pE)) + '">' +
-          '<i class="ts-e">支出</i><b data-ts="e">¥0</b>' + delta(last.expense, pE) + '</div>' +
-        '<div class="ts-cell" title="本月收入' + (pI === null ? '' : '，上月同期 ' + moneyText(pI)) + '">' +
-          '<i class="ts-i">收入</i><b data-ts="i">¥0</b>' + delta(last.income, pI) + '</div>' +
-        '<div class="ts-cell" title="本月结余' + (pB === null ? '' : '，上月同期 ' + moneyText(pB)) + '">' +
-          '<i class="ts-b">结余</i><b data-ts="b">¥0</b>' + delta(last.balance, pB) + '</div>' +
+        '<div class="ts-cell" title="' + tipPrefix + '支出' + (pE === null ? '' : '，对比期 ' + moneyText(pE)) + '">' +
+          '<i class="ts-e">支出</i><b data-ts="e">¥0</b>' + delta(curE, pE) + '</div>' +
+        '<div class="ts-cell" title="' + tipPrefix + '收入' + (pI === null ? '' : '，对比期 ' + moneyText(pI)) + '">' +
+          '<i class="ts-i">收入</i><b data-ts="i">¥0</b>' + delta(curI, pI) + '</div>' +
+        '<div class="ts-cell" title="' + tipPrefix + '结余' + (pB === null ? '' : '，对比期 ' + moneyText(pB)) + '">' +
+          '<i class="ts-b">结余</i><b data-ts="b">¥0</b>' + delta(curB, pB) + '</div>' +
       '</div>';
 
     var ax = axis();
-    rollNumber(ax, box.querySelector('[data-ts="e"]'), last.expense, moneyText, 0, 2000);
-    rollNumber(ax, box.querySelector('[data-ts="i"]'), last.income, moneyText, 70, 2000);
-    rollNumber(ax, box.querySelector('[data-ts="b"]'), last.balance, moneyText, 140, 2000);
+    rollNumber(ax, box.querySelector('[data-ts="e"]'), curE, moneyText, 0, 2000);
+    rollNumber(ax, box.querySelector('[data-ts="i"]'), curI, moneyText, 70, 2000);
+    rollNumber(ax, box.querySelector('[data-ts="b"]'), curB, moneyText, 140, 2000);
 
     /* 这块插进来会把下面的图表容器压矮。echarts 的画布高度是 init 那一刻
        量出来的，容器后变矮它不会自己跟——不补这一下，横轴那排月份刻度会被
@@ -1313,30 +1348,115 @@
     }
   }
 
+  /* v1.0.97：趋势图的数据源。
+     以前直接 monthlyAgg(scopeRecords()) —— 有多少个月就画多少根，2024-07 到
+     2026-11 是 23 根，横轴刻度被 interval 抽成三四档，柱子上也放不下数字。
+     现在只铺 12 格：
+       '12m'  → 以「今天」和「最后一笔记录」里更晚的那个月为锚，往前数 12 格
+       某年份  → 那年 1~12 月，没有记录的月份就是 0（空月在图上必须留位置，
+                 否则「3 月没花钱」和「没有 3 月」看起来一样）
+     返回的行结构和 monthlyAgg 一致，后面点柱子跳月、小结都还能用。 */
+  function trendRows(recs) {
+    var map = {};
+    recs.forEach(function (r) {
+      var k = r.year * 12 + (r.month - 1);
+      if (!map[k]) map[k] = { income: 0, expense: 0, byCat: {} };
+      var e = map[k];
+      if (r.type === 'income') e.income += r.amount; else e.expense += r.amount;
+      e.byCat[r.category] = (e.byCat[r.category] || 0) + r.amount;
+    });
+    var slots = [];
+    if (String(state.trendRange) === '12m') {
+      var now = new Date();
+      var maxK = now.getFullYear() * 12 + now.getMonth();
+      recs.forEach(function (r) {
+        var k = r.year * 12 + (r.month - 1);
+        if (k > maxK) maxK = k;
+      });
+      for (var i = 11; i >= 0; i--) slots.push(maxK - i);
+    } else {
+      var y = Number(state.trendRange) || new Date().getFullYear();
+      var today = new Date();
+      /* 当年只铺到本月：12 月还没到，画出来是一根贴着底的 0 —— 收入那条线
+         会被它拽出一个「断崖跌到零」的假信号。往后的年份同理，一格都不画。 */
+      var lastM = (y === today.getFullYear()) ? today.getMonth() : 11;
+      if (y > today.getFullYear()) lastM = -1;
+      for (var m = 0; m <= lastM; m++) slots.push(y * 12 + m);
+    }
+    return slots.map(function (k) {
+      var y = Math.floor(k / 12), mo = (k % 12) + 1;
+      var e = map[k] || { income: 0, expense: 0, byCat: {} };
+      return {
+        key: k, year: y, month: mo, label: String(y).slice(2) + '/' + pad2(mo),
+        income: round(e.income), expense: round(e.expense),
+        balance: round(e.income - e.expense), byCat: e.byCat
+      };
+    });
+  }
+
+  /* 柱顶数字：12 根柱的空间里只放得下「几位数 + 可能一个万」，
+     完整金额交给悬浮提示。千位不加千分位逗号 —— 「1,552」比「1552」宽一截。 */
+  function shortYuan(v) {
+    var n = Math.round(Number(v) || 0);
+    if (!n) return '';
+    var a = Math.abs(n);
+    if (a >= 10000) return (n / 10000).toFixed(a >= 100000 ? 0 : 1) + '万';
+    return String(n);
+  }
+
   function renderTrend(p) {
-    var rows = monthlyAgg(scopeRecords());
+    fillTrendYears();
+    var rows = trendRows(scopeRecords());
     var labels = rows.map(function (r) { return r.label; });
+    var isYear = String(state.trendRange) !== '12m';
+    /* 只有 12 根柱，柱顶放得下数；收入走折线时数字会和柱子上的数错位，
+       所以只在「只看收入」时才给折线挂标签。 */
+    var showBarLabel = true;
+    var expVals = rows.map(function (r) { return r.expense; });
+    var expSum = 0, expN = 0;
+    expVals.forEach(function (v) { if (v > 0) { expSum += v; expN++; } });
+    var expAvg = expN ? expSum / expN : 0;
+
     var series = [];
     if (state.trendScope !== 'income') {
       series.push({
-        name: '支出', type: 'bar', barMaxWidth: 20, z: 2,
-        data: rows.map(function (r) { return r.expense; }),
+        name: '支出', type: 'bar', barMaxWidth: 26, z: 2,
+        data: expVals,
         itemStyle: { borderRadius: [5, 5, 0, 0], color: gradV(withAlpha(p.expense, .88), withAlpha(p.expense, .14)) },
         emphasis: { itemStyle: { color: p.expense } },
-        animationDelay: function (i) { return i * 20; }
+        animationDelay: function (i) { return i * 20; },
+        label: {
+          show: showBarLabel, position: 'top', distance: 3,
+          color: p.muted, fontSize: 9.5, fontFamily: p.font, fontWeight: 600,
+          formatter: function (o2) { return shortYuan(o2.value); }
+        },
+        /* 一条虚线标出「这段时间的月均支出」：柱子高低一眼能比，但「这个月算不算
+           偏多」需要一条参照线才读得出来。线上的字不放在图里 —— 11 根柱顶都写着
+           数，标在哪里都会压住一个；均值改成写在上面那行小结里（见 renderTrendSum）。 */
+        markLine: expAvg > 0 ? {
+          silent: true, symbol: 'none', animation: false,
+          lineStyle: { type: [4, 4], color: withAlpha(p.expense, .55), width: 1.2 },
+          label: { show: false },
+          data: [{ yAxis: round(expAvg) }]
+        } : undefined
       });
     }
     if (state.trendScope !== 'expense') {
       series.push({
         name: '收入', type: 'line', smooth: .34, symbol: 'circle', symbolSize: 6,
-        showSymbol: rows.length <= 14, z: 3,
+        showSymbol: true, z: 3,
         data: rows.map(function (r) { return r.income; }),
         lineStyle: { width: 2.4, color: p.income },
         itemStyle: { color: p.income, borderColor: p.surface, borderWidth: 2 },
         /* 不再铺面积：工资这种每月几乎一样的收入会是一条贴在顶上的水平线，
            面积一直填到轴底，整张图变成一块红底，柱子全被盖住。
            细线 + 上方的小结数字，比一片色块读得清楚。 */
-        emphasis: { focus: 'series' }
+        emphasis: { focus: 'series' },
+        label: {
+          show: state.trendScope === 'income', position: 'top', distance: 4,
+          color: p.income, fontSize: 9.5, fontFamily: p.font, fontWeight: 600,
+          formatter: function (o2) { return shortYuan(o2.value); }
+        }
       });
     }
     var o = baseOption(p);
@@ -1345,27 +1465,59 @@
        既省掉 40px 的顶部留白（这张卡只剩 185px 给图，横轴刻度会被挤没），
        也不用在同一张卡里出现两套「谁是谁」。 */
     o.legend = { show: false };
-    o.grid = { left: 6, right: 12, top: 16, bottom: 6, containLabel: true };
+    /* 顶部留白从 16 加到 26：柱顶要写数字，贴着上边框会被裁 */
+    o.grid = { left: 6, right: 12, top: 26, bottom: 6, containLabel: true };
     o.tooltip = tooltipCommon(p, {
       trigger: 'axis',
       axisPointer: { type: 'shadow', shadowStyle: { color: withAlpha(p.muted, .09) } },
-      valueFormatter: function (v) { return fmtYuan(v); }
+      /* 横轴为了不挤只写「11月」，这里补回年份；顺手把结余也算给出来 */
+      formatter: function (ps) {
+        if (!ps || !ps.length) return '';
+        var row = rows[ps[0].dataIndex];
+        if (!row) return '';
+        var body = ps.map(function (it) {
+          var v = (it.value && it.value.value !== undefined) ? it.value.value : it.value;
+          return '<div style="display:flex;align-items:center;gap:7px;line-height:1.75">' +
+            '<span style="width:7px;height:7px;border-radius:2px;flex:0 0 7px;background:' + it.color + '"></span>' +
+            '<span style="color:' + p.text2 + '">' + it.seriesName + '</span>' +
+            '<b style="margin-left:auto;font-variant-numeric:tabular-nums">' + fmtYuan(v) + '</b></div>';
+        }).join('');
+        return '<div style="font-weight:700;margin-bottom:5px">' + row.year + ' 年 ' + row.month + ' 月</div>' +
+          body +
+          '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + p.border +
+          ';color:' + p.muted + '">结余 ' + fmtYuan(row.balance) + '</div>';
+      }
     });
     o.xAxis = catAxis(p, labels, {
       boundaryGap: state.trendScope !== 'income',
-      axisLabel: { color: p.muted, fontSize: 10.5, fontFamily: p.font, interval: labelInterval('chartTrend', labels.length, 70) }
+      axisLabel: {
+        color: p.muted, fontSize: 10, fontFamily: p.font, interval: 0,
+        /* 12 格挤在 380px 里，写「26/11」会一根贴一根；改成一月一个「11月」，
+           年份交给副标题。近 12 月那档的第一格补上「25/12」，把起点年份说清。 */
+        formatter: function (v, i) {
+          var row = rows[i];
+          if (!row) return v;
+          if (i === 0 && !isYear) return String(row.year).slice(2) + '/' + row.month;
+          return row.month + '月';
+        }
+      }
     });
     o.yAxis = valAxis(p);
     /* 不挂 inside dataZoom：它会拦截 wheel 并 preventDefault，
-       鼠标停在趋势图上时整页滚不动。数据最多 36 个月，本来也不需要缩放。 */
+       鼠标停在趋势图上时整页滚不动。现在固定 12 格，本来也不需要缩放。 */
     o.dataZoom = [];
     o.series = series;
     /* 先铺小结再画图：容器的最终高度是由这块决定的，晚一步 echarts 就会
        按旧高度开画布，底部那排月份刻度会被裁掉。 */
-    renderTrendSum(p, rows);
+    renderTrendSum(p, rows, expAvg);
     setOpt('chartTrend', o);
     lastTrendRows = rows;
     bindAxisClick('chartTrend', function (idx) { jumpMonthFromRow(lastTrendRows[idx]); });
+    var sub = $('trendSub');
+    if (sub) {
+      var scopeText = state.trendScope === 'income' ? '收入' : state.trendScope === 'expense' ? '支出' : '收支';
+      sub.textContent = (isYear ? rows[0].year + ' 年 · ' + rows.length + ' 个月' : '近 12 个月') + ' · ' + scopeText + '按月汇总';
+    }
   }
 
   /* 体重记录：按日期升序的折线 + 平均线。数据来自 state.store.weights，
@@ -1506,6 +1658,35 @@
     bindSeg($('donutMode'), 'data-dm', function (v) {
       state.donutMode = v;
       renderCharts('overview', 'instant');
+    });
+  }
+
+  /* v1.0.97：趋势图的年份条。段数 = 「近 12 月」+ 数据里出现过的年份，
+     全部只有一年的账本也能用（两颗按钮，滑块不会跑出边界）。
+     默认选「近 12 月」：它跨年，又固定 12 根柱，柱顶数字排得开。 */
+  function fillTrendYears() {
+    var box = $('trendYear'); if (!box) return;
+    var years = [];
+    allRecords().forEach(function (r) { var y = Number(r.year); if (y && years.indexOf(y) < 0) years.push(y); });
+    years.sort(function (a, b) { return b - a; });
+    var sig = years.join(',');
+    if (box.dataset.sig === sig && box.__segUsed) return;
+    box.dataset.sig = sig;
+    box.__segUsed = 1;
+    var ys = ['12m'].concat(years);
+    box.innerHTML = '<span class="seg-ind" aria-hidden="true"></span>' +
+      ys.map(function (y) {
+        return '<button type="button" data-ty="' + y + '"' +
+          (String(state.trendRange) === String(y) ? ' class="is-active"' : '') + '>' +
+          (y === '12m' ? '近12月' : y) + '</button>';
+      }).join('');
+    box.style.setProperty('--seg-n', String(ys.length));
+    setSegActive(box, 'data-ty', state.trendRange);
+  }
+  function bindTrendYear() {
+    bindSeg($('trendYear'), 'data-ty', function (v) {
+      state.trendRange = v;
+      renderTrend(palette());
     });
   }
 
@@ -3528,13 +3709,57 @@
         if (gd >= 0 && (lastGap < 0 || gd < lastGap)) lastGap = gd;
       });
       var gapText = lastGap < 0 ? '还没有记过账' : (lastGap === 0 ? '今天刚记过' : lastGap + ' 天前记过');
-      catRowsHTML = '<div class="day-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M9 15h6"/></svg><strong>这天还没有记录</strong>' +
+      /* v1.0.97：空状态从「图标 + 一句灰字」改成一块有内容的卡。
+         空日子原来只有三格数字和一句「用左侧的表单记下第一笔」，右半边一片灰；
+         补上近 7 日的小柱（今天那根高亮、可点着跳）和一句能立刻行动的结论，
+         这块就不再是「这儿什么都没有」的占位，而是一天的上下文。 */
+      var week7 = [], wSum7 = 0, wMax7 = 1;
+      var daySum = {};
+      allRecords().forEach(function (r) {
+        if (r.type !== 'income' && r.date) daySum[r.date] = (daySum[r.date] || 0) + r.amount;
+      });
+      for (var sw = 6; sw >= 0; sw--) {
+        var sd = new Date(dRef.getFullYear(), dRef.getMonth(), dRef.getDate() - sw);
+        var sk = dateKey(sd), sv = round(daySum[sk] || 0);
+        week7.push({ k: sk, v: sv, d: sd, today: sw === 0 });
+        wSum7 += sv;
+        if (sv > wMax7) wMax7 = sv;
+      }
+      var bars7 = week7.map(function (x) {
+        var hgt = Math.max(6, x.v / wMax7 * 100);
+        var lbl = x.k + ' 支出 ' + fmtYuan(x.v) + (x.today ? '（今天）' : '');
+        return '<button type="button" class="de-bar' + (x.today ? ' is-today' : '') + '"' +
+          ' data-jump-day="' + x.k + '" data-tip="' + esc(lbl) + '" aria-label="' + esc(lbl) + '">' +
+          '<i style="height:' + hgt.toFixed(1) + '%"></i>' +
+          '<span>' + (x.today ? '今天' : WEEK_CN[x.d.getDay()].slice(1)) + '</span></button>';
+      }).join('');
+      /* 距月底 / 日均可花：把「还剩多少预算」换算成「每天还能花多少」，
+         这是空日子里唯一能立刻用来做决定的一个数。 */
+      var dimE = new Date(dRef.getFullYear(), dRef.getMonth() + 1, 0).getDate();
+      var leftDays = Math.max(1, dimE - dRef.getDate() + 1);
+      var perDay = remain > 0 ? Math.round(remain / leftDays) : 0;
+      var actionHint = remain > 0
+        ? '距月底还有 ' + leftDays + ' 天 · 日均可花 ' + fmtYuan(perDay)
+        : (bud > 0 ? '本月已超出月均 ' + fmtYuan(-remain) + ' · 下面几笔悠着点' : '记下第一笔，这里就会长出趋势');
+      catRowsHTML =
+        '<div class="day-empty">' +
+        '<div class="de-head">' +
+        '<span class="de-ico"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M9 15h6"/></svg></span>' +
+        '<div class="de-title"><strong>这天还没有记录</strong>' +
+        '<span>先记一笔，明细和图表就跟着动起来</span></div>' +
+        '</div>' +
         '<div class="de-stats">' +
         '<span><b>' + fmtYuan(mSum) + '</b><i>本月累计</i></span>' +
         '<span><b class="' + (remain < 0 ? 'is-over' : '') + '">' + (remain < 0 ? '超 ' + fmtYuan(-remain) : fmtYuan(remain)) + '</b><i>距月均预算</i></span>' +
         '<span><b>' + gapText + '</b><i>上次记账</i></span>' +
         '</div>' +
-        '<span class="de-hint">用左侧的表单记下第一笔。</span></div>';
+        '<div class="de-week">' +
+        '<div class="de-week-top"><span>近 7 日支出</span><b>' + fmtYuan(wSum7) + '</b></div>' +
+        '<div class="de-bars">' + bars7 + '</div>' +
+        '</div>' +
+        '<p class="de-hint">' + actionHint + '</p>' +
+        '</div>';
     }
 
     quickCatManual = false;
@@ -3625,14 +3850,25 @@
     box.innerHTML =
       '<aside class="day-side' + (isWeekend ? ' is-weekend' : '') + '">' +
       '<div class="ds-inner">' +
-      '<div class="ds-head"><div class="ds-head-l">' +
-      '<span class="ds-dow">' + WEEK_CN[d.getDay()] + '</span>' +
+      /* v1.0.97：日期区从「四块竖排」改成「一块牌 + 两行」。
+         原来星期胶囊 21px、年月 10.5px、日号 60px、净额一张独立卡，四块各占一行，
+         290px 宽的栏里日号右边整片空着，看着空洞；竖着排还吃掉 210px 高度。
+         现在左边一块「星期牌」撑满两行（56×62），右边上排年月 + 相对日、下排
+         日号 + 当日净额。横向铺满，高度收到 70px 出头。 */
+      '<div class="ds-hero">' +
+      '<span class="ds-dow"><b>' + WEEK_CN[d.getDay()] + '</b><i>' + WEEK_EN[d.getDay()] + '</i></span>' +
+      '<div class="ds-hero-main">' +
+      '<div class="ds-hero-top">' +
+      '<span class="ds-ym">' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月</span>' +
       '<span class="ds-when' + (isToday ? ' is-today' : '') + '">' + whenText + '</span>' +
       '</div>' +
-      '<span class="ds-ym">' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月</span></div>' +
-      '<div class="ds-big"><b>' + d.getDate() + '</b><i>日</i></div>' +
-      '<div class="ds-net" style="--ds:' + (Math.abs(net) < .005 ? p.muted : net > 0 ? p.income : p.expense) + '">' +
-      '<span>当日净额</span><b>' + (net >= 0 ? '+' : '−') + fmtYuan(Math.abs(net)).slice(1) + '</b></div>' +
+      '<div class="ds-hero-num">' +
+      '<span class="ds-big"><b>' + d.getDate() + '</b><i>日</i></span>' +
+      '<span class="ds-net" style="--ds:' + (Math.abs(net) < .005 ? p.muted : net > 0 ? p.income : p.expense) + '">' +
+      '<span>当日净额</span><b>' + (net >= 0 ? '+' : '−') + fmtYuan(Math.abs(net)).slice(1) + '</b></span>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
       '<div class="ds-meta"><div><span>支出</span><b class="c-expense">' + fmtYuan(de) + '</b></div>' +
       '<div><span>收入</span><b class="c-income">' + fmtYuan(di) + '</b></div>' +
       '<div><span>笔数</span><b>' + items.length + '</b></div></div>' +
@@ -5776,8 +6012,7 @@
     });
     bindSeg($('trendScope'), 'data-scope', function (v) {
       state.trendScope = v;
-      var sub = $('trendSub');
-      if (sub) sub.textContent = ({ both: '按自然月汇总', expense: '仅显示支出', income: '仅显示收入' })[v];
+      /* 副标题由 renderTrend 统一写：范围 + 粒度两件事都在那儿，这里不再单独改 */
       renderTrend(palette());
     });
     /* 消费日历的年份按钮跟着数据走：补进 2022 / 2023 之后不能再写死三年 */
@@ -5911,6 +6146,7 @@
     if ($('undoBtn')) $('undoBtn').addEventListener('click', doUndo);
     bindDonutYear();
     bindDonutMode();
+    bindTrendYear();
     bindSeg($('weightYear'), 'data-wy', function (v) {
       state.weightYear = v;
       renderCharts('overview', 'instant');
@@ -7187,6 +7423,9 @@
     if (meta) meta.setAttribute('content', state.theme === 'dark' ? '#0d121c' : '#f5f7fa');
 
     buildSelectOptions();
+    /* 更新条上那枚版本号小签：跟着 ASSET_V 走，不用每次发版手改 HTML */
+    var ubv = $('ubVer');
+    if (ubv) ubv.textContent = 'v' + ASSET_V;
     bindEvents();
     bindFilterCollapse();
     bindCubeFrame();

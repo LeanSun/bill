@@ -10,19 +10,27 @@
 <meta name="theme-color" content="#f5f7fa" data-page-node-id="YNZhYru6j3RsrXDah5InT4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%234a6cf7'/%3E%3Crect x='8' y='21' width='6' height='12' rx='2.5' fill='white' opacity='.55'/%3E%3Crect x='17' y='13' width='6' height='20' rx='2.5' fill='white' opacity='.8'/%3E%3Crect x='26' y='7' width='6' height='26' rx='2.5' fill='white'/%3E%3C/svg%3E" data-page-node-id="ljD9H3EvTZuStNxnHHhOfD">
 <title>轻账 · 收支看板</title>
-<link rel="stylesheet" href="assets/ui-select.css?v=1.0.96">
-<link rel="stylesheet" href="assets/styles.css?v=1.0.96" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
+<link rel="stylesheet" href="assets/ui-select.css?v=1.0.97">
+<link rel="stylesheet" href="assets/styles.css?v=1.0.97" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
 </head>
 <body class="is-booting" data-page-node-id="tMyPJ5SSZhJcCq6bXrfJH7">
 <script>setTimeout(function(){document.body.classList.remove("is-booting")},3000)</script>
 
 <div class="boot-veil" id="bootVeil" aria-hidden="true" data-page-node-id="3oqzy3PLhDEvCJbNnPCFEl">
+  <div class="boot-aura" aria-hidden="true" data-page-node-id="RAp9EbRBenyvXGO5JkDS2D"><i data-page-node-id="iHaGVmtLX2HIg0AAcEPZfA"></i><i data-page-node-id="z0May0zxG4YMg0QK2mIl6t"></i></div>
   <div class="boot-inner" data-page-node-id="vK6tvYErG20nx7QC2RQj3s">
     <div class="boot-mark" data-page-node-id="Rd0mmWaw35g0LzOYwNvCPB">
-      <svg viewBox="0 0 40 40" fill="none" data-page-node-id="RAp9EbRBenyvXGO5JkDS2D"><rect x="7" y="20" width="6" height="13" rx="2.5" fill="currentColor" opacity=".55" data-page-node-id="iHaGVmtLX2HIg0AAcEPZfA"/><rect x="17" y="12" width="6" height="21" rx="2.5" fill="currentColor" opacity=".8" data-page-node-id="z0May0zxG4YMg0QK2mIl6t"/><rect x="27" y="6" width="6" height="27" rx="2.5" fill="currentColor" data-page-node-id="nZoxtEbaI0wkgiyZ7kQqT4"/></svg>
+      <svg viewBox="0 0 40 40" fill="none" data-page-node-id="nZoxtEbaI0wkgiyZ7kQqT4"><rect class="bm bm-1" x="7" y="20" width="6" height="13" rx="2.5" fill="currentColor" opacity=".55" data-page-node-id="whdvklcApfUWSwUzUjROVY"/><rect class="bm bm-2" x="17" y="12" width="6" height="21" rx="2.5" fill="currentColor" opacity=".8" data-page-node-id="QmpyuAe3EZjU3EimcECEkw"/><rect class="bm bm-3" x="27" y="6" width="6" height="27" rx="2.5" fill="currentColor" data-page-node-id="aaeCfVOoNFUAawtlq7QFFK"/></svg>
+      <span class="bm-sweep" aria-hidden="true" data-page-node-id="pFoayXa9PKHdfvj3WPQ2Rc"></span>
     </div>
     <div class="boot-name" data-page-node-id="wNItKQR6bcjZfxT99o6xm3">轻账</div>
-    <div class="boot-bar" data-page-node-id="DRMWQUpm2wS8OfUNTCcaiS"><i data-page-node-id="7UIB39v3atg5t8BBuS3rNm"></i></div>
+    <div class="boot-status" data-page-node-id="DRMWQUpm2wS8OfUNTCcaiS"><b>正在整理你的账本…</b></div>
+    <div class="boot-bar" data-page-node-id="K2DEUpNiYAowFB1RKCgDsS"><i data-page-node-id="Y4PoxB4GW4ujf4FJBxc97a"></i></div>
+    <div class="boot-tips" data-page-node-id="BHR8NQsYfZCQpCpb2GI3Kv">
+      <span data-page-node-id="GPKHBAKzWTahWhZgpBR24e">双击月历里的一天，能看到那天完整明细</span>
+      <span data-page-node-id="Lq3Jb9xWcT2vRm5sHd8fA">记一笔只要「内容 + 金额」，分类会自动认</span>
+      <span data-page-node-id="Zt6Kn4yQpW1mRb7dXc9vB">总览里点任意一根柱子，直接跳到那个月</span>
+    </div>
   </div>
 </div>
 
@@ -185,11 +193,14 @@
           <article class="card chart-card span-2" style="--i:4" data-page-node-id="GmitIUHx7kCS9EyK4HDWTS">
             <div class="card-head" data-page-node-id="dUT1d6pDOnnsNV0gCF0dK6">
               <div data-page-node-id="wmIBpTP0zHRLjnUne8FGGo"><h3 data-page-node-id="MbufWOINiWvECRe95BvWlb">月度收支趋势</h3><p id="trendSub" data-page-node-id="tZHc3LX8FFcwxgQ5Xmv5AB">按自然月汇总</p></div>
-              <div class="seg seg-sm" id="trendScope" role="group" aria-label="趋势范围" data-page-node-id="uC6taMhmLcrRrSh8rd84GB">
-                <span class="seg-ind" aria-hidden="true" data-page-node-id="BqPnmfaAVf7QLmx2Iknjt0"></span>
-                <button type="button" data-scope="both" class="is-active" data-page-node-id="3Cw7ZIDr2AlVcF7nqAJAIS">全部</button>
-                <button type="button" data-scope="expense" data-page-node-id="rX0y1AgjXBylbMY2CJfEmn">支出</button>
-                <button type="button" data-scope="income" data-page-node-id="DDx9DU0qnWAP9iiVZ9XmH5">收入</button>
+              <div class="tr-controls" data-page-node-id="uC6taMhmLcrRrSh8rd84GB">
+                <div class="seg seg-sm trend-years" id="trendYear" role="group" aria-label="趋势年份"></div>
+                <div class="seg seg-sm" id="trendScope" role="group" aria-label="趋势范围" data-page-node-id="3Cw7ZIDr2AlVcF7nqAJAIS">
+                  <span class="seg-ind" aria-hidden="true" data-page-node-id="BqPnmfaAVf7QLmx2Iknjt0"></span>
+                  <button type="button" data-scope="both" class="is-active" data-page-node-id="DDx9DU0qnWAP9iiVZ9XmH5">全部</button>
+                  <button type="button" data-scope="expense" data-page-node-id="rX0y1AgjXBylbMY2CJfEmn">支出</button>
+                  <button type="button" data-scope="income" data-page-node-id="T9rYn2LmWq8sPd4vHc6bJ">收入</button>
+                </div>
               </div>
             </div>
             <div class="tr-sum" id="trendSum" hidden></div>
@@ -706,20 +717,23 @@
   <span class="ub-ico" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none"><path d="M20 11a8 8 0 1 0-2.3 6.6M20 5v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </span>
-  <span class="ub-text">有新版本<em>刷新后生效</em></span>
+  <span class="ub-text">
+    <b>有新版本可用<i class="ub-ver" id="ubVer">v1.0.97</i></b>
+    <em>刷新即用，账目和设置都不会丢</em>
+  </span>
   <button type="button" class="ub-btn" id="updateNow">立即刷新</button>
   <button type="button" class="ub-close" id="updateLater" aria-label="稍后再说">
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
   </button>
 </div>
 
-<script src="assets/echarts.min.js?v=1.0.96" defer></script>
-<script src="assets/vault.js?v=1.0.96"></script>
-<script src="assets/boot.js?v=1.0.96"></script>
-<script src="assets/ui-select.js?v=1.0.96"></script>
-<script src="assets/app.js?v=1.0.96"></script>
+<script src="assets/echarts.min.js?v=1.0.97" defer></script>
+<script src="assets/vault.js?v=1.0.97"></script>
+<script src="assets/boot.js?v=1.0.97"></script>
+<script src="assets/ui-select.js?v=1.0.97"></script>
+<script src="assets/app.js?v=1.0.97"></script>
 <script>window.addEventListener("load",function(){try{UISelect.init()}catch(e){}});</script>
-<script src="assets/sync.js?v=1.0.96"></script>
+<script src="assets/sync.js?v=1.0.97"></script>
 <script>
 /* 离线加速：静态资源走本地缓存，页面本身始终取最新（详见 sw.js 顶部说明）。
    localhost 也算安全上下文，本地调试同样注册，省得两套行为。
