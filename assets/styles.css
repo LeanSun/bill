@@ -1640,9 +1640,6 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
   flex: 0 0 auto; gap: 6px; align-content: start;
   grid-auto-rows: minmax(100px, auto);
 }
-/* 周几卡是紧凑横条，单独放宽行高下限 */
-.day-insights .ins-card:last-child { grid-row-end: span 1; }
-.day-insights:has(.ins-wdheat) { grid-auto-rows: minmax(72px, auto); }
 .ins-card { min-height: 0; overflow: hidden; padding: 7px 11px 8px; }
 .ins-card h4 { margin: 0 0 5px; font-size: 12px; }
 .ins-bars { height: 32px; }
@@ -3183,10 +3180,11 @@ html[data-theme="dark"] .ins-wd.is-today span { color: #ff9c74; }
 }
 .spend-row:hover { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); background: var(--surface); }
 .spend-rank {
-  flex: 0 0 10px; width: 10px; height: 10px; border-radius: 50%;
+  flex: 0 0 18px; width: 18px; height: 18px; border-radius: 5px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--dot, var(--surface-3)); color: transparent;
-  font-size: 0; margin-right: 2px;
+  background: var(--dot, var(--surface-3)); color: #fff;
+  font-size: 10px; font-weight: 750;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
 }
 .spend-name { flex: 0 0 40px; width: 40px; font-weight: 700; white-space: nowrap; }
 .spend-track {
@@ -3835,7 +3833,7 @@ html[data-theme="dark"] .day-list.is-today {
 body.nums-in .ins-key,
 body.nums-in .stat-strip .sc-value,
 body.nums-in .pay-hero .ph-net {
-  animation: numRise .5s var(--ease) both;
+  animation: numRise 2s var(--ease) both;
 }
 body.nums-in .ins-key:nth-child(2) { animation-delay: .06s; }
 body.nums-in .ins-key:nth-child(3) { animation-delay: .12s; }
@@ -3859,21 +3857,6 @@ body.nums-in .ins-key:nth-child(3) { animation-delay: .12s; }
   border-radius: 50%; background: var(--danger); color: #fff;
   font-size: 10px; font-weight: 800; font-style: normal; line-height: 1;
 }
-
-/* #9 周几消费热力：七根小柱，最高那根用主色 */
-.ins-wdheat {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
-  height: 34px; align-items: end; padding-top: 2px;
-}
-.iwh-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; }
-.iwh-col i {
-  display: block; width: 100%; max-width: 15px; border-radius: 3px 3px 1px 1px;
-  background: color-mix(in srgb, var(--primary) 26%, var(--surface-3));
-}
-.iwh-col.is-top i { background: var(--primary); }
-.iwh-col span { font-size: 9px; line-height: 10px; color: var(--muted); }
-.iwh-col.is-top span { color: var(--primary); font-weight: 700; }
-.iwh-note { margin-top: 2px; font-size: 10px; color: var(--muted); text-align: center; }
 
 /* #12 趋势模式下，金额榜的 is-percent 样式不干扰画布 */
 #chartDonut.is-percent { color-scheme: normal; }
@@ -3921,3 +3904,27 @@ body.nums-in .ins-key:nth-child(3) { animation-delay: .12s; }
 .back-top:hover { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
 .back-top svg { width: 19px; height: 19px; }
 @media (max-width: 720px) { .back-top { right: 14px; bottom: 18px; width: 36px; height: 36px; } }
+
+/* ==================================================================
+   v1.0.80 · 支出构成「趋势」档：每类一行迷你折线
+   ================================================================== */
+.sp-trend-row {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 7px 8px; border-radius: 8px;
+  border: 1px solid transparent; background: transparent;
+  font-family: var(--font); color: var(--text); cursor: pointer;
+  text-align: left; transition: background .18s var(--ease), border-color .18s var(--ease);
+}
+.sp-trend-row:hover { background: var(--surface-2); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+.sp-dot { flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: var(--dot); }
+.sp-name { flex: 0 0 40px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.sp-spark { flex: 1 1 auto; min-width: 40px; height: 24px; overflow: visible; }
+.sp-last { flex: 0 0 auto; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sp-trend { flex: 0 0 38px; text-align: right; font-size: 10.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.sp-trend.is-up { color: var(--expense); }
+.sp-trend.is-down { color: var(--income); }
+@media (max-width: 560px) {
+  .sp-trend-row { gap: 5px; padding: 6px 4px; }
+  .sp-name { flex-basis: 34px; font-size: 11px; }
+  .sp-trend { display: none; }
+}

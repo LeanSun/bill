@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.79';
+  var ASSET_V = '1.0.80';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1394,9 +1394,9 @@
 
   /* 支出构成：HTML 金额榜。右上角「金额 / 占比」切换两种读法，
      条目本身仍可点，跳到对应分类的日历明细。 */
-  /* #12 占比趋势：改成分组柱状图 —— 每月每类一根独立柱，
-     比之前的 100% 堆叠面积清楚得多：堆叠面积颜色叠一起糊成一片，
-     分组柱能直接看出每月各类金额高低和相互对比。 */
+  /* #12 分类趋势：窄卡片里堆叠面积会糊、分组柱又太挤（5类×12月=60根柱）。
+     改成每个分类一行的迷你折线：左边圆点+名字，中间 sparkline 看走势，
+     右边最新月金额与环比。保留金额榜的熟悉形式，一屏能看全。 */
   function renderDonutTrend(p, el) {
     var recs = scopeRecords().filter(function (r) {
       return r.type === 'expense' && (state.donutYear === 'all' || String(r.year) === String(state.donutYear));
@@ -1409,46 +1409,53 @@
       var c = r.category || '其它';
       byMonth[m][c] = (byMonth[m][c] || 0) + r.amount;
     });
-    var months = Object.keys(byMonth).sort();
+    var months = Object.keys(byMonth).sort().slice(-12);
     if (months.length < 2) {
       el.innerHTML = '<div class="spend-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>至少两个月才有趋势</div>';
       return;
     }
-    var cats = EXPENSE_CATS.filter(function (c) {
-      return months.some(function (m) { return (byMonth[m][c] || 0) > 0; });
+    var byCat = {};
+    recs.forEach(function (r) {
+      var c = r.category || '其它';
+      if (!byCat[c]) byCat[c] = 0;
+      byCat[c] += r.amount;
     });
+    var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
     var colors = catColors(p);
     var idx = {}; EXPENSE_CATS.forEach(function (c, i) { idx[c] = i; });
-    var series = cats.map(function (c) {
-      return {
-        name: c, type: 'bar',
-        barMaxWidth: 14, barGap: '12%', barCategoryGap: '32%',
-        itemStyle: { color: colors[idx[c]], borderRadius: [3, 3, 0, 0] },
-        emphasis: { focus: 'series' },
-        data: months.map(function (m) { return round(byMonth[m][c] || 0); })
-      };
-    });
-    setOpt('chartDonut', {
-      backgroundColor: 'transparent',
-      animationDuration: RENDER_MODE === 'instant' ? 0 : 560,
-      textStyle: { fontFamily: p.font },
-      tooltip: tooltipCommon(p, {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow', shadowStyle: { color: withAlpha(p.muted, .07) } },
-        valueFormatter: function (v) { return fmtYuan(v); }
-      }),
-      legend: {
-        bottom: 0, itemWidth: 9, itemHeight: 9, itemGap: 11,
-        textStyle: { color: p.text2, fontSize: 10.5, fontFamily: p.font }, data: cats
-      },
-      grid: { left: 6, right: 12, top: 12, bottom: 34, containLabel: true },
-      xAxis: catAxis(p, months.map(function (m) { return m.slice(5) + '月'; }), { axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font } }),
-      yAxis: {
-        type: 'value',
-        axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: function (v) { return v >= 1000 ? (v / 1000) + 'k' : v; } },
-        splitLine: { lineStyle: { color: p.border, type: 'dashed' } }
-      },
-      series: series
+
+    el.innerHTML = cats.map(function (c) {
+      var col = colors[idx[c]] || p.primary;
+      var vals = months.map(function (m) { return byMonth[m][c] || 0; });
+      var hi = Math.max.apply(null, vals.concat([1]));
+      var lo = Math.min.apply(null, vals);
+      var span = Math.max(1, hi - lo);
+      var pts = vals.map(function (v, i) {
+        var x = vals.length > 1 ? i / (vals.length - 1) * 100 : 0;
+        var y = 21 - ((v - lo) / span) * 17;
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      }).join(' ');
+      var area = '0,24 ' + pts + ' 100,24';
+      var last = vals[vals.length - 1], prev = vals[vals.length - 2] || 0;
+      var dlt = prev > 0 ? (last - prev) / prev * 100 : 0;
+      var trend = prev > 0
+        ? '<span class="sp-trend ' + (dlt >= 0 ? 'is-up' : 'is-down') + '">' +
+          (dlt >= 0 ? '↑' : '↓') + Math.abs(dlt).toFixed(0) + '%</span>'
+        : '';
+      return '<button type="button" class="sp-trend-row" data-cat="' + esc(c) + '"' +
+        ' title="' + esc(c + ' · 近 ' + vals.length + ' 个月走势，点击查看明细') + '">' +
+        '<span class="sp-dot" style="--dot:' + col + '"></span>' +
+        '<span class="sp-name">' + esc(c) + '</span>' +
+        '<svg class="sp-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true" style="--line:' + col + '">' +
+        '<polygon points="' + area + '" fill="var(--line)" opacity=".12"/>' +
+        '<polyline points="' + pts + '" fill="none" stroke="var(--line)" stroke-width="1.6" ' +
+        'vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>' +
+        '<span class="sp-last">' + fmtYuan(last) + '</span>' + trend +
+        '</button>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.sp-trend-row'), function (row) {
+      row.onclick = function () { jumpToDetail({ reset: true, category: row.getAttribute('data-cat') }); };
     });
   }
   function renderDonut(p) {
@@ -2140,6 +2147,14 @@
     watchChartRO();
   }
 
+  /* 数字入场：每次进入总览都重播。
+     先移除 class + 读一次 offsetWidth 强制 reflow，再重新加上，动画才会从头跑。 */
+  function replayNumIntro() {
+    var body = document.body;
+    body.classList.remove('nums-in');
+    void body.offsetWidth;
+    requestAnimationFrame(function () { body.classList.add('nums-in'); });
+  }
   function renderCharts(view, mode) {
     if (view === 'overview') {
       try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
@@ -3003,27 +3018,6 @@
       ' · 存下 ' + yLeftPct.toFixed(0) + '%</div>' +
       '</div>';
 
-    /* #9 周几消费热力：所有支出按周一~周日汇总，指出「哪天最容易花钱」 */
-    var wdSum = [0, 0, 0, 0, 0, 0, 0], wdCnt = [0, 0, 0, 0, 0, 0, 0];
-    allRecords().forEach(function (r) {
-      if (r.type !== 'expense' || !r.date) return;
-      var dt = new Date(r.date + 'T00:00:00');
-      if (isNaN(dt.getTime())) return;
-      var i = (dt.getDay() + 6) % 7;
-      wdSum[i] += r.amount; wdCnt[i]++;
-    });
-    var wdMax = Math.max.apply(null, wdSum.concat([1]));
-    var wdTop = wdSum.indexOf(wdMax);
-    var wdNames = ['一', '二', '三', '四', '五', '六', '日'];
-    var wdCard =
-      '<div class="ins-wdheat">' + wdSum.map(function (v, i) {
-        var h = Math.max(5, v / wdMax * 100);
-        return '<div class="iwh-col' + (i === wdTop ? ' is-top' : '') + '"' +
-          ' data-tip="' + esc('周' + wdNames[i] + ' · ' + fmtYuan(v) + ' · ' + wdCnt[i] + ' 笔') + '">' +
-          '<i style="height:' + h.toFixed(1) + '%"></i><span>' + wdNames[i] + '</span></div>';
-      }).join('') + '</div>' +
-      '<div class="iwh-note">周' + wdNames[wdTop] + '最多 · ' + fmtYuan(wdMax) + '</div>';
-
     return card('近 7 日支出', line7, 0, '',
         '<span class="ins-key">' + fmtYuan(de) + '</span>') +
       card('今天花得多吗', cmpCard, 1, '', cmpKey) +
@@ -3031,8 +3025,7 @@
         '<span class="ins-key' + (mNow < 0 ? ' is-over' : '') + '">' + fmtYuan(mNow) + '</span>') +
       card('当日分类构成', catCard, 3, '',
         '<span class="ins-key">' + fmtYuan(catTotal) + '</span>') +
-      card('体重记录', weightCard, 4, 'is-weight', weightKey) +
-      card('周几最容易花', wdCard, 5, '', '<span class="ins-key">周' + wdNames[wdTop] + '</span>');
+      card('体重记录', weightCard, 4, 'is-weight', weightKey);
   }
 
   /* 左栏内容随当天分类数变化：先按紧凑排版，仍超高就整体等比缩小，
@@ -3486,6 +3479,7 @@
       if (view === 'calendar') renderBoard();
       resizeAll();
       renderCharts(view);
+      if (view === 'overview') replayNumIntro();
     });
   }
   /* ---------------- 路由 ----------------
@@ -5060,6 +5054,16 @@
       }
     });
     document.addEventListener('keydown', function (e) {
+      /* 确认弹窗最优先：它盖在编辑弹窗之上，但焦点往往还留在底层表单的输入框里。
+         不先拦住 Enter，浏览器会把按键送进底层 form 触发表单提交（等于误点了「保存」）。
+         所以只要确认框开着，Enter = 确认删除，Tab 之外一律不让事件往下走。 */
+      var confirmOpen = $('confirmBackdrop') && !$('confirmBackdrop').hidden;
+      if (confirmOpen && e.key === 'Enter') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        confirmDelete();
+        return;
+      }
       if (e.key === 'Escape') {
         if (dp.open) { closeDp(); return; }
         if (cmpOpen) { closeCmp(); return; }
@@ -6147,11 +6151,7 @@
       function () { applyDataset({}); startApp(); });
   }
   function startApp() {
-    /* #3 数字入场：解锁后给核心读数加一次轻微上浮淡入。
-       只跑一次，靠 body 上的 once 标记，避免后续重绘反复触发。 */
-    if (!document.body.classList.contains('nums-in')) {
-      requestAnimationFrame(function () { document.body.classList.add('nums-in'); });
-    }
+    /* 数字入场改到每次进入总览时触发，见 replayNumIntro() */
     document.body.classList.remove('is-booting');
     var pv = window.QZPrivate && window.QZPrivate.status && window.QZPrivate.status();
     if (pv && pv.error) toast('私人数据未载入：' + pv.error + '（当前显示空账本）', 'warn');
