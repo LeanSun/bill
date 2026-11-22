@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.82';
+  var ASSET_V = '1.0.83';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3503,6 +3503,10 @@
          一屏能塞几条条目才算得准 */
       if (view === 'calendar') renderBoard();
       resizeAll();
+      /* 每次切进总览都重渲 KPI：renderKpis 里的 animateValue 带 force，
+         数字会从 0 重新滚动。原先只在 renderAll（数据变化）时调用，
+         所以从日历切回来 KPI 根本不重绘，动画自然不播。 */
+      if (view === 'overview') renderKpis();
       renderCharts(view);
     });
   }

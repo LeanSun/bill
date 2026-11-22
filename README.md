@@ -1124,3 +1124,14 @@ if (Math.abs(prev - target) < .005) { el.textContent = formatter(target); return
 
 Node 校验：生成的对象与用户给的 JSON `JSON.stringify` 完全一致。
 
+
+## v1.0.83 · 切回总览时 KPI 重新滚动（2026-11-22）
+
+用户反馈：只有第一次打开网页时数字会增长，从日历或其它板块切回总览就不再滚动。
+
+**真因**：`renderKpis()`（里面有带 `force` 的 `animateValue`）只在 `renderAll()`（数据变化）和启动时调用。而 `setView(view)` 切到 overview 时只调了 `renderBoard()` 和 `renderCharts()` —— **KPI 压根没重绘**，动画无从谈起。之前几版一直在改 animateValue 本身和 CSS，都没碰到这个调用链问题。
+
+**修复**：在 `setView` 的 rAF 里，`renderCharts(view)` 之前补上 `if (view === 'overview') renderKpis();`。放在 rAF 中是为了让视图先可见、动画看得见。
+
+**验证**：用 MutationObserver 监听 `kpiIncome` 的文本变更，模拟「日历→总览→日历→总览」两次切换，共捕获 3 次变更，证明每次切回都重新滚动。
+
