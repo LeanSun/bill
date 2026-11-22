@@ -2987,17 +2987,29 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 
 /* ---- 2. 今年结余：浅一档的红，压在卡片里不刺眼 ------------------ */
 
-/* ---- 3. 换肤：一帧换完 ------------------------------------------
-   上一版用 document.startViewTransition()：旧帧快照和新帧交叉淡入，
-   切到深色时中间那一下整屏发白，就是「刺眼」。现在不进那条管线，
-   只在换色的这两帧里把全站过渡按住，避免几十个控件各自补间。 */
+/* ---- 3. 换肤：柔和化过去（v1.0.98） -------------------------------
+   v1.0.43 用 startViewTransition 时，旧帧快照和新帧交叉淡入，切到深色
+   那一下整屏先发白 —— 刺眼；改成「两帧内按住所有过渡」后变成一帧硬切，
+   干净但生硬。现在 .theme-snap 只做一件事：换色的这 520ms 里给全站一个
+   统一时长、统一缓动的颜色补间（applyTheme 到点才撤掉这个类，中途撤会
+   把补间截断）。所有元素同一条曲线同步起步，不会出现「几十个控件各自
+   补间」的抖动；只列颜色类属性 + transform，滑块与翻页的位移不被打断。
+   尊重 prefers-reduced-motion：那一档退回瞬时切换。 */
 html.theme-snap,
 html.theme-snap *,
 html.theme-snap *::before,
 html.theme-snap *::after {
-  transition: none !important;
-  animation-duration: 1ms !important;
-  animation-delay: 0s !important;
+  transition-property: background-color, color, border-color, box-shadow,
+                       fill, stroke, outline-color, transform !important;
+  transition-duration: .42s !important;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1) !important;
+  transition-delay: 0s !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-snap,
+  html.theme-snap *,
+  html.theme-snap *::before,
+  html.theme-snap *::after { transition-duration: 0s !important; }
 }
 
 /* ---- 4. 魔方蒙层：整屏一张，中间给 iframe 挖个洞 ------------------
@@ -4738,4 +4750,194 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
   .ub-text em { font-size: 10px; }
   .ub-btn { height: 32px; padding: 0 12px; font-size: 12px; }
   .ub-close { width: 26px; height: 26px; }
+}
+
+/* ==================================================================
+   v1.0.98 · 手机顶栏：logo → 账单 → 统计 → 更多 → 深浅切换
+   ----------------------------------------------------------------
+   桌面那颗主题按钮在 .side-tools 里，手机上 .side-tool-col 整组被隐藏
+   （只留右下角悬浮的「记一笔」），深浅切换就跟着一起消失了。这一颗
+   .top-theme-btn 独立于 .side-tools：桌面隐藏，手机固定排在顶栏最右。
+   .nav 在手机档本来就有 margin-left:auto，会自动把按钮推到最右端。
+   ================================================================== */
+.top-theme-btn { display: none; }
+@media (max-width: 760px) {
+  .sidebar { gap: 8px; }
+  .sidebar .nav { margin-left: auto; }
+  .top-theme-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; width: 34px; height: 34px; padding: 0;
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text-2); background: var(--surface-2);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+  }
+  .top-theme-btn svg { width: 17px; height: 17px; }
+  .top-theme-btn:active { transform: scale(.94); }
+  html[data-theme="dark"] .top-theme-btn { box-shadow: none; }
+}
+
+/* ==================================================================
+   v1.0.98 · 手机端翻页改左右 + 屏幕滑动手势
+   ----------------------------------------------------------------
+   turnVertical() 在 ≤760px 已返回 false（旧页往左右推）。这里给棋盘
+   定 touch-action：横滑交给 JS 翻页、竖滑照旧交给页面滚动；周视图自己
+   能横向滚看七列，保留 auto，滚到边界再滑才由 JS 翻页。
+   ================================================================== */
+@media (max-width: 760px) {
+  #calGrid, #calDayBoard, #calYearBoard { touch-action: pan-y; }
+  #calWeekGrid { touch-action: auto; }
+}
+
+/* ==================================================================
+   v1.0.98 · 手机年历：12 个月完整铺开
+   ----------------------------------------------------------------
+   修之前：桌面「6 列 × 2 行铺满一屏」的规则在手机上只被改了列数
+   （940px 档改成 2 列），行数仍沿用 1100px 档的 3 行，加上 .cal-board
+   的 overflow:hidden 与卡内 overflow:auto —— 一屏只露得出 1~6 月，
+   6 月那格还被地址栏从中间截断，7~12 月要在一个不明显的内部滚动区里找。
+   现在手机档把年历还原成「2 列 × 6 行」的完整网格，跟着整页自然滚，
+   每格统一 186px 最小高度，右下角悬浮 ＋ 也不再压住 12 月。
+   ================================================================== */
+@media (max-width: 760px) {
+  body[data-cal-scale="year"] .cal-board { overflow: visible; flex: 0 0 auto; }
+  .cal-year {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(6, minmax(186px, auto));
+    height: auto; min-height: 0; flex: 0 0 auto;
+    overflow: visible;
+  }
+  .cal-year .ym { min-height: 186px; height: auto; overflow: visible; }
+  .cal-year .ym-grid { grid-auto-rows: minmax(15px, 1fr); }
+  body[data-cal-scale="year"] .main.is-calendar {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ==================================================================
+   v1.0.98 · 年 / 月 / 周历的「今天」统一换琥珀，月格流光绕边也换琥珀
+   ----------------------------------------------------------------
+   v1.0.95 只把天页「当日明细」的今天徽章换成了琥珀；日历里 v1.0.34~
+   v1.0.63 攒下来的今日标记仍全用 var(--primary)（蓝/紫）：整格呼吸底色、
+   周/年视图的今日文字、日号圆牌，还有月格那圈 .cal-beam 无极渐变流光
+   —— 同一页里「今天」出现两种颜色。
+
+   呼吸是 @keyframes 在动 background-color，逐条改规则必漏；这里后置
+   重定义同名关键帧（后定义覆盖先定义），把色源换成 var(--today-ink)
+   （浅 #e0992a / 深 #f0b356），引用它的月/周/年三套规则一起换过来。
+   静态部分（圆牌、年视图文字、reduced-motion 兜底）单独覆盖。
+   ================================================================== */
+
+/* 1. 呼吸底色：四套关键帧统一换琥珀 */
+@keyframes todayCellBreath {
+  0%,100% {
+    background-color: color-mix(in srgb, var(--today-ink) 11%, var(--surface));
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--today-ink) 30%, var(--surface));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--today-ink) 30%, transparent);
+  }
+}
+@keyframes todayCellBreathDark {
+  0%,100% {
+    background-color: color-mix(in srgb, var(--today-ink) 15%, var(--surface));
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--today-ink) 38%, var(--surface));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--today-ink) 44%, transparent);
+  }
+}
+/* 月历单独一套：v1.0.63 把填充压到极淡，让流光当主角 */
+@keyframes todayCellBreathCal {
+  0%,100% {
+    background-color: color-mix(in srgb, var(--today-ink) 5%, var(--surface));
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--today-ink) 14%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--today-ink) 16%, transparent);
+  }
+}
+@keyframes todayCellBreathCalDark {
+  0%,100% { background-color: color-mix(in srgb, var(--today-ink) 7%, var(--surface)); }
+  50%     { background-color: color-mix(in srgb, var(--today-ink) 20%, var(--surface)); }
+}
+
+/* 2. 静态底色：动画未播 / hover / 减少动态那一帧也不能退回蓝 */
+.cal-cell.is-today { background-color: color-mix(in srgb, var(--today-ink) 9%, var(--surface)); }
+html[data-theme="dark"] .cal-cell.is-today:hover {
+  background-color: color-mix(in srgb, var(--today-ink) 26%, var(--surface));
+}
+.wk-col.is-today { background-color: color-mix(in srgb, var(--today-ink) 16%, var(--surface)); }
+.wk-col.is-today .wk-head { border-bottom-color: color-mix(in srgb, var(--today-ink) 28%, var(--border)); }
+@media (prefers-reduced-motion: reduce) {
+  .cal-cell.is-today, .wk-col.is-today, .ym-day.is-today {
+    background-color: color-mix(in srgb, var(--today-ink) 22%, var(--surface)) !important;
+  }
+}
+
+/* 3. 日号圆牌 / 今日文字：琥珀实心底 + 深墨字（白字在琥珀上只有 2.5:1） */
+.cal-cell.is-today .cal-daynum {
+  color: var(--today-on); background: var(--today-solid);
+  box-shadow: 0 0 14px -2px color-mix(in srgb, var(--today-ink) 72%, transparent);
+}
+.cal-cell.is-weekend.is-today .cal-daynum { color: var(--today-on) !important; }
+.wk-col.is-today .wk-day { color: var(--today-on); background: var(--today-solid); }
+.cal-year .ym-day.is-today {
+  color: var(--today-ink) !important; background: transparent; font-weight: 800;
+}
+/* 「关于这一天」里标今天的两根柱子跟着走琥珀 */
+.ins-bar.is-today b, .ins-wd.is-today b { background: var(--today-ink); }
+
+/* 4. 月格流光绕边：conic 每一档色标都换琥珀，白色高光保留 */
+.cal-beam {
+  background: conic-gradient(from var(--beam-a, 0deg),
+    color-mix(in srgb, var(--today-ink) 22%, transparent) 0deg,
+    color-mix(in srgb, var(--today-ink) 40%, transparent) 28deg,
+    #ffffff 46deg,
+    color-mix(in srgb, var(--today-ink) 78%, transparent) 62deg,
+    color-mix(in srgb, var(--today-ink) 22%, transparent) 92deg,
+    color-mix(in srgb, var(--today-ink) 22%, transparent) 180deg,
+    color-mix(in srgb, var(--today-ink) 40%, transparent) 208deg,
+    #ffffff 226deg,
+    color-mix(in srgb, var(--today-ink) 78%, transparent) 242deg,
+    color-mix(in srgb, var(--today-ink) 22%, transparent) 272deg,
+    color-mix(in srgb, var(--today-ink) 22%, transparent) 360deg);
+}
+html[data-theme="dark"] .cal-beam {
+  background: conic-gradient(from var(--beam-a, 0deg),
+    color-mix(in srgb, var(--today-ink) 34%, transparent) 0deg,
+    color-mix(in srgb, var(--today-ink) 55%, transparent) 28deg,
+    #ffffff 46deg,
+    color-mix(in srgb, var(--today-ink) 90%, transparent) 62deg,
+    color-mix(in srgb, var(--today-ink) 34%, transparent) 92deg,
+    color-mix(in srgb, var(--today-ink) 34%, transparent) 180deg,
+    color-mix(in srgb, var(--today-ink) 55%, transparent) 208deg,
+    #ffffff 226deg,
+    color-mix(in srgb, var(--today-ink) 90%, transparent) 242deg,
+    color-mix(in srgb, var(--today-ink) 34%, transparent) 272deg,
+    color-mix(in srgb, var(--today-ink) 34%, transparent) 360deg);
+}
+
+/* ==================================================================
+   v1.0.98 · 手机周视图：7 列横滚 → 2 列 × 4 行网格
+   ----------------------------------------------------------------
+   原来手机上七列各 132px，得横向滚才看得全一周；而「左右滑动翻页」
+   用的正好是同一个手势，二者只能留一个。改成两列网格后每天约 190px，
+   wk-col 里 28~64px 的条目原样放得下，七天上下滚完，左右滑动全部
+   交给翻周 —— 和年 / 月 / 日三档一致。顶上那条「周一…周日」表头
+   在两列网格里对不上，收掉；每天自己的 .wk-head 已写明周几与日号。
+   ================================================================== */
+@media (max-width: 760px) {
+  .cal-week {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: minmax(176px, auto);
+    min-height: 0; overflow: visible;
+  }
+  .wk-col { min-height: 176px; border-bottom: 1px solid var(--border); }
+  .wk-col:nth-child(2n) { border-right: 0; }
+  .cal-weekhead { display: none; }
+  #calWeekGrid { touch-action: pan-y; }
 }

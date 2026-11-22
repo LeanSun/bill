@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.97';
+  var ASSET_V = '1.0.98';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -164,7 +164,10 @@
     view: 'calendar',
     year: 'all',
     theme: 'light',
-    scale: 'month',
+    /* v1.0.98：默认粒度直接是「天」。原先初始为 month，只靠 startApp 末尾的
+       gotoToday() 纠正；带 #/calendar 刷新时那句会被跳过，于是同一个网址
+       首次打开是今日、刷新却退回月历。把初始值坐实成 day，首帧就不会闪月历。 */
+    scale: 'day',
     calMonth: { year: 2026, month: 11 },
     anchorDate: '',
     focusDate: '',
@@ -198,10 +201,11 @@
   var storeRev = 0;
   var lastFocused = null;
   var lastTrendRows = [], lastBalanceRows = [], lastStackRows = [], lastTopRows = [], lastSideTrendRows = [];
-  /* 总览与分析已合并进同一页；导航只剩两个入口，默认落在日历。 */
+  /* 统计与分析已合并进同一页；导航第一位是账单（日历），第二位是统计。
+     v1.0.98：两处改名只动文案与顺序，data-view 值保持不变，路由和逻辑不受影响。 */
   var VIEW_META = {
-    overview: ['总览', '收支总览与图表，汇总在同一页。'],
-    calendar: ['日历', '一个月的所有流水，尽在一页日历。点格子记一笔，双击看当天明细。'],
+    calendar: ['账单', '按年、月、周、日翻账；一打开就是今天。点格子记一笔，双击看当天明细。'],
+    overview: ['统计', '收支总览与图表，汇总在同一页。'],
     cube: ['魔方', '魔方收藏、比赛记录与润滑油指南。独立数据，不进收支账。']
   };
 
@@ -1167,7 +1171,7 @@
       opts.category && opts.category !== 'all' ? '已筛选：' + opts.category :
         opts.q ? '已搜索：' + opts.q :
           opts.date ? '已定位：' + opts.date :
-            (opts.year !== undefined ? '已跳转：' + opts.year + '年' + opts.month + '月' : '已跳转日历'));
+            (opts.year !== undefined ? '已跳转：' + opts.year + '年' + opts.month + '月' : '已打开账单'));
     toast(label, 'info');
   }
   /* 单日直达：分析页热力图 / 月视图「还有 N 笔」都走这里 */
@@ -5538,19 +5542,23 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
     var root = document.documentElement;
-    /* v1.0.43：不再走 startViewTransition。
-       那条管线会把旧帧拍成快照再和新帧交叉淡入，浅切成深的那一下整屏先亮起来，
-       就是他说的「闪、刺眼」。现在直接换 token，只在换色的这两帧按住全站过渡
-       （几十个控件各自补间 220ms，屏幕上就是一层从旧配色化过去的抖动）。 */
+    /* v1.0.43 起不走 startViewTransition：那条管线会把旧帧拍成快照交叉淡入，
+       浅切深的那一下整屏先亮起来，刺眼。当时改成了「换色这两帧按住全站过渡」
+       —— 一帧硬切，干净但生硬。
+       v1.0.98 改成柔和化过去：.theme-snap 现在不是禁用过渡，而是给全站一个
+       统一时长、统一缓动的颜色补间（见 styles.css 末尾）。类必须留到补间跑完
+       才能撤，中途撤掉 transition 会把动画截断在半路。 */
     root.classList.add('theme-snap');
     root.setAttribute('data-theme', t);
     if (!deferCharts) renderCharts(state.view, 'instant');
     /* 让 iframe 同一帧换色；子页自己会 repaint 行底色与图表 */
     var f = $('cubeFrame');
     if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __ledgerTheme: t }, '*'); } catch (e) {} }
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () { root.classList.remove('theme-snap'); });
-    });
+    if (root.__themeTimer) clearTimeout(root.__themeTimer);
+    root.__themeTimer = setTimeout(function () {
+      root.classList.remove('theme-snap');
+      root.__themeTimer = 0;
+    }, 520);
   }
 
   /* 换肤：光晕已取消。只做一次 token + 图表配色的同步替换，
@@ -5978,7 +5986,7 @@
       navs[i].addEventListener('click', function () {
         var tab = this.dataset.cubeTab;
         var v = this.dataset.view;
-        /* 每次点「日历」都回到今天的天页面；其它视图照常切 */
+        /* 每次点「账单」都回到今天的天页面；其它视图照常切 */
         if (!tab && v === 'calendar') gotoToday();
         if (tab) jumpCube({ tab: tab });
         else setView(v);
@@ -6049,8 +6057,12 @@
       renderCalendar(palette());
     });
 
-    if ($('themeBtn')) $('themeBtn').addEventListener('click', function () {
-      setTheme(state.theme === 'dark' ? 'light' : 'dark');
+    /* v1.0.98：桌面侧栏那颗与手机顶栏右侧那颗共用同一套换肤 */
+    ['themeBtn', 'themeBtnM'].forEach(function (id) {
+      var b = $(id);
+      if (b) b.addEventListener('click', function () {
+        setTheme(state.theme === 'dark' ? 'light' : 'dark');
+      });
     });
     bindColorPanel();
 
@@ -6261,6 +6273,7 @@
     /* 日历：粒度 / 步进 / 筛选 / 交互 */
     bindSeg($('scaleSeg'), 'data-scale', function (v) { setScale(v); });
     bindWheelPaging();
+    bindSwipePaging();
     if ($('calPrev')) $('calPrev').addEventListener('click', function () { softStep(-1); });
     if ($('calNext')) $('calNext').addEventListener('click', function () { softStep(1); });
     if ($('calToday')) $('calToday').addEventListener('click', function () {
@@ -6669,11 +6682,11 @@
   }
 
   /* 一次翻页：旧页整块推出去，新页从另一头滑进来。
-     dir > 0 是往后翻（下一月 / 下一周）。轴按粒度分：
-     所有粒度一律竖着推）。 */
+     dir > 0 是往后翻（下一月 / 下一周）。轴由 turnVertical 决定。 */
   function turnVertical() {
-    /* v1.0.62：日历翻页统一走上下 —— 月 / 周 / 日 / 年一致，不再横竖混用 */
-    return true;
+    /* v1.0.62 桌面四档统一走上下；v1.0.98 手机端改成左右 —— 竖着推和
+       手指左右滑的方向对不上。阈值 760px 与顶栏 / 日历布局的断点一致。 */
+    return !(window.matchMedia && window.matchMedia('(max-width: 760px)').matches);
   }
 
   function pageTurn(dir) {
@@ -6804,11 +6817,79 @@
     });
   }
 
+  /* v1.0.98 · 手机端左右滑动翻页
+     ----------------------------------------------------------------
+     翻页原本只有箭头、← →、滚轮三个入口，手机上都没有。现在四块棋盘都认
+     横向手势：按下记起点，横向够 48px 且明显压过纵向就记一次，松手翻一页
+     （左滑 = 下一段，右滑 = 上一段）。翻页本身复用 softStep / pageTurn，
+     和箭头、滚轮同一套动效与 460ms 的锁，不会连滑连跳。
+
+     用 touch 事件而不是 PointerEvent：实测在 touch-action:pan-y 的容器上，
+     浏览器会在第一帧 pointermove 之后立刻补一个 pointercancel 把手势接管，
+     pointerup 根本不来；touchstart/move/end 三个却完整派发。桌面没有 touch
+     事件，天然不会干扰鼠标拖选。
+
+     三条护栏：
+       1. 竖向手势直接放行给页面滚动（配合 CSS 的 touch-action: pan-y），
+          年历 / 天页照样能上下滚；
+       2. 周视图原先在手机上是 7 列横滚，和「左右滑翻页」抢同一个手势；
+          手机档把它改成 2 列 × 4 行的网格（见 styles.css），四档就都能
+          一视同仁地左右滑翻页，不必再按 scrollWidth 猜边界；
+       3. 手势尾随的那次合成 click 要吃掉，否则滑过日历格会顺手「记一笔」。
+          守卫挂在 document 上而不是棋盘上 —— 翻页会重绘棋盘内容，挂在
+          棋盘上的标记会跟着丢。 */
+  var swipeGuardUntil = 0;
+  function bindSwipePaging() {
+    var SWIPE_MIN = 48, SWIPE_MAX_MS = 900;
+    function point(e, isEnd) {
+      var list = isEnd ? e.changedTouches : e.touches;
+      return list && list[0] ? list[0] : null;
+    }
+    ['calGrid', 'calWeekGrid', 'calDayBoard', 'calYearBoard'].forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      var st = null;
+      el.addEventListener('touchstart', function (e) {
+        if (state.view !== 'calendar') return;
+        if (dp.open || cmpOpen || !$('modalBackdrop').hidden || !$('confirmBackdrop').hidden) return;
+        var t = e.target, p = point(e, false);
+        if (!p) return;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''))) return;
+        if (t && t.closest && t.closest('.seg, .ui-sel, .nav-more-sheet, .cal-more')) return;
+        st = { x: p.clientX, y: p.clientY, t: Date.now(), horiz: false };
+      }, { passive: true });
+      el.addEventListener('touchmove', function (e) {
+        if (!st) return;
+        var p = point(e, false); if (!p) return;
+        var dx = p.clientX - st.x, dy = p.clientY - st.y;
+        /* 竖向为主就放行，别抢页面滚动 */
+        if (Math.abs(dy) > Math.abs(dx) * 1.2) return;
+        if (Math.abs(dx) < 12) return;
+        st.horiz = true;
+        if (e.cancelable) e.preventDefault();
+      }, { passive: false });
+      el.addEventListener('touchend', function (e) {
+        if (!st) return;
+        var s = st; st = null;
+        if (!s.horiz) return;
+        var p = point(e, true); if (!p) return;
+        var dx = p.clientX - s.x;
+        if (Math.abs(dx) < SWIPE_MIN || Date.now() - s.t > SWIPE_MAX_MS) return;
+        swipeGuardUntil = Date.now() + 420;
+        softStep(dx < 0 ? 1 : -1);
+      }, { passive: true });
+      el.addEventListener('touchcancel', function () { st = null; }, { passive: true });
+    });
+    document.addEventListener('click', function (e) {
+      if (Date.now() < swipeGuardUntil) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  }
+
 
   function jumpFromKpi(kind) {
     if (kind === 'income') { jumpToDetail({ reset: true, type: 'income', label: '已筛选：全部收入' }); return; }
     if (kind === 'expense') { jumpToDetail({ reset: true, type: 'expense', label: '已筛选：全部支出' }); return; }
-    if (kind === 'rate') { setView('overview'); toast('已打开总览', 'info'); return; }
+    if (kind === 'rate') { setView('overview'); toast('已打开统计', 'info'); return; }
     jumpToDetail({ reset: true, label: '已跳转日历' });
   }
 
@@ -6863,11 +6944,17 @@
     }
   }
   /* 全局悬浮提示：接管原生 title 与动态图表的 data-tip。
-     气泡固定在鼠标上方、pointer-events:none，永远不会被光标挡住。 */
+     气泡固定在鼠标上方、pointer-events:none，永远不会被光标挡住。
+
+     v1.0.98：触屏点一下会补发 mouseover，却不会补发 mouseout —— 气泡就
+     一直挂在屏幕上。实测在手机上点「上一段」箭头，提示「上一段（←）」
+     停留不消失，之后点的每个控件都叠一层。现在按下时认出非鼠标指针就
+     先收掉气泡，并压住随后 900ms 内那一串合成 mouse 事件；touchstart
+     给没有 PointerEvent 的老浏览器兜底。桌面 hover 完全不受影响。 */
   function bindHoverTip() {
     var tip = $('hoverTip');
     if (!tip) return;
-    var active = null;
+    var active = null, suppressUntil = 0;
     function place(x, y) {
       var w = tip.offsetWidth || 160, h = tip.offsetHeight || 34;
       var px = Math.max(w / 2 + 8, Math.min(window.innerWidth - w / 2 - 8, x));
@@ -6875,7 +6962,26 @@
       tip.style.left = px + 'px';
       tip.style.top = py + 'px';
     }
+    function dismiss() {
+      if (active && active.__nativeTip) {
+        active.setAttribute('title', active.__nativeTip);
+        active.__nativeTip = '';
+      }
+      active = null;
+      tip.hidden = true;
+    }
+    /* 触屏 / 触控笔：按下就收，并压住随后补发的合成 mouseover */
+    document.addEventListener('pointerdown', function (e) {
+      if (!e.pointerType || e.pointerType === 'mouse') return;
+      suppressUntil = Date.now() + 900;
+      dismiss();
+    }, true);
+    document.addEventListener('touchstart', function () {
+      suppressUntil = Date.now() + 900;
+      dismiss();
+    }, { capture: true, passive: true });
     document.addEventListener('mouseover', function (e) {
+      if (Date.now() < suppressUntil) return;
       if (!e.target || typeof e.target.closest !== 'function') return;
       var el = e.target.closest('[title], [data-tip]');
       if (!el) return;
@@ -6896,12 +7002,7 @@
     document.addEventListener('mouseout', function (e) {
       if (!active) return;
       if (e.relatedTarget && active.contains(e.relatedTarget)) return;
-      if (active.__nativeTip) {
-        active.setAttribute('title', active.__nativeTip);
-        active.__nativeTip = '';
-      }
-      active = null;
-      tip.hidden = true;
+      dismiss();
     });
   }
 
@@ -7439,11 +7540,14 @@
     renderAll();
     enableSegDragAll();
 
-    /* 默认打开日历；地址栏带深链（含旧的 #/analysis）则优先深链 */
+    /* 默认打开账单；地址栏带深链（含旧的 #/analysis）则优先深链 */
     var initialRoute = parseRoute() || 'calendar';
     bindRoute();
-    /* 首屏就是日历、且地址栏没有深链时，直接落到今天的天页面 */
-    if (initialRoute === 'calendar' && !parseRoute()) gotoToday();
+    /* v1.0.98：每次打开都落到「今天」的天页面，不再看地址栏有没有 hash。
+       原先带 #/calendar 刷新会跳过这句，落回 state.scale 的初始值（月历），
+       同一个网址首次打开与刷新两种结果；现在初始值已是 day，这里再兜一次底。
+       应用内切视图走 hashchange -> setView，不会经过这里，粒度不会被重置。 */
+    if (initialRoute === 'calendar') gotoToday();
     setView(initialRoute);
 
     /* 门禁没过：整块内容换成「未解锁」，不给看也不给记 */
