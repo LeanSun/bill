@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.93';
+  var ASSET_V = '1.0.94';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2839,6 +2839,11 @@
   /* 一条条目的最小/最大高度。15px 是 "色点 + 11px 字" 还看得清的底线；
      46px 是两块式再高也只是空，不如把空间留给下面的行 */
   var ENTRY_GAP = 3, ENTRY_MIN = 22, ENTRY_MAX = 48;
+  /* v1.0.94：月格条目高度改成定值，不再「条少就发胖」。
+     原来的规则是 1 条就撑到 48px、3 条压到 26px，于是同一个月里既有大方块
+     又有细条，扫一眼像两种控件。定死 26px 之后每个胶囊同一个尺寸，
+     一列数字右对齐成一条线；条数多也不缩，放不下就走「+N 笔」。 */
+  var MONTH_ROW = 26;
   function narrowGrid() {
     return !!(window.matchMedia && window.matchMedia('(max-width: 620px)').matches);
   }
@@ -2905,8 +2910,10 @@
     for (var i = 0; i < cells.length; i++) {
       var box = cells[i].querySelector('.cal-items');
       if (!box) continue;
-      /* 右下角 ＋ 常驻，先把那 28px 让出来，条目不会压到它下面 */
-      fitStack(cells[i], box, '.cal-cell-head', perRow, narrow ? 5 : ENTRY_MIN, narrow ? 6 : ENTRY_MAX, '.cal-add', true);
+      /* 右下角 ＋ 常驻，先把那 28px 让出来，条目不会压到它下面。
+         最小/最大都给同一个值 = 定高，换行数不换高度。 */
+      fitStack(cells[i], box, '.cal-cell-head', perRow,
+        narrow ? 5 : MONTH_ROW, narrow ? 6 : MONTH_ROW, '.cal-add', true);
     }
   }
 
@@ -3960,7 +3967,31 @@
   function bindSeg(el, attr, handler) {
     if (!el) return;
     function btns() { return [].slice.call(el.querySelectorAll('button[' + attr + ']')); }
-    function apply(b, fire) {
+    /* v1.0.94：重绘不再在 pointerdown 那一刻同步发生。
+       原来点一下 = 滑块刚起步 + 立刻重建整个日历，主线程被占住，动画最
+       关键的起手三四帧全丢，手感就是「先顿一下，再猛地滑过去」。拖拽更糟：
+       enableSegDrag 每跨一格都会 click 一次，拖过五格就重建五遍日历。
+       现在 —— 按下只挪滑块（--seg-i），拖拽全程只记账，松手才重绘一次；
+       重绘本身再往后放两帧，让合成器先把这一段过渡跑起来。 */
+    var queued = null, queuedBusy = false;
+    function queueRender(v, delay) {
+      queued = v;
+      if (queuedBusy) return;
+      queuedBusy = true;
+      function run() {
+        var raf = window.requestAnimationFrame ?
+          window.requestAnimationFrame.bind(window) : function (f) { return setTimeout(f, 16); };
+        raf(function () {
+          raf(function () {
+            var val = queued;
+            queued = null; queuedBusy = false;
+            if (val !== null && val !== undefined) handler(val);
+          });
+        });
+      }
+      if (delay) setTimeout(run, delay); else run();
+    }
+    function apply(b, now) {
       if (!b || b.parentNode !== el) return;
       var v = b.getAttribute(attr);
       btns().forEach(function (x) { x.classList.toggle('is-active', x === b); });
@@ -3968,13 +3999,17 @@
       el.dataset.active = String(idx);
       el.style.setProperty('--seg-n', String(btns().length || 1));
       el.style.setProperty('--seg-i', String(idx));
-      if (fire) {
+      if (now) {
         /* 去重状态挂在 DOM 上而不是闭包里：gotoToday() 会用 setSegActive()
            直接改选中态（进日历默认「天」），闭包里的 last 不会跟着变，
            于是那之后第一次点「月」会被当成「没变化」吞掉。 */
         var prev = el.__segLast;
         el.__segLast = v;
-        if (v !== prev) handler(v);
+        if (v !== prev) {
+          /* 拖拽中只记账，等松手：拖过几格就重绘几次，正是卡顿的主因 */
+          if (el.classList.contains('is-dragging')) el.__segPending = v;
+          else queueRender(v);
+        }
       }
     }
     var active = el.querySelector('button.' + 'is-active[' + attr + ']');
@@ -3987,21 +4022,39 @@
        之前和 enableSegDrag 共用 data-seg-drag，而后者在绑定时把它永久置 1，
        导致 bindSeg 的 pointermove 守卫恒通过 —— 纯 hover 就跟随滑块，
        点一下 pointerup 置 0 才恢复。改用独立标记彻底隔离两个系统。 */
+    var pressBtn = null;
     el.addEventListener('pointerdown', function (e) {
       var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
       if (!b) return;
       el.dataset.segPress = '1';
-      apply(b, true);
+      pressBtn = b;
+      /* 手还没抬，只挪滑块；数据等 pointerup 再说 */
+      apply(b, false);
     });
     el.addEventListener('pointermove', function (e) {
       if (el.dataset.segPress !== '1') return;
-      if (e.pointerType === 'mouse' && !(e.buttons & 1)) { el.dataset.segPress = '0'; return; }
+      if (e.pointerType === 'mouse' && !(e.buttons & 1)) { el.dataset.segPress = '0'; pressBtn = null; return; }
       var t = document.elementFromPoint(e.clientX, e.clientY);
       var b = t && t.closest ? t.closest('button[' + attr + ']') : null;
+      if (b && b !== pressBtn) { pressBtn = b; apply(b, false); }
+    });
+    document.addEventListener('pointerup', function () {
+      var pend = el.__segPending;
+      if (pend !== null && pend !== undefined) {
+        el.__segPending = null;
+        /* 等回弹走完再重绘：那 320ms 主线程得空着，滑块才不掉帧 */
+        queueRender(pend, 280);
+      }
+      if (el.dataset.segPress !== '1') return;
+      el.dataset.segPress = '0';
+      var b = pressBtn;
+      pressBtn = null;
       if (b) apply(b, true);
     });
-    document.addEventListener('pointerup', function () { el.dataset.segPress = '0'; });
-    document.addEventListener('pointercancel', function () { el.dataset.segPress = '0'; });
+    document.addEventListener('pointercancel', function () {
+      el.dataset.segPress = '0';
+      pressBtn = null;
+    });
   }
   function setSegActive(el, attr, value) {
     if (!el) return;
