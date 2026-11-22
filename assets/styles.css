@@ -53,6 +53,10 @@
   --radius-sm: 10px;
   --ease: cubic-bezier(.22, 1, .36, 1);
   --ease-soft: cubic-bezier(.4, 0, .2, 1);
+  /* 分段滑块专用。--ease 是「强减速」曲线：前 8% 的时间已经走完 17% 的距离，
+     落在滑块上就是「先猛跳一下、再花 270ms 一寸一寸挪」—— 看着像卡顿。
+     这条是「缓加速—中段最快—缓收尾」，首帧只走 5px，峰值落在 67ms。 */
+  --ease-seg: cubic-bezier(.3, .1, .2, 1);
   --sidebar-w: 208px;
   --main-pt: 18px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
@@ -204,7 +208,7 @@ svg { display: block; }
 }
 .seg button { position: relative; z-index: 1; padding: 9px 2px; font-size: 13.5px; font-weight: 600; color: var(--muted); border-radius: 8px; transition: color .3s var(--ease-soft); }
 .seg button.is-active { color: var(--text); }
-.seg-ind { position: absolute; z-index: 0; top: 4px; left: 4px; width: calc((100% - 8px) / var(--seg-n)); height: calc(100% - 8px); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-sm), 0 2px 6px rgba(24, 39, 75, .07); transform: translateX(calc(var(--seg-i, 0) * 100%)); transition: transform .42s var(--ease); }
+.seg-ind { position: absolute; z-index: 0; top: 4px; left: 4px; width: calc((100% - 8px) / var(--seg-n)); height: calc(100% - 8px); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-sm), 0 2px 6px rgba(24, 39, 75, .07); transform: translateX(calc(var(--seg-i, 0) * 100%)); transition: transform .3s var(--ease-seg); }
 
 .side-foot { margin-top: auto; padding: 18px 4px 0; border-top: 1px solid var(--border); }
 .side-today, .side-sync { gap: 8px; }
@@ -477,7 +481,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
   background: color-mix(in srgb, var(--primary) 30%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
   box-shadow: 0 1px 3px rgba(24, 39, 75, .08);
-  transition: transform .42s var(--ease), background-color .3s, border-color .3s;
+  transition: transform .3s var(--ease-seg), background-color .3s, border-color .3s;
 }
 /* 图表按某个具体星期跳转时，三段控件没有对应项，滑块收起来 */
 .fx-seg.is-custom .seg-ind { opacity: 0; }
@@ -493,7 +497,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
   background: color-mix(in srgb, var(--ac, var(--primary)) 34%, var(--surface));
   border: 1px solid var(--ac, var(--primary));
   box-shadow: 0 1px 3px rgba(24, 39, 75, .1);
-  transition: transform .42s var(--ease), background-color .3s, border-color .3s;
+  transition: transform .3s var(--ease-seg), background-color .3s, border-color .3s;
 }
 .cat-seg .ct-sub b, .sub-seg .ct-sub b {
   font-weight: 700; font-size: 10.5px; padding: 0 4px; margin-left: 4px;
@@ -538,7 +542,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
   background: color-mix(in srgb, var(--primary) 34%, var(--surface));
   border: 1px solid var(--primary);
   box-shadow: 0 1px 3px rgba(24, 39, 75, .1);
-  transition: transform .42s var(--ease), background-color .3s, border-color .3s;
+  transition: transform .3s var(--ease-seg), background-color .3s, border-color .3s;
 }
 #typeSeg[data-active="1"] .seg-ind { background: color-mix(in srgb, var(--expense) 34%, var(--surface)); border-color: var(--expense); }
 #typeSeg[data-active="2"] .seg-ind { background: color-mix(in srgb, var(--income) 34%, var(--surface)); border-color: var(--income); }
@@ -619,7 +623,9 @@ html[data-theme="dark"] .cal-cell.is-today:hover { background: color-mix(in srgb
 }
 .cal-item {
   display: flex; flex-direction: column; justify-content: center; gap: 1px;
-  min-width: 0; padding: 2px 5px 3px; border-radius: 6px; overflow: hidden;
+  /* v1.0.92：圆角从 6 提到 10，和筛选条里的「最近」胶囊同一个值 ——
+     同一页里两套圆角，一小一大，并排看就是「两种控件」。 */
+  min-width: 0; padding: 2px 5px 3px; border-radius: 10px; overflow: hidden;
   text-align: left; color: var(--text-2);
   /* 不透明混色：透明叠色在深色底上会糊成灰，直接混到 surface 上色相才留得住 */
   background: color-mix(in srgb, var(--c) 14%, var(--surface));
@@ -650,7 +656,7 @@ html[data-theme="dark"] .cal-item:hover {
 .cal-items.is-tight .cal-item.is-inc { margin-top: 3px; }
 .cal-more {
   display: flex; align-items: center; justify-content: center;
-  border-radius: 8px; text-align: center;
+  border-radius: 10px; text-align: center;
   font-size: 12px; font-weight: 700; color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
@@ -1601,6 +1607,9 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
 .seg.is-dragging, .seg.is-dragging button { cursor: grabbing; }
 .seg.is-dragging .seg-ind {
   transition: none;
+  /* 拖拽时滑块每帧都在改写 transform。它身上有阴影，不提层就是每帧一次重绘；
+     提层之后交给合成器挪位置，跟手才不会一顿一顿。只在拖拽这几百毫秒里提。 */
+  will-change: transform;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 42%, transparent), var(--shadow-sm);
 }
 .seg.is-dragging button { transition: none; }
@@ -3787,32 +3796,34 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 }
 
 /* ==================================================================
-   v1.0.90 · 当日明细栏的「今天」底色（重做）
+   v1.0.92 · 当日明细栏的「今天」：照左栏周末那套标
    ----------------------------------------------------------------
-   旧版是一条从左到右的横向渐变：左边缘 26% 主色、右端 8%。一列 500px
-   高的竖长区域被劈成「深左—浅右」，像刷墙刷到一半停手；行本身是浅灰
-   卡片，压在偏蓝的底上还会泛出一层脏紫。
-   问题的根不在深浅，在手法不一致：左栏用平铺粉表达周末，这一栏却用
-   横向渐变，两块并排时谁都不像谁。现在改成同一套语言 ——
-   整栏一层很淡的平涂蓝（纸面），行级卡片换成白底（浮在纸面上）。
-   于是「今天」是：淡蓝纸 + 白卡片 + 标题旁的蓝色徽章，三层说同一件事，
-   而数字读在纯白上，比读在灰卡上更清楚。
+   6.5% 的淡蓝等于没染：主色混到白里是 rgb(243,245,254)，肉眼读成「白」；
+   这一栏又常常只装一两行，剩下大半是空白，淡色铺在空白上更看不出来。
+   真正的参照就在旁边：左栏周末是「14% 平涂 + 内嵌 3px 左标线」，
+   一眼就认得出。今天照同一套做，只把色相换成主色：
+       15% 平涂（rgb(228,233,254)，明度和周末粉同一档）
+       + inset 3px 左标线（55%）
+       + 行卡片用白底浮在上面
+   颜色变了、手法没变，两块并排才像同一个人画的。
    ================================================================== */
 .day-list.is-today {
-  background: color-mix(in srgb, var(--primary) 6.5%, var(--surface));
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary) 55%, transparent);
 }
 /* 淡蓝纸面 + 白卡片：让每一行从底色上真正「浮」起来 */
 .day-list.is-today .dl-cat {
   background: var(--surface);
-  border-color: color-mix(in srgb, var(--primary) 12%, var(--border));
+  border-color: color-mix(in srgb, var(--primary) 16%, var(--border));
 }
-.day-list.is-today .day-list-head { border-bottom-color: color-mix(in srgb, var(--primary) 16%, var(--border)); }
+.day-list.is-today .day-list-head { border-bottom-color: color-mix(in srgb, var(--primary) 26%, var(--border)); }
 html[data-theme="dark"] .day-list.is-today {
-  background: color-mix(in srgb, var(--primary) 13%, var(--surface));
+  background: color-mix(in srgb, var(--primary) 20%, var(--surface));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary) 45%, transparent);
 }
 html[data-theme="dark"] .day-list.is-today .dl-cat {
   background: color-mix(in srgb, var(--surface) 92%, var(--primary));
-  border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
 }
 /* 标题旁的小徽章，和左栏日期卡的「今天」同一套视觉，只是缩一档 */
 .dl-today {
