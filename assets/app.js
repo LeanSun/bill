@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.87';
+  var ASSET_V = '1.0.88';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3164,6 +3164,61 @@
     var fits = inner.getBoundingClientRect().height <= have + 1;
     side.classList.toggle('is-scroll', !fits);
   }
+  /* ---------------- 每月固定支出（#13） ----------------
+     口径：同名目在最近账里至少出现在 3 个不同月份，且最高额 / 最低额 ≤ 1.25，
+     日期取各次的中位数当「通常几号」。金额忽大忽小的同名目不算固定支出
+     （比如「超市」每月都买，但金额浮动，不该被当成账单提醒）。
+     只在「查看今天」且这个月还没记过同名目、且已过通常日时提醒。 */
+  function fixedMonthly() {
+    var byNote = {};
+    allRecords().forEach(function (r) {
+      if (r.type === 'income') return;
+      var k = String(r.note || '').trim();
+      if (!k) return;
+      (byNote[k] = byNote[k] || []).push(r);
+    });
+    var out = [];
+    Object.keys(byNote).forEach(function (k) {
+      var rs = byNote[k], months = {}, lo = Infinity, hi = 0, days = [];
+      rs.forEach(function (r) {
+        months[String(r.date).slice(0, 7)] = 1;
+        if (r.amount < lo) lo = r.amount;
+        if (r.amount > hi) hi = r.amount;
+        days.push(Number(String(r.date).slice(8, 10)) || 1);
+      });
+      if (Object.keys(months).length < 3) return;
+      if (!(lo > 0) || hi / lo > 1.25) return;
+      days.sort(function (a, b) { return a - b; });
+      var last = rs[rs.length - 1];
+      out.push({
+        note: k, amount: last.amount, category: last.category, sub: last.sub,
+        day: days[Math.floor(days.length / 2)]
+      });
+    });
+    /* 金额大的排前面：房租、宽带比一杯咖啡更值得提醒 */
+    out.sort(function (a, b) { return b.amount - a.amount; });
+    return out;
+  }
+
+  /* 打开记账弹窗并预填。不直接给 openModal 传伪记录：
+     那样它会以为在编辑、把「删除」按钮亮出来，而这条记录并不存在。 */
+  function prefillEntry(o) {
+    openModal(null, o.date || todayStr());
+    if ($('fNote')) $('fNote').value = o.note || '';
+    if ($('fAmount')) $('fAmount').value = o.amount ? String(o.amount) : '';
+    if (o.type && o.type !== state.entryType) setEntryType(o.type);
+    var sel = $('fCategory');
+    if (sel && o.category) {
+      var found = false;
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === o.category) { sel.selectedIndex = i; found = true; break; }
+      }
+      if (!found) { sel.add(new Option(o.category, o.category)); sel.value = o.category; }
+      paintSelect(sel);
+      fillSubOptions(o.sub);
+    }
+  }
+
   function renderDayBoard(p, board) {
     var box = $('calDayBoard');
     if (!box) return;
@@ -3308,6 +3363,32 @@
     var whenText = isToday ? '今天'
       : dayDiff === -1 ? '昨天' : dayDiff === 1 ? '明天'
       : dayDiff < 0 ? (-dayDiff) + ' 天前' : dayDiff + ' 天后';
+
+    /* 固定支出提醒：只在看「今天」时出现，且本月还没记过同名目、已经过了通常的日子。
+       最多列 3 条 —— 这是一句提醒，不是一张待办清单。 */
+    dueList = [];
+    if (isToday) {
+      var mk = key.slice(0, 7), paid = {};
+      allRecords().forEach(function (r) {
+        if (r.type !== 'income' && String(r.date || '').slice(0, 7) === mk) {
+          paid[String(r.note || '').trim()] = 1;
+        }
+      });
+      dueList = fixedMonthly().filter(function (f) { return f.day <= d.getDate() && !paid[f.note]; });
+    }
+    var dueHTML = dueList.length
+      ? '<div class="day-due">' +
+        '<span class="dd-lab">每月固定</span>' +
+        dueList.slice(0, 3).map(function (f, i) {
+          return '<button type="button" class="dd-row" data-due="' + i + '">' +
+            '<b>' + esc(f.note) + '</b>' +
+            '<i>通常 ' + f.day + ' 号 · ' + fmtYuan(f.amount) + '</i>' +
+            '<em>记一笔</em></button>';
+        }).join('') +
+        '<span class="dd-tip">这个月还没记，按你过去几个月的习惯它该出现了</span>' +
+        '</div>'
+      : '';
+
     box.innerHTML =
       '<aside class="day-side' + (isWeekend ? ' is-weekend' : '') + '">' +
       '<div class="ds-inner">' +
@@ -3332,6 +3413,7 @@
       '<div class="dlh-sum"><span>支出 <b class="c-expense">' + fmtYuan(de) + '</b></span>' +
       '<span>收入 <b class="c-income">' + fmtYuan(di) + '</b></span></div>' +
       '</div>' +
+      dueHTML +
       '<div class="day-cat-list">' + catRowsHTML + '</div>' +
       '</div>' +
       '<div class="day-ins-col">' +
@@ -3373,6 +3455,19 @@
       var t = peak > 0 ? Math.min(1, v / peak) : 0;
       return v > 0 ? .16 + t * .74 : 0;
     }
+    /* 重月：支出比「有支出月份的均值」高出 15% 以上才标。
+       少于 3 个月有数据时样本太薄，一律不标 —— 一年只记了两个月，
+       怎么算都有一半是重月，那这个标记就没有信息量了。 */
+    var mList = [], mSum = 0;
+    for (var mi = 1; mi <= 12; mi++) {
+      if (monthDe[mi] > 0) { mList.push(monthDe[mi]); mSum += monthDe[mi]; }
+    }
+    var mAvg = mList.length >= 3 ? mSum / mList.length : 0;
+    function heavyOf(m) {
+      if (!mAvg) return 0;
+      var v = monthDe[m] || 0;
+      return v > mAvg * 1.15 ? v / mAvg : 0;
+    }
     var today = todayStr();
     var html = '';
     for (var m = 1; m <= 12; m++) {
@@ -3409,13 +3504,79 @@
       var mde = monthDe[m] || 0, mid = monthDi[m] || 0;
       var msum = (mde ? '<i class="c-expense">−' + fmtBig(mde).slice(1) + '</i>' : '') +
         (mid ? '<i class="c-income">+' + fmtBig(mid).slice(1) + '</i>' : '');
-      html += '<article class="ym">' +
-        '<button type="button" class="ym-head" data-month="' + m + '"><b>' + m + '月</b>' +
+      var hv = heavyOf(m);
+      html += '<article class="ym' + (hv ? ' is-heavy' : '') + '">' +
+        '<button type="button" class="ym-head" data-month="' + m + '"' +
+        (hv ? ' title="' + m + ' 月支出比全年月均高 ' + Math.round((hv - 1) * 100) + '%"' : '') + '><b>' + m + '月</b>' +
         '<span class="ym-msum">' + (msum || '<i>—</i>') + '</span></button>' +
         '<div class="ym-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
         '<div class="ym-grid">' + grid + '</div></article>';
     }
     box.innerHTML = html;
+  }
+
+  /* ---------------- 空粒度提示（#19） ----------------
+     月 / 周 / 年整段没有记录时，原来只剩一片空网格，什么也不说。
+     天页早就有「本月累计 / 距月均预算 / 上次记账」三个数，这里补齐同一套口径：
+     先给三个可比的数，再给一个「补一笔」的出口，空白页也能回答「我这阵子什么状态」。 */
+  function monthExpOf(y, m) {
+    var s = 0;
+    allRecords().forEach(function (r) {
+      if (r.type === 'income') return;
+      if (r.year === y && r.month === m) s += r.amount;
+    });
+    return round(s);
+  }
+  function prevMonthsAvgExp(y, m, n) {
+    /* 不含当月，往回数 n 个月，只把有支出的月份计入均值 */
+    var sum = 0, cnt = 0, base = new Date(y, m - 1, 1);
+    for (var i = 1; i <= n; i++) {
+      var dd = new Date(base.getFullYear(), base.getMonth() - i, 1);
+      var v = monthExpOf(dd.getFullYear(), dd.getMonth() + 1);
+      if (v > 0) { sum += v; cnt++; }
+    }
+    return cnt ? round(sum / cnt) : 0;
+  }
+  function lastEntryGapText() {
+    var key = todayStr(), best = -1;
+    allRecords().forEach(function (r) {
+      var dk = String(r.date || '');
+      if (!dk || dk > key) return;
+      var g = Math.round((new Date(key + 'T00:00:00') - new Date(dk + 'T00:00:00')) / 86400000);
+      if (g >= 0 && (best < 0 || g < best)) best = g;
+    });
+    return best < 0 ? '还没记过' : best === 0 ? '今天' : best + ' 天前';
+  }
+  function calEmptyHint(scale) {
+    var y = state.calMonth.year, m = state.calMonth.month;
+    var title, items, gap = lastEntryGapText();
+    if (scale === 'year') {
+      var prevY = 0, sum = 0, cnt = 0;
+      for (var i = 1; i <= 12; i++) {
+        prevY += monthExpOf(y - 1, i);
+        var cv = monthExpOf(y, i);
+        if (cv > 0) { sum += cv; cnt++; }
+      }
+      title = y + ' 年还没有记录';
+      items = [['去年全年', fmtBig(prevY)], ['今年月均', cnt ? fmtBig(round(sum / cnt)) : '—'], ['上次记账', gap]];
+    } else if (scale === 'week') {
+      var b = rangeBounds();
+      var wy = b.from.getFullYear(), wm = b.from.getMonth() + 1;
+      title = '这一周还没有记录';
+      items = [[wm + ' 月累计', fmtBig(monthExpOf(wy, wm))],
+               ['近 6 月月均', fmtBig(prevMonthsAvgExp(wy, wm, 6))],
+               ['上次记账', gap]];
+    } else {
+      title = m + ' 月还没有记录';
+      items = [['上月支出', fmtBig(monthExpOf(m === 1 ? y - 1 : y, m === 1 ? 12 : m - 1))],
+               ['近 6 月月均', fmtBig(prevMonthsAvgExp(y, m, 6))],
+               ['上次记账', gap]];
+    }
+    return '<span class="ceh-title">' + esc(title) + '</span>' +
+      '<div class="ceh-stats">' + items.map(function (it) {
+        return '<span><b>' + it[1] + '</b><i>' + it[0] + '</i></span>';
+      }).join('') + '</div>' +
+      '<button type="button" class="btn btn-ghost ceh-btn" data-add="' + todayStr() + '">补一笔</button>';
   }
 
   function renderBoard() {
@@ -3443,6 +3604,9 @@
     cmpYear = y;
 
     var scale = state.scale;
+    /* 记在 body 上给纯 CSS 用：天页有内嵌表单，手机端就把悬浮的「记一笔」藏掉，
+       免得它压在金额输入框和保存按钮上 */
+    document.body.setAttribute('data-cal-scale', scale);
     if ($('calGrid')) $('calGrid').hidden = scale !== 'month';
     if ($('calWeekGrid')) $('calWeekGrid').hidden = scale !== 'week';
     if ($('calDayBoard')) $('calDayBoard').hidden = scale !== 'day';
@@ -3455,6 +3619,15 @@
     else renderYearBoard(p, board);
 
     if ($('boardEmpty')) $('boardEmpty').hidden = board.length !== 0 || scale === 'day';
+    /* 整段没有任何记录（不是被筛掉的）才给「空粒度提示」；
+       同时把 boardEmpty 让出去，避免两条空态上下叠在一起 */
+    var hint = $('calEmptyHint');
+    var emptyPeriod = scale !== 'day' && scopeAll.length === 0;
+    if (hint) {
+      hint.innerHTML = emptyPeriod ? calEmptyHint(scale) : '';
+      hint.hidden = !emptyPeriod;
+    }
+    if (emptyPeriod && $('boardEmpty')) $('boardEmpty').hidden = true;
     renderCatBar(p);
   }
 
@@ -3647,7 +3820,6 @@
      按钮每次现取，后来才填进来的年份条也能直接用。 */
   function bindSeg(el, attr, handler) {
     if (!el) return;
-    var last = null;
     function btns() { return [].slice.call(el.querySelectorAll('button[' + attr + ']')); }
     function apply(b, fire) {
       if (!b || b.parentNode !== el) return;
@@ -3657,10 +3829,17 @@
       el.dataset.active = String(idx);
       el.style.setProperty('--seg-n', String(btns().length || 1));
       el.style.setProperty('--seg-i', String(idx));
-      if (fire && v !== last) { last = v; handler(v); }
+      if (fire) {
+        /* 去重状态挂在 DOM 上而不是闭包里：gotoToday() 会用 setSegActive()
+           直接改选中态（进日历默认「天」），闭包里的 last 不会跟着变，
+           于是那之后第一次点「月」会被当成「没变化」吞掉。 */
+        var prev = el.__segLast;
+        el.__segLast = v;
+        if (v !== prev) handler(v);
+      }
     }
     var active = el.querySelector('button.' + 'is-active[' + attr + ']');
-    if (active) last = active.getAttribute(attr);
+    if (active) el.__segLast = active.getAttribute(attr);
     el.addEventListener('click', function (e) {
       var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
       apply(b, true);
@@ -3697,6 +3876,8 @@
     el.dataset.active = String(idx);
     el.style.setProperty('--seg-n', String(btns.length || 1));
     el.style.setProperty('--seg-i', String(idx));
+    /* 同步给 bindSeg 的去重标记，否则程序化改选中态之后，下一次点回同值会被吞 */
+    el.__segLast = String(value);
     resetSegInd(el);
   }
 
@@ -4021,6 +4202,8 @@
   /* 天页内嵌记账表单：与弹窗共用一套落库逻辑，只是字段前缀不同。
      用独立前缀避免和弹窗的 id 撞车，两个入口可以同时存在于 DOM 里。 */
   var quickType = 'expense';
+  /* 本次渲染识别出的「每月固定支出」候选，供点击补录时按下标取用 */
+  var dueList = [];
   /* 手动改过分类就别再被自动识别抢回去；两个入口各记一份 */
   var modalCatManual = false, quickCatManual = false;
   /* 展开框里的每个 option 都带分类文字色与同色淡底，
@@ -4097,10 +4280,67 @@
   /* 天页快速表单：备注末尾写数字就自动填金额，和弹窗表单同一套体验。
      支持「午餐 35」「午餐35」「房租 2800.50」「¥88」；只在金额为空时填，
      不覆盖已经手填的数。失焦 / 回车 / 保存前各调用一次，确保任何操作路径都能识别。 */
+  /* 金额框支持四则运算：`12.5+8`、`36/2`、`(15+8)*2`。
+     自己写递归下降而不是 new Function —— 备注是用户输入，绝不进 eval。
+     只认数字、小数点、四则符号和括号，其它字符一律判非法。 */
+  function calcExpr(src) {
+    var s = String(src).replace(/[×✕xX]/g, '*').replace(/[÷]/g, '/').replace(/\s+/g, '');
+    if (!s || !/[+\-*/]/.test(s) || !/^[\d.+\-*/()]+$/.test(s)) return NaN;
+    var i = 0;
+    function num() {
+      var st = i;
+      while (i < s.length && /[\d.]/.test(s.charAt(i))) i++;
+      if (st === i) return NaN;
+      var v = parseFloat(s.slice(st, i));
+      return isFinite(v) ? v : NaN;
+    }
+    function factor() {
+      if (s.charAt(i) === '(') { i++; var v = expr(); if (s.charAt(i) === ')') i++; return v; }
+      if (s.charAt(i) === '-') { i++; return -factor(); }
+      if (s.charAt(i) === '+') { i++; return factor(); }
+      return num();
+    }
+    function term() {
+      var v = factor();
+      while (s.charAt(i) === '*' || s.charAt(i) === '/') {
+        var op = s.charAt(i); i++;
+        var r = factor();
+        v = op === '*' ? v * r : v / r;
+      }
+      return v;
+    }
+    function expr() {
+      var v = term();
+      while (s.charAt(i) === '+' || s.charAt(i) === '-') {
+        var op = s.charAt(i); i++;
+        var r = term();
+        v = op === '+' ? v + r : v - r;
+      }
+      return v;
+    }
+    var out = expr();
+    return (i === s.length && isFinite(out)) ? out : NaN;
+  }
+
   function quickParseAmount() {
     var note = $('qNote'), amt = $('qAmount');
     if (!note || !amt || amt.value) return false;
     var txt = String(note.value || '').trim();
+    if (!txt) return false;
+    /* 先试算式：既支持「午餐 12.5+8」，也支持整条只有「12.5+8+3」。
+       表达式必须从「行首 / 空格 / 冒号」开始，且一路吃到底 —— 用懒匹配前缀的写法
+       会在「(15+8)*2」上把「(」当成名字、把「15+8)*2」当成表达式，直接算错。 */
+    var em = /(?:^|[\s：:])([¥￥]?[\d.(][\d.\s+\-*/×÷()]*)$/.exec(txt);
+    if (em) {
+      var ev = calcExpr(em[1]);
+      if (isFinite(ev) && ev > 0) {
+        var ename = txt.slice(0, em.index).trim().replace(/^[¥￥]\s*/, '').trim();
+        note.value = ename;
+        amt.value = ev.toFixed(2);
+        toast('算好了：' + em[1].replace(/\s+/g, '') + ' = ' + fmtYuan(ev), 'info');
+        return true;
+      }
+    }
     var m = /^(.+?)[\s：:]*[¥￥]?\s*(\d+(?:\.\d{1,2})?)\s*$/.exec(txt);
     if (!m || !m[1].trim()) return false;
     var v = Number(m[2]);
@@ -4122,8 +4362,16 @@
       type: quickType,
       category: $('qCategory') ? $('qCategory').value : '',
       sub: $('qSub') ? $('qSub').value : '',
-      note: $('qNote') ? $('qNote').value : ''
+      note: $('qNote') ? $('qNote').value : '',
+      dupAck: quickDupAck
     });
+    if (msg && msg.indexOf(DUP_FLAG) === 0) {
+      quickDupAck = true;
+      if (err) { err.textContent = dupHint(msg); err.hidden = false; err.classList.add('is-warn'); }
+      return;
+    }
+    quickDupAck = false;
+    if (err) err.classList.remove('is-warn');
     if (msg) { if (err) { err.textContent = msg; err.hidden = false; } return; }
     if (err) { err.hidden = true; err.textContent = ''; }
   }
@@ -4285,6 +4533,32 @@
 
   /* 弹窗与天页内嵌表单共用的落库入口：校验、组装、存增量层、重绘。
      返回空串表示成功，否则返回可直接展示的错误文案。 */
+  /* ---------------- 重复记账拦截 ----------------
+     判重不看分类（分类可能被自动猜测改掉），只看「同一天 + 同金额 + 同名目」。
+     名目做去空格、去大小写、去尾部标点的归一化，再允许一边包含另一边
+     （「午餐」对「午餐 公司楼下」算同一笔，防止加了地点后缀就绕过）。
+     命中不阻止保存，只让用户再确认一次 —— 重复买两份一样的东西是真实的。 */
+  var DUP_FLAG = '\u0001dup\u0001';
+  var quickDupAck = false, entryDupAck = false;
+  function dupKey(s) {
+    return String(s || '').toLowerCase().replace(/\s+/g, '')
+      .replace(/[，。、,.!！?？~～·\-—_]+$/g, '');
+  }
+  function looksDuplicate(rec) {
+    var k = dupKey(rec.note);
+    if (!k) return null;
+    var hit = null;
+    allRecords().forEach(function (r) {
+      if (hit || r.type !== rec.type) return;
+      if (r.date !== rec.date) return;
+      if (Math.abs(r.amount - rec.amount) > 0.005) return;
+      var rk = dupKey(r.note);
+      if (!rk) return;
+      if (rk === k || (k.length >= 2 && rk.indexOf(k) === 0) || (rk.length >= 2 && k.indexOf(rk) === 0)) hit = r;
+    });
+    return hit;
+  }
+
   function commitEntry(v) {
     var amount = Number(v.amount);
     if (!isFinite(amount) || amount <= 0) return '请输入大于 0 的金额。';
@@ -4300,6 +4574,11 @@
     /* 子类：选了就用选的，留空交给关键词匹配 */
     if (v.sub) { rec.sub = v.sub; rec.subExplicit = true; }
     if (!rec.note) rec.note = rec.category;
+    /* 新记的这笔先查重；用户确认过（dupAck）就直接放行 */
+    if (!v.editingId && !v.dupAck) {
+      var dup = looksDuplicate(rec);
+      if (dup) return DUP_FLAG + dup.note + '\u0001' + fmtYuan(dup.amount);
+    }
     if (v.editingId) {
       state.store.edited[v.editingId] = rec;
       toast('已更新「' + rec.note + '」', 'info');
@@ -4326,6 +4605,10 @@
     }
     return '';
   }
+  function dupHint(msg) {
+    var parts = String(msg).slice(DUP_FLAG.length).split('\u0001');
+    return '今天已经有一笔「' + parts[0] + ' · ' + parts[1] + '」。没记错的话，再点一次保存就记下。';
+  }
   function submitEntry(e) {
     e.preventDefault();
     var err = $('formError');
@@ -4336,8 +4619,16 @@
       type: state.entryType,
       category: $('fCategory') ? $('fCategory').value : '',
       sub: $('fSub') ? $('fSub').value : '',
-      note: $('fNote') ? $('fNote').value : ''
+      note: $('fNote') ? $('fNote').value : '',
+      dupAck: entryDupAck
     });
+    if (msg && msg.indexOf(DUP_FLAG) === 0) {
+      entryDupAck = true;
+      if (err) { err.textContent = dupHint(msg); err.hidden = false; err.classList.add('is-warn'); }
+      return;
+    }
+    entryDupAck = false;
+    if (err) err.classList.remove('is-warn');
     if (msg) { if (err) { err.textContent = msg; err.hidden = false; } return; }
     closeModal();
   }
@@ -5255,6 +5546,16 @@
       }
     });
 
+    /* 改了内容或金额，上一次的「重复已确认」就作废，重新判一次 */
+    function dupReset(e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('#quickEntryForm')) quickDupAck = false;
+      else if (t.closest('#entryForm')) entryDupAck = false;
+    }
+    document.addEventListener('input', dupReset);
+    document.addEventListener('change', dupReset);
+
     /* 日历：粒度 / 步进 / 筛选 / 交互 */
     bindSeg($('scaleSeg'), 'data-scale', function (v) { setScale(v); });
     bindWheelPaging();
@@ -5416,6 +5717,14 @@
 
       var add = e.target.closest('[data-add]');
       if (add) { openModal(null, add.dataset.add, 'cell'); return; }
+
+      /* 固定支出提醒上的「记一笔」：预填名目 / 金额 / 分类，日期用今天 */
+      var due = e.target.closest('[data-due]');
+      if (due) {
+        var f = dueList[Number(due.getAttribute('data-due'))];
+        if (f) prefillEntry({ note: f.note, amount: f.amount, category: f.category, sub: f.sub, type: 'expense', date: todayStr() });
+        return;
+      }
 
       var item = e.target.closest('[data-id]');
       if (item) {
