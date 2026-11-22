@@ -1098,3 +1098,29 @@ mock 实测：`insSig` 搜索前后一致且 DOM 是同一个节点；周几卡 
 
 **验证**：`kpiAnim=numRise / 2s`、`insAnim=numRise / 0.62s`、切走再切回仍重播；趋势 `type=line / stack=pct / area=yes`，sparkline 残留 0，`errs=[]`。
 
+
+## v1.0.82 · 数字滚动计数 / 默认布局定版（2026-11-22）
+
+### 数字入场：之前方向完全错了
+
+连续几版都在改 CSS 的上浮淡入（`numRise`），但用户说的「数字入场」其实是**数字本身滚动计数**。而且项目里本来就有 `animateValue()` 做这件事——真正的 bug 是：
+
+```js
+var prev = Number(el.dataset.value || 0);
+if (Math.abs(prev - target) < .005) { el.textContent = formatter(target); return; }
+```
+
+第二次进总览时 `data-value` 已经等于目标值，`prev === target` 直接 return，动画根本不跑。所以用户只在前一次看到过一次滚动，之后「没生效」。
+
+**修复**：给 `animateValue` 加 `force` 选项，切页渲染时强制从 0 重播：
+- KPI 四张卡：**2s**，分别延迟 0 / 90 / 180 / 270ms 错峰
+- 天页洞察小字：新增 `rollSmallNumbers()`，从文本解析数值和前后缀，**0.62s** 快滚；只在洞察区 DOM 真重绘时播（`data-static` 复用时不重播，避免筛选闪烁）
+
+同时把之前所有上浮动画的 CSS 和函数（`numRise` / `replayNumIntro` / `replayInsights` / `nums-in`）彻底清除。
+
+### 默认布局定版
+
+按用户给的 JSON 固化 `DEFAULT_LAYOUT`：order 18 项不变，`salary:[6,15]`、`reimb:[6,7]`，版本 v13→**v14**，让已存的旧布局自动失效回落到新默认值（用户确认升级）。
+
+Node 校验：生成的对象与用户给的 JSON `JSON.stringify` 完全一致。
+

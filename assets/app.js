@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.81';
+  var ASSET_V = '1.0.82';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2139,33 +2139,6 @@
      直接对元素逐个重启动画（清 animation → 强制 reflow → 恢复），
      比切 body class 可靠：不受上一次 class 残留、也不依赖嵌套 rAF 的时序。
      KPI 大数字慢（2s），错落但收得住；洞察区小字走 replayInsights()。 */
-  /* 天页洞察区读数：切到日历·天时单独播一段快速上浮 */
-  function replayInsights() {
-    var els = document.querySelectorAll('.day-insights .ins-key');
-    Array.prototype.forEach.call(els, function (el, i) {
-      el.style.animation = 'none';
-      void el.offsetWidth;
-      el.style.animation = '';
-      el.style.animationDuration = '.62s';
-      el.style.animationDelay = (i * 0.05) + 's';
-    });
-  }
-  function replayNumIntro() {
-    var groups = [
-      { sel: '#view-overview .sc-value', dur: 2, step: 0.09 },
-      { sel: '.pay-hero .ph-net', dur: 1.2, step: 0 }
-    ];
-    groups.forEach(function (g) {
-      var els = document.querySelectorAll(g.sel);
-      Array.prototype.forEach.call(els, function (el, i) {
-        el.style.animation = 'none';
-        void el.offsetWidth;
-        el.style.animation = '';
-        el.style.animationDuration = g.dur + 's';
-        el.style.animationDelay = (i * g.step) + 's';
-      });
-    });
-  }
   function renderCharts(view, mode) {
     if (view === 'overview') {
       try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
@@ -2193,19 +2166,56 @@
   }
 
   /* ---------------- 数字动效 ---------------- */
-  function animateValue(el, target, formatter) {
+  /* 数字滚动计数：#force 用于每次进入总览时强制从 0 重播。
+     之前的坑：只靠 data-value 比对，第二次进页面 prev===target 直接 return，
+     所以只有首次有动画、之后再也不动 —— 用户看到的就是「没生效」。 */
+  function animateValue(el, target, formatter, opt) {
     if (!el) return;
-    var prev = Number(el.dataset.value || 0);
+    opt = opt || {};
+    var prev = opt.force ? 0 : Number(el.dataset.value || 0);
     el.dataset.value = String(target);
-    if (Math.abs(prev - target) < .005) { el.textContent = formatter(target); return; }
-    var start = performance.now(), dur = 900;
+    if (!opt.force && Math.abs(prev - target) < .005) { el.textContent = formatter(target); return; }
+    var start = performance.now(), dur = opt.dur || 900, delay = opt.delay || 0;
+    var fired = false;
     function step(now) {
+      if (now - start < delay) { requestAnimationFrame(step); return; }
+      if (!fired) { fired = true; start = now; }
       var t = Math.min(1, (now - start) / dur);
       var e = 1 - Math.pow(1 - t, 3);
       el.textContent = formatter(prev + (target - prev) * e);
       if (t < 1) requestAnimationFrame(step);
+      else el.textContent = formatter(target);
     }
     requestAnimationFrame(step);
+  }
+  /* 洞察区小字读数：从现有文本解析数值和前后缀，滚动到目标，0.62s 快进快出。
+     洞察区有 data-static 复用机制，只有真正重绘时才播，不会每次筛选都闪。 */
+  function rollSmallNumbers(root) {
+    if (!root) return;
+    var els = root.querySelectorAll('.ins-key');
+    Array.prototype.forEach.call(els, function (el, i) {
+      if (el.querySelector('i')) return;   /* 带单位后缀（kg）的跳过，避免拆坏结构 */
+      var text = String(el.textContent || '').trim();
+      var m = /^([^0-9\-]*)(-?[\d,]+(?:\.\d+)?)([^0-9]*)$/.exec(text);
+      if (!m) return;
+      var target = Number(m[2].replace(/,/g, ''));
+      if (!isFinite(target)) return;
+      var pre = m[1], suf = m[3], dec = (m[2].split('.')[1] || '').length;
+      var start = performance.now(), dur = 620, delay = i * 50, fired = false;
+      function step(now) {
+        if (now - start < delay) { requestAnimationFrame(step); return; }
+        if (!fired) { fired = true; start = now; }
+        var t = Math.min(1, (now - start) / dur);
+        var e = 1 - Math.pow(1 - t, 3);
+        var v = target * e;
+        el.textContent = pre + (dec
+          ? v.toFixed(dec)
+          : Math.round(v).toLocaleString('zh-CN')) + suf;
+        if (t < 1) requestAnimationFrame(step);
+        else el.textContent = text;
+      }
+      requestAnimationFrame(step);
+    });
   }
   function sparkline(svg, values, color, w, h) {
     if (!svg) return;
@@ -2285,10 +2295,11 @@
       ? Math.max(1, Math.round((new Date(dates[dates.length - 1] + 'T00:00:00') - new Date(dates[0] + 'T00:00:00')) / 864e5) + 1)
       : 1;
 
-    animateValue($('kpiIncome'), income, fmtBig);
-    animateValue($('kpiExpense'), expense, fmtBig);
-    animateValue($('kpiBalance'), balance, fmtBig);
-    animateValue($('kpiRate'), rate, function (v) { return v.toFixed(1) + '%'; });
+    /* 每次渲染都重播滚动；KPI 大数字 2s，四张卡错峰 90ms */
+    animateValue($('kpiIncome'), income, fmtBig, { force: true, dur: 2000, delay: 0 });
+    animateValue($('kpiExpense'), expense, fmtBig, { force: true, dur: 2000, delay: 90 });
+    animateValue($('kpiBalance'), balance, fmtBig, { force: true, dur: 2000, delay: 180 });
+    animateValue($('kpiRate'), rate, function (v) { return v.toFixed(1) + '%'; }, { force: true, dur: 2000, delay: 270 });
 
     var balEl = $('kpiBalance');
     if (balEl) { balEl.classList.toggle('pos', balance > 0); balEl.classList.toggle('neg', balance < 0); }
@@ -3238,6 +3249,9 @@
     if (reuseIns) {
       var freshIns = box.querySelector('.day-ins-col .day-insights');
       if (freshIns && freshIns.parentNode) freshIns.parentNode.replaceChild(reuseIns, freshIns);
+    } else {
+      /* 只有真重绘才滚动，复用 DOM 时不重播 */
+      rollSmallNumbers(box.querySelector('.day-insights'));
     }
     fillQuickCats();
     enableSegDrag($('qTypeSeg'));
@@ -3490,8 +3504,6 @@
       if (view === 'calendar') renderBoard();
       resizeAll();
       renderCharts(view);
-      if (view === 'overview') replayNumIntro();
-      if (view === 'calendar' && state.scale === 'day') replayInsights();
     });
   }
   /* ---------------- 路由 ----------------
@@ -5677,7 +5689,7 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 13,
+    v: 14,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
@@ -5689,7 +5701,7 @@
       cubeyear: [6, 5], cubetype: [6, 5],
       cubebrand: [4, 5], cubeprice: [4, 5], compyear: [4, 5],
       compprov: [6, 5], compprice: [6, 5],
-      salary: [6, 16], reimb: [6, 12]
+      salary: [6, 15], reimb: [6, 7]
     }
   };
   var ovGrid = null, ovEditing = false;
@@ -5712,7 +5724,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 13 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 14 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -5728,7 +5740,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 13, order: [], spans: {} };
+    var L = { v: 14, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;
@@ -6163,7 +6175,6 @@
       function () { applyDataset({}); startApp(); });
   }
   function startApp() {
-    /* 数字入场改到每次进入总览时触发，见 replayNumIntro() */
     document.body.classList.remove('is-booting');
     var pv = window.QZPrivate && window.QZPrivate.status && window.QZPrivate.status();
     if (pv && pv.error) toast('私人数据未载入：' + pv.error + '（当前显示空账本）', 'warn');

@@ -3829,24 +3829,6 @@ html[data-theme="dark"] .day-list.is-today {
 }
 .pay-reimb-hint .empty-ico { width: 30px; height: 30px; color: var(--muted); opacity: .75; }
 
-/* 数字入场：每次进总览由 replayNumIntro() 逐元素重播。
-   时长分档：KPI 大数字 2s 慢、洞察小字 .62s 快 —— 大数字是主角，值得铺垫；
-   小字只是补充读数，快进快出才不拖沓。具体时长由 JS 内联覆盖，这里是兜底。 */
-/* 基础规则必须保留：JS 只覆盖 duration/delay，animation-name 由这里提供 */
-#view-overview .sc-value,
-.day-insights .ins-key,
-.pay-hero .ph-net {
-  animation: numRise 1s var(--ease) both;
-}
-@keyframes numRise {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  #view-overview .sc-value,
-  .day-insights .ins-key,
-  .pay-hero .ph-net { animation: none !important; }
-}
 
 /* ==================================================================
    v1.0.78 · C 组：异常标记 / 周几热力 / 占比趋势
