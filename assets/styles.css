@@ -4225,9 +4225,6 @@ html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2
   .ct-right #resetFilters { width: 36px; min-width: 0; padding: 0; }
   .ct-right #resetFilters .reset-label { display: none; }
 }
-/* 360 及以下再少这 42px，搜索 / 今天 / 收支 / 筛选 刚好排成一行。
-   重置没有消失 —— 脚本会把它搬到筛选面板末尾（见 app.js 里的 place），
-   这里只管它在面板里的样子：一行铺满，文字也放得下 */
 /* 380 及以下：这一行真的塞不下五样了（375 的机型就少 15px），
    重置挪进筛选面板末尾。390 / 393 / 412 这些常见宽度仍然留在工具条里 */
 @media (max-width: 380px) {
@@ -4243,4 +4240,21 @@ html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2
     display: inline-flex; gap: 6px; margin-top: 2px;
   }
   .ct-filters #resetFilters .reset-label { display: inline; font-size: 12px; }
+}
+
+/* ==================================================================
+   v1.0.93 · 「更新」不再和「保存」同一副面孔
+   ----------------------------------------------------------------
+   原来「保存 → 更新」只换两个字，底色还是同一块主色渐变。改动发生在
+   弹窗内部，眼睛正盯着上面的表单，底部那块颜色不动就很难察觉 —— 只能
+   靠读字确认「我刚才是改过还是没改」。换成一支紫：色相离开主色蓝四十
+   来度、整体再压深一档，扫一眼就知道这颗按钮已经不是原来那颗了。
+   紫在这套配色里不是新色（分类色里本来就有 #7f77dd），不突兀。
+   ================================================================== */
+#modalSave.is-dirty {
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  box-shadow: 0 6px 18px -8px #5b21b6, var(--shadow-sm);
+}
+#modalSave.is-dirty:hover {
+  box-shadow: 0 12px 26px -10px #5b21b6, var(--shadow-sm);
 }

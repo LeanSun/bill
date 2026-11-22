@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.92';
+  var ASSET_V = '1.0.93';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -5901,6 +5901,28 @@
           var anchor = $('exportBtn') || $('ctFilterToggle');
           if (anchor && anchor.parentNode === right) right.insertBefore(btn, anchor);
           else right.appendChild(btn);
+        }
+      }
+      place();
+      if (mq.addEventListener) mq.addEventListener('change', place);
+      else if (mq.addListener) mq.addListener(place);
+    })();
+    /* 「回到今天」的落脚点随宽度走：
+       桌面 —— 留在 年/月/周/天 后面，和粒度控件共用一条 40px 基线；
+       手机 —— 挪到搜索框右边。手机工具条是「日期一行 / 搜索一行」，
+       它要是还站粒度后面，就得独自再占一行，白白吃掉 46px 首屏。
+       事件按 id 绑，搬节点不影响点击。 */
+    (function () {
+      var mq = window.matchMedia('(max-width: 760px)');
+      var btn = $('calToday');
+      if (!btn) return;
+      function place() {
+        var seg = $('scaleSeg'), field = document.querySelector('.ct-right .search-field');
+        if (!seg || !field) return;
+        if (mq.matches) {
+          if (btn.previousElementSibling !== field) field.parentNode.insertBefore(btn, field.nextSibling);
+        } else if (btn.previousElementSibling !== seg) {
+          seg.parentNode.insertBefore(btn, seg.nextSibling);
         }
       }
       place();
