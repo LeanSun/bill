@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.86';
+  var ASSET_V = '1.0.87';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -211,6 +211,18 @@
     return '¥' + (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   function fmtBig(n) { return '¥' + Math.round(Number(n) || 0).toLocaleString('zh-CN'); }
+  /* 动画中途的金额格式：必须和终态一样带千位分隔符。
+     坑：之前中途用 v.toFixed(2)，它只管小数位不管分组，滚的时候是 ¥1234.56，
+     一停下来恢复原文才变成 ¥1,234.56 —— 用户看到的就是「位数分隔符最后才冒出来」。
+     dec 位数由目标文本决定，所以这里只负责补分隔符，不做四舍五入的取舍。 */
+  function fmtGrouped(v, dec) {
+    v = Number(v) || 0;
+    if (!dec) return Math.round(v).toLocaleString('zh-CN');
+    var neg = v < 0;
+    var p = Math.abs(v).toFixed(dec).split('.');
+    if (Number(p.join('.')) === 0) neg = false;   /* 别闪出 -0.00 */
+    return (neg ? '-' : '') + Number(p[0]).toLocaleString('zh-CN') + '.' + p[1];
+  }
 
   /* 最近记录条里的金额：三位数以内保留一位小数，别把 20.8 四舍五入成 21；
      上千才走整数 + 千位分隔，窄条里也放得下 */
@@ -2192,7 +2204,7 @@
     }
     return {
       add: function (delay, apply, dur) {
-        list.push({ delay: delay || 0, apply: apply, dur: dur || 2500 });
+        list.push({ delay: delay || 0, apply: apply, dur: dur || 2000 });
         if (!raf) raf = requestAnimationFrame(tick);
       }
     };
@@ -2217,8 +2229,8 @@
     var ax = axis();
     /* ---- 1) 数字滚动 ---- */
     var groups = [
-      { sel: '.ir-line b', dur: 2500, step: 140 },   /* 卡内大数，主力 */
-      { sel: '.ins-mtd > b', dur: 2500, step: 0 },
+      { sel: '.ir-line b', dur: 2000, step: 140 },   /* 卡内大数，主力 */
+      { sel: '.ins-mtd > b', dur: 2000, step: 0 },
       { sel: '.ins-key', dur: 900, step: 60 }          /* 标题旁小字，快一点 */
     ];
     var bigs = [];   /* 卡内大数节点 + 它的 delay，给同卡横条对时间用 */
@@ -2237,10 +2249,7 @@
         el.textContent = pre + (dec ? '0.' + new Array(dec + 1).join('0') : '0') + suf;
         ax.add(delay, function (e) {
           if (e >= 1) { el.textContent = text; return; }
-          var v = target * e;
-          el.textContent = pre + (dec
-            ? v.toFixed(dec)
-            : Math.round(v).toLocaleString('zh-CN')) + suf;
+          el.textContent = pre + fmtGrouped(target * e, dec) + suf;
         }, g.dur);
       });
     });
@@ -2263,7 +2272,7 @@
       bar.style.width = '0%';
       ax.add(delay, function (e) {
         bar.style.width = (targetPct * e).toFixed(2) + '%';
-      }, 2500);
+      }, 2000);
     });
   }
   function sparkline(svg, values, color, w, h, opt) {
@@ -2294,9 +2303,9 @@
       opt.ax.add(opt.delay || 0, function (e) {
         svg.style.clipPath = e >= 1 ? 'inset(0 0% 0 0)'
           : 'inset(0 ' + ((1 - e) * 100).toFixed(2) + '% 0 0)';
-      }, opt.dur || 2500);
+      }, opt.dur || 2000);
     } else if (opt && opt.animate) {
-      var dur = opt.dur || 2500, delay = opt.delay || 0;
+      var dur = opt.dur || 2000, delay = opt.delay || 0;
       svg.style.transition = 'none';
       svg.style.clipPath = 'inset(0 100% 0 0)';
       void svg.getBoundingClientRect();
@@ -2368,7 +2377,7 @@
       : 1;
 
     /* 四个数字 + 比例条 + 三条折线，全部挂在同一条时间轴上：
-       同样的 2.5s、同样的 quint 缓动、同样的 90ms 错峰步长。
+       同样的 2s、同样的 quint 缓动、同样的 90ms 错峰步长。
        缓动曲线选择说明见 axis() 上方的注释。 */
     var ax = axis();
     rollNumber(ax, $('kpiIncome'), income, fmtBig, 0);
