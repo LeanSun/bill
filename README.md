@@ -1150,3 +1150,20 @@ Node 校验：生成的对象与用户给的 JSON `JSON.stringify` 完全一致�
 
 **验证**：三种备注写法解析正确；表单可滚时 `defaultPrevented=false`（原生滚动放行）、不可滚时 `true`（走翻页）；折线 `stroke-dashoffset` 与比例条 `width` 的 2s transition 均已写入；全程 `errs=[]`。
 
+
+## v1.0.85 · 折线去分段 / 2.5s 缓停 / 洞察读数与进度条（2026-11-22）
+
+1. **折线为什么分段**：v1.0.84 用 `stroke-dasharray + getTotalLength()` 做从左向右描边。但 KPI 的 SVG 是 `preserveAspectRatio="none"` 加上 `vector-effect: non-scaling-stroke`，`getTotalLength()` 返回的是 viewBox 坐标里的长度，实际渲染被横向拉伸了好几倍——dash 走完就没得画了，于是折线断成几截。改用 `clip-path: inset(0 100% 0 0) → inset(0 0 0 0)` 直接裁整张 SVG，与路径长度无关，折线和淡填充都连续。
+
+2. **数字尾段再放缓**：缓动从 quartic 提到 quintic（`1-(1-t)⁵`），时长 2s → **2.5s**。折线与储蓄率比例条同步改 2.5s，缓动统一 `cubic-bezier(.16,1,.3,1)`。
+
+3. **「还剩多少」卡里的数字和进度条不动**：根因是选择器漏了。之前只滚 `.ins-key`（卡片标题旁的小字），而卡内真正显眼的三个数字用的是 `.ir-line b`，三条进度条是 `.ir-bar i`——两类都没被选中。新增 `animateInsights()` 统一处理：
+   - `.ir-line b`（过往对比 / 本月剩余 / 年度结余）：2.5s，间隔 140ms
+   - `.ins-mtd > b`：2.5s
+   - `.ins-key`：0.9s（小字快一点，形成层级）
+   - `.ir-bar i / .ins-prog i / .tb-track i`：从 0% 起 2.5s，间隔 90ms
+
+   另外从别的视图切回日历·天时，若洞察区走了 `data-static` 复用（没有重绘），会补播一次，与 KPI 每次切回总览重播保持一致。筛选时不重播，避免闪烁。
+
+**验证**：`strokeDasharray` 零残留、`svg clip-path` 2.5s transition 写入、三条进度条 `width 2500ms` transition 写入、`ir-line b` 捕获到文本变更；截图确认折线连续无断口；`errs=[]`。
+

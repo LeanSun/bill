@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.84';
+  var ASSET_V = '1.0.85';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2183,40 +2183,61 @@
       var t = Math.min(1, (now - start) / dur);
       /* 尾段缓停：quartic ease-out 比 cubic 在最后 30% 慢得多，
          数字会先快后慢慢「落定」，不是匀速冲到终点硬停。 */
-      var e = 1 - Math.pow(1 - t, 4);
+      var e = 1 - Math.pow(1 - t, 5);
       el.textContent = formatter(prev + (target - prev) * e);
       if (t < 1) requestAnimationFrame(step);
       else el.textContent = formatter(target);
     }
     requestAnimationFrame(step);
   }
-  /* 洞察区小字读数：从现有文本解析数值和前后缀，滚动到目标，0.62s 快进快出。
-     洞察区有 data-static 复用机制，只有真正重绘时才播，不会每次筛选都闪。 */
-  function rollSmallNumbers(root) {
+  /* 洞察区读数与进度条一起动。
+     之前只滚 .ins-key（卡片标题右侧的小数），卡里面真正显眼的
+     「过往对比 / 本月剩余 / 年度结余」数字用的是 .ir-line b，
+     进度条是 .ir-bar i —— 两类都没被选中，所以截图里它们全是静止的。 */
+  function animateInsights(root) {
     if (!root) return;
-    var els = root.querySelectorAll('.ins-key');
-    Array.prototype.forEach.call(els, function (el, i) {
-      if (el.querySelector('i')) return;   /* 带单位后缀（kg）的跳过，避免拆坏结构 */
-      var text = String(el.textContent || '').trim();
-      var m = /^([^0-9\-]*)(-?[\d,]+(?:\.\d+)?)([^0-9]*)$/.exec(text);
-      if (!m) return;
-      var target = Number(m[2].replace(/,/g, ''));
-      if (!isFinite(target)) return;
-      var pre = m[1], suf = m[3], dec = (m[2].split('.')[1] || '').length;
-      var start = performance.now(), dur = 620, delay = i * 50, fired = false;
-      function step(now) {
-        if (now - start < delay) { requestAnimationFrame(step); return; }
-        if (!fired) { fired = true; start = now; }
-        var t = Math.min(1, (now - start) / dur);
-        var e = 1 - Math.pow(1 - t, 4);
-        var v = target * e;
-        el.textContent = pre + (dec
-          ? v.toFixed(dec)
-          : Math.round(v).toLocaleString('zh-CN')) + suf;
-        if (t < 1) requestAnimationFrame(step);
-        else el.textContent = text;
-      }
-      requestAnimationFrame(step);
+    /* ---- 1) 数字滚动 ---- */
+    var groups = [
+      { sel: '.ir-line b', dur: 2500, step: 140 },   /* 卡内大数，主力 */
+      { sel: '.ins-mtd > b', dur: 2500, step: 0 },
+      { sel: '.ins-key', dur: 900, step: 60 }          /* 标题旁小字，快一点 */
+    ];
+    groups.forEach(function (g) {
+      var els = root.querySelectorAll(g.sel);
+      Array.prototype.forEach.call(els, function (el, i) {
+        if (el.querySelector('i')) return;   /* 带单位后缀（kg）的跳过，避免拆坏结构 */
+        var text = String(el.textContent || '').trim();
+        var m = /^([^0-9\-]*)(-?[\d,]+(?:\.\d+)?)([^0-9]*)$/.exec(text);
+        if (!m) return;
+        var target = Number(m[2].replace(/,/g, ''));
+        if (!isFinite(target)) return;
+        var pre = m[1], suf = m[3], dec = (m[2].split('.')[1] || '').length;
+        var start = performance.now(), dur = g.dur, delay = i * g.step, fired = false;
+        function step(now) {
+          if (now - start < delay) { requestAnimationFrame(step); return; }
+          if (!fired) { fired = true; start = now; }
+          var t = Math.min(1, (now - start) / dur);
+          var e = 1 - Math.pow(1 - t, 5);
+          var v = target * e;
+          el.textContent = pre + (dec
+            ? v.toFixed(dec)
+            : Math.round(v).toLocaleString('zh-CN')) + suf;
+          if (t < 1) requestAnimationFrame(step);
+          else el.textContent = text;
+        }
+        requestAnimationFrame(step);
+      });
+    });
+    /* ---- 2) 进度条从 0 长到目标 ---- */
+    var bars = root.querySelectorAll('.ir-bar i, .ins-prog i, .tb-track i');
+    Array.prototype.forEach.call(bars, function (bar, i) {
+      var target = bar.style.width || '';
+      if (!target || target === '0%' || target === '0') return;
+      bar.style.transition = 'none';
+      bar.style.width = '0%';
+      void bar.offsetWidth;
+      bar.style.transition = 'width 2500ms cubic-bezier(.16,1,.3,1) ' + (i * 90) + 'ms';
+      bar.style.width = target;
     });
   }
   function sparkline(svg, values, color, w, h, opt) {
@@ -2233,28 +2254,19 @@
     var d = pts.map(function (pt, i) { return (i ? 'L' : 'M') + pt[0].toFixed(1) + ',' + pt[1].toFixed(1); }).join(' ');
     var area = d + ' L' + (w - pad) + ',' + h + ' L' + pad + ',' + h + ' Z';
     svg.innerHTML = '<path class="area" d="' + area + '" fill="' + color + '"/><path class="line" d="' + d + '" stroke="' + color + '"/>';
-    /* 折线与数字同步增长：从左到右描边，淡填充随后浮出 */
+    /* 折线与数字同步增长：用 clip-path 从左向右揭示整张 SVG。
+       之前用 stroke-dasharray + getTotalLength() 做描边，但 SVG 是
+       preserveAspectRatio="none" + vector-effect:non-scaling-stroke，
+       路径在 viewBox 里的长度和实际渲染像素长度不一致，dash 用完后
+       后面一段画不出来 —— 就是截图里那种「折线分成几截」的现象。
+       clip-path 直接裁整个图形，跟路径长度无关，不会再分段。 */
     if (opt && opt.animate) {
-      var line = svg.querySelector('.line'), fillPath = svg.querySelector('.area');
-      var dur = opt.dur || 2000, delay = opt.delay || 0;
-      if (line) {
-        var len = 0;
-        try { len = line.getTotalLength(); } catch (err) { len = 0; }
-        if (!len || !isFinite(len)) len = w * 2;
-        line.style.transition = 'none';
-        line.style.strokeDasharray = len + ' ' + len;
-        line.style.strokeDashoffset = String(len);
-        void line.getBoundingClientRect();
-        line.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(.22,1,.36,1) ' + delay + 'ms';
-        line.style.strokeDashoffset = '0';
-      }
-      if (fillPath) {
-        fillPath.style.transition = 'none';
-        fillPath.style.opacity = '0';
-        void fillPath.getBoundingClientRect();
-        fillPath.style.transition = 'opacity ' + Math.round(dur * .8) + 'ms ease-out ' + (delay + 160) + 'ms';
-        fillPath.style.opacity = '';
-      }
+      var dur = opt.dur || 2500, delay = opt.delay || 0;
+      svg.style.transition = 'none';
+      svg.style.clipPath = 'inset(0 100% 0 0)';
+      void svg.getBoundingClientRect();
+      svg.style.transition = 'clip-path ' + dur + 'ms cubic-bezier(.16,1,.3,1) ' + delay + 'ms';
+      svg.style.clipPath = 'inset(0 0% 0 0)';
     }
   }
 
@@ -2321,10 +2333,10 @@
       : 1;
 
     /* 每次渲染都重播滚动；KPI 大数字 2s，四张卡错峰 90ms */
-    animateValue($('kpiIncome'), income, fmtBig, { force: true, dur: 2000, delay: 0 });
-    animateValue($('kpiExpense'), expense, fmtBig, { force: true, dur: 2000, delay: 90 });
-    animateValue($('kpiBalance'), balance, fmtBig, { force: true, dur: 2000, delay: 180 });
-    animateValue($('kpiRate'), rate, function (v) { return v.toFixed(1) + '%'; }, { force: true, dur: 2000, delay: 270 });
+    animateValue($('kpiIncome'), income, fmtBig, { force: true, dur: 2500, delay: 0 });
+    animateValue($('kpiExpense'), expense, fmtBig, { force: true, dur: 2500, delay: 90 });
+    animateValue($('kpiBalance'), balance, fmtBig, { force: true, dur: 2500, delay: 180 });
+    animateValue($('kpiRate'), rate, function (v) { return v.toFixed(1) + '%'; }, { force: true, dur: 2500, delay: 270 });
 
     var balEl = $('kpiBalance');
     if (balEl) { balEl.classList.toggle('pos', balance > 0); balEl.classList.toggle('neg', balance < 0); }
@@ -2354,13 +2366,13 @@
       fill.style.transition = 'none';
       fill.style.width = '0%';
       void fill.offsetWidth;
-      fill.style.transition = 'width 2000ms cubic-bezier(.22,1,.36,1) 270ms';
+      fill.style.transition = 'width 2500ms cubic-bezier(.16,1,.3,1) 270ms';
       fill.style.width = targetW;
     }
 
-    sparkline($('sparkIncome'), rows.map(function (r) { return r.income; }), p.income, 100, 26, { animate: true, dur: 2000, delay: 0 });
-    sparkline($('sparkExpense'), rows.map(function (r) { return r.expense; }), p.expense, 100, 26, { animate: true, dur: 2000, delay: 90 });
-    sparkline($('sparkBalance'), rows.map(function (r) { return r.balance; }), p.primary, 100, 26, { animate: true, dur: 2000, delay: 180 });
+    sparkline($('sparkIncome'), rows.map(function (r) { return r.income; }), p.income, 100, 26, { animate: true, dur: 2500, delay: 0 });
+    sparkline($('sparkExpense'), rows.map(function (r) { return r.expense; }), p.expense, 100, 26, { animate: true, dur: 2500, delay: 90 });
+    sparkline($('sparkBalance'), rows.map(function (r) { return r.balance; }), p.primary, 100, 26, { animate: true, dur: 2500, delay: 180 });
   }
 
   function setText(id, v) {
@@ -3284,7 +3296,7 @@
       if (freshIns && freshIns.parentNode) freshIns.parentNode.replaceChild(reuseIns, freshIns);
     } else {
       /* 只有真重绘才滚动，复用 DOM 时不重播 */
-      rollSmallNumbers(box.querySelector('.day-insights'));
+      animateInsights(box.querySelector('.day-insights'));
     }
     fillQuickCats();
     enableSegDrag($('qTypeSeg'));
@@ -3535,6 +3547,12 @@
       /* 日历在 rAF 里再排一次：此时视图已可见，格子高度才是真值，
          一屏能塞几条条目才算得准 */
       if (view === 'calendar') renderBoard();
+      /* 切回日历·天时，洞察区若走了 data-static 复用（没有重绘），
+         手动补播一次读数和进度条 —— 和 KPI 每次切回总览都重播保持一致。 */
+      if (view === 'calendar' && state.scale === 'day') {
+        var reusedIns = document.querySelector('.day-insights[data-static]');
+        if (reusedIns) animateInsights(reusedIns);
+      }
       resizeAll();
       /* 每次切进总览都重渲 KPI：renderKpis 里的 animateValue 带 force，
          数字会从 0 重新滚动。原先只在 renderAll（数据变化）时调用，
