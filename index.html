@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#f5f7fa" data-page-node-id="YNZhYru6j3RsrXDah5InT4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%234a6cf7'/%3E%3Crect x='8' y='21' width='6' height='12' rx='2.5' fill='white' opacity='.55'/%3E%3Crect x='17' y='13' width='6' height='20' rx='2.5' fill='white' opacity='.8'/%3E%3Crect x='26' y='7' width='6' height='26' rx='2.5' fill='white'/%3E%3C/svg%3E" data-page-node-id="ljD9H3EvTZuStNxnHHhOfD">
 <title>轻账 · 收支看板</title>
-<link rel="stylesheet" href="assets/ui-select.css?v=1.0.90">
-<link rel="stylesheet" href="assets/styles.css?v=1.0.90" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
+<link rel="stylesheet" href="assets/ui-select.css?v=1.0.91">
+<link rel="stylesheet" href="assets/styles.css?v=1.0.91" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
 </head>
 <body class="is-booting" data-page-node-id="tMyPJ5SSZhJcCq6bXrfJH7">
 <script>setTimeout(function(){document.body.classList.remove("is-booting")},3000)</script>
@@ -66,6 +66,10 @@
       <button type="button" class="nav-item" data-view="cube" data-cube-tab="updates">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 6.6M20 5v6h-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>更新日志</span><i class="nav-ind"></i>
+      </button>
+      <button type="button" class="nav-item nav-more" id="navMore" aria-haspopup="true" aria-expanded="false" aria-controls="navMoreSheet">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="6" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18" cy="12" r="1.7" fill="currentColor"/></svg>
+        <span>更多</span><i class="nav-ind"></i>
       </button>
     </nav>
 
@@ -409,11 +413,6 @@
             <button type="button" data-scale="day" data-page-node-id="FRQlmdvbFflNta6yaVwARm">天</button>
           </div>
 
-          <button type="button" class="ct-today" id="calToday" aria-label="回到今天" title="回到今天">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>回到今天</span>
-          </button>
-
           <span class="ct-vr" aria-hidden="true" data-page-node-id="DdvNmwj06vcAn62bR0T7et"></span>
 
           <div class="ct-right" data-page-node-id="hG1aJfkxX0BwSGUrwJWxE5">
@@ -421,6 +420,10 @@
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" data-page-node-id="akqhEkmDutWWtdtL7lME3K"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7" data-page-node-id="t7A2BaiSZ9nALpWAEWBO4A"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" data-page-node-id="2sYAThH5F52D1WVAf7uelC"/></svg>
               <input type="search" id="searchInput" placeholder="搜索" autocomplete="off" aria-label="搜索账单" data-page-node-id="qzG90kKWGGQh7DaJ46t2kp">
             </div>
+            <button type="button" class="ct-today" id="calToday" aria-label="回到今天" title="回到今天">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>回到今天</span>
+            </button>
             <div class="seg seg-sm" id="typeSeg" role="group" aria-label="收支类型" data-page-node-id="ckEsjSAsfEoGlT9092NE80">
               <span class="seg-ind" aria-hidden="true" data-page-node-id="GRE75m9n9dtKp0Cqy1ghVR"></span>
               <button type="button" data-type="all" class="is-active" data-page-node-id="tNQKRgC9qHxnwJdQu1ULjl">全部</button>
@@ -488,6 +491,10 @@
   </button>
   </main>
 </div>
+
+<!-- ============ 手机端「更多」入口面板 ============ -->
+<div class="nav-more-veil" id="navMoreVeil" hidden></div>
+<div class="nav-more-sheet" id="navMoreSheet" role="menu" aria-label="更多入口" hidden></div>
 
 <!-- ============ 记账弹窗 ============ -->
 <div class="cube-global-veil" id="cubeGlobalVeil" hidden aria-hidden="true"></div>
@@ -706,13 +713,13 @@
   </button>
 </div>
 
-<script src="assets/echarts.min.js?v=1.0.90" defer></script>
-<script src="assets/vault.js?v=1.0.90"></script>
-<script src="assets/boot.js?v=1.0.90"></script>
-<script src="assets/ui-select.js?v=1.0.90"></script>
-<script src="assets/app.js?v=1.0.90"></script>
+<script src="assets/echarts.min.js?v=1.0.91" defer></script>
+<script src="assets/vault.js?v=1.0.91"></script>
+<script src="assets/boot.js?v=1.0.91"></script>
+<script src="assets/ui-select.js?v=1.0.91"></script>
+<script src="assets/app.js?v=1.0.91"></script>
 <script>window.addEventListener("load",function(){try{UISelect.init()}catch(e){}});</script>
-<script src="assets/sync.js?v=1.0.90"></script>
+<script src="assets/sync.js?v=1.0.91"></script>
 <script>
 /* 离线加速：静态资源走本地缓存，页面本身始终取最新（详见 sw.js 顶部说明）。
    localhost 也算安全上下文，本地调试同样注册，省得两套行为。

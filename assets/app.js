@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.90';
+  var ASSET_V = '1.0.91';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3803,7 +3803,10 @@
   function moveSideGlide(animate) {
     var nav = document.querySelector('.sidebar .nav'), g = document.getElementById('sideNavGlide');
     if (!nav || !g) return;
-    var btn = nav.querySelector('.nav-item.is-active');
+    /* 「更多」在桌面是 display:none，却仍然带着 is-active —— 跳过所有不可见的
+       候选，否则滑块会跑到 (0,0)，整条侧栏的高亮一起消失 */
+    var cand = nav.querySelectorAll('.nav-item.is-active'), btn = null;
+    for (var i = 0; i < cand.length; i++) if (cand[i].offsetWidth) { btn = cand[i]; break; }
     if (!btn) { g.style.opacity = '0'; return; }
     var to = { x: btn.offsetLeft, y: btn.offsetTop, w: btn.offsetWidth, h: btn.offsetHeight };
     g.style.opacity = '1';
@@ -3828,6 +3831,43 @@
     g.style.transform = 'translate3d(' + to.x + 'px,' + to.y + 'px,0)';
     sideGlideState = to;
   }
+  /* v1.0.91 · 手机端顶栏放不下魔方工作台那五项，整组收进「更多」。
+     条目在第一次打开时从侧栏克隆 —— 图标、文案、data-cube-tab 都跟着原节点
+     走，以后改侧栏不用再同步一份清单。克隆体也带 .nav-item，所以 setView
+     刷新选中态时会一起亮。 */
+  function mountNavMore() {
+    var nav = document.querySelector('.sidebar .nav'), sheet = $('navMoreSheet');
+    if (!nav || !sheet || sheet.dataset.built) return;
+    var src = nav.querySelectorAll('.nav-item[data-cube-tab]');
+    for (var i = 0; i < src.length; i++) {
+      var c = src[i].cloneNode(true);
+      c.classList.remove('is-active');
+      c.removeAttribute('data-page-node-id');
+      var inner = c.querySelectorAll('[data-page-node-id]');
+      for (var j = 0; j < inner.length; j++) inner[j].removeAttribute('data-page-node-id');
+      sheet.appendChild(c);
+    }
+    sheet.dataset.built = '1';
+  }
+  function closeNavMore() {
+    var sheet = $('navMoreSheet'), veil = $('navMoreVeil'), btn = $('navMore');
+    if (!sheet || sheet.hidden) return;
+    sheet.hidden = true;
+    if (veil) veil.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+  function openNavMore() {
+    var sheet = $('navMoreSheet'), veil = $('navMoreVeil'), btn = $('navMore');
+    if (!sheet) return;
+    mountNavMore();
+    sheet.hidden = false;
+    if (veil) veil.hidden = false;
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+  function toggleNavMore() {
+    var sheet = $('navMoreSheet');
+    if (sheet && !sheet.hidden) closeNavMore(); else openNavMore();
+  }
   function setView(view, cubeTab) {
     if (!VIEW_META[view]) return;
     /* 切页先把自定义下拉收掉：面板挂在 body 上，视图换了它不会自己消失 */
@@ -3851,6 +3891,11 @@
         : (item.dataset.view === view && !isCube);
       item.classList.toggle('is-active', on);
     }
+    /* 手机端「更多」代表魔方那一整组入口：在魔方页时它自己也是选中态。
+       切页顺手把面板收掉，免得停在半空挡着新页面。 */
+    var moreBtn = $('navMore');
+    if (moreBtn) moreBtn.classList.toggle('is-active', view === 'cube');
+    closeNavMore();
     moveSideGlide(!!sideGlideState);
     /* 日历页要锁一整屏，正文底距归零，否则那 56px 会把日历顶出一截 */
     var main = document.querySelector('.main');
@@ -4039,6 +4084,7 @@
       if (m) { dp.year = Number(m[1]); dp.month = Number(m[2]); dp.view = 'days'; }
     }
     if (dp.open) renderDp();
+    refreshSaveLabel();
   }
   function renderDp() {
     var title = $('dpTitle'), daysBox = $('dpDays'), monthsBox = $('dpMonths');
@@ -4529,12 +4575,45 @@
       resetSegInd(box);
     }
     fillCategoryOptions();
+    refreshSaveLabel();
   }
   /* v1.0.40：取消记一笔的输入记忆。
      上一笔的备注 / 分类 / 金额不再跟到下一笔；这里只留一个清道夫，
      把老版本写进 localStorage 的草稿删掉，免得升级后第一次打开还回填旧值。 */
   var ENTRY_DRAFT_KEY = 'qingzhang.entryDraft.v1';
   function clearEntryDraft() { try { localStorage.removeItem(ENTRY_DRAFT_KEY); } catch (e) {} }
+
+  /* v1.0.91 · 编辑已有记录：只有真的改了，按钮才从「保存」换成「更新」。
+     打开弹窗那一刻的样子拍成快照，之后每次输入拿当前值跟它比；逐字改回
+     原样也算一致，按钮退回「保存」—— 文案跟着「会不会产生改动」走，
+     而不是跟着「有没有碰过键盘」走。 */
+  var editSnap = null;
+  function entrySnapshot() {
+    var note = $('fNote') ? String($('fNote').value || '').trim() : '';
+    var cat = $('fCategory') ? $('fCategory').value : '';
+    return {
+      type: state.entryType,
+      amount: round(Number($('fAmount') ? $('fAmount').value : 0) || 0),
+      date: $('fDate') ? $('fDate').value : '',
+      /* 内容为空时落库会被分类名顶替（commitEntry 里那行兜底），快照按同一口径比，
+         否则一打开编辑弹窗就显示"已改过" */
+      note: note || cat,
+      category: cat,
+      sub: $('fSub') ? $('fSub').value : ''
+    };
+  }
+  function refreshSaveLabel() {
+    var btn = $('modalSave');
+    if (!btn) return;
+    var dirty = false;
+    if (editSnap) {
+      var now = entrySnapshot();
+      for (var k in editSnap) if (now[k] !== editSnap[k]) { dirty = true; break; }
+    }
+    var label = dirty ? '更新' : '保存';
+    if (btn.textContent !== label) btn.textContent = label;
+    btn.classList.toggle('is-dirty', dirty);
+  }
   function openModal(record, prefillDate, mode) {
     /* 没连私有仓库就不给记账口子：写了也没地方去，还会在本机留痕 */
     if (LOCKED) { showLockGate(true); return; }
@@ -4542,9 +4621,11 @@
     collapseFiltersOnMobile();
     lastFocused = document.activeElement;
     state.editingId = record ? record.id : null;
+    /* 先清空快照：下面回填字段时 setEntryType / setDateValue 都会顺手刷新按钮文案，
+       拿上一笔的快照去比会闪一下「更新」 */
+    editSnap = null;
     if ($('modalTitle')) $('modalTitle').textContent = record ? '编辑记录' : '记一笔';
     if ($('modalDesc')) $('modalDesc').textContent = record ? '修改后即时更新所有图表与统计。' : '记录一条新的收支流水';
-    if ($('modalSave')) $('modalSave').textContent = '保存';
     if ($('modalDelete')) $('modalDelete').hidden = !record;
     /* cell：从月历 / 周历格子弹出来的，用天页那套「内容在上、金额在下」的排布；
        default：侧栏「记一笔」，保持原来的顺序 */
@@ -4569,6 +4650,9 @@
     }
     /* 只有显式存过子类的记录才回填选择；旧账留「自动识别」并实时显示推断结果 */
     fillSubOptions(record && record.subExplicit ? record.sub : '');
+    /* 回填完才拍快照：之后每次输入都拿当前值跟它比，一致就还是「保存」 */
+    editSnap = record ? entrySnapshot() : null;
+    refreshSaveLabel();
     if ($('formError')) { $('formError').hidden = true; $('formError').textContent = ''; }
     if (!record) clearEntryDraft();
     var back = $('modalBackdrop');
@@ -4595,6 +4679,8 @@
       }, 240);
     }
     state.editingId = null;
+    editSnap = null;
+    refreshSaveLabel();
     if ($('modalDelete')) $('modalDelete').hidden = true;
     if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
     lastFocused = null;
@@ -5388,7 +5474,8 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     }
-    window.addEventListener('resize', function () { moveSideGlide(false); });
+    /* 变宽到桌面时面板没有意义了（触发它的按钮已经藏起来），顺手收掉 */
+    window.addEventListener('resize', function () { moveSideGlide(false); closeNavMore(); });
     var navs = document.querySelectorAll('.nav-item');
     for (var i = 0; i < navs.length; i++) {
       navs[i].addEventListener('click', function () {
@@ -5400,6 +5487,19 @@
         else setView(v);
       });
     }
+
+    /* 手机端「更多」：开合、点空白收起、点条目跳转 */
+    if ($('navMore')) $('navMore').addEventListener('click', function (e) {
+      e.stopPropagation(); toggleNavMore();
+    });
+    if ($('navMoreVeil')) $('navMoreVeil').addEventListener('click', closeNavMore);
+    if ($('navMoreSheet')) $('navMoreSheet').addEventListener('click', function (e) {
+      var b = e.target.closest('.nav-item');
+      if (!b) return;
+      closeNavMore();
+      var tab = b.dataset.cubeTab;
+      if (tab) jumpCube({ tab: tab }); else setView(b.dataset.view);
+    });
 
     bindSeg($('yearSwitch'), 'data-year', function (v) {
       state.year = v;
@@ -5490,6 +5590,11 @@
       noteEl.placeholder = '午餐 35、房租 2800（写数字自动填金额）';
     }
     if (form) form.addEventListener('submit', submitEntry);
+    /* 编辑弹窗：任何一处输入都重新判一次「和打开时相比改了吗」 */
+    if (form) {
+      form.addEventListener('input', refreshSaveLabel);
+      form.addEventListener('change', refreshSaveLabel);
+    }
     if ($('typeToggle')) $('typeToggle').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-type]');
       if (b) setEntryType(b.dataset.type);
@@ -5600,6 +5705,8 @@
         return;
       }
       if (e.key === 'Escape') {
+        /* 「更多」是浮在最上层的面板，先收它 */
+        if ($('navMoreSheet') && !$('navMoreSheet').hidden) { closeNavMore(); return; }
         if (dp.open) { closeDp(); return; }
         if (cmpOpen) { closeCmp(); return; }
         /* 魔方 / 比赛弹窗在 iframe 里：焦点留在父页时父页先接到这个键，
@@ -5778,6 +5885,28 @@
     if ($('resetFilters')) $('resetFilters').addEventListener('click', function () {
       resetBoardFilters(); toast('筛选条件已重置', 'info');
     });
+    /* 380 及以下的工具条塞不下「重置」（搜索 / 今天 / 收支 / 筛选 刚好一行），
+       那就把它挪进筛选面板里 —— 复位本来就是筛选的一部分，位置反而更顺。
+       事件是按 id 绑的，搬节点不影响点击；变宽再挪回原位。 */
+    (function () {
+      var mq = window.matchMedia('(max-width: 380px)');
+      var btn = $('resetFilters');
+      if (!btn) return;
+      function place() {
+        var panel = $('ctFilters'), right = document.querySelector('.ct-right');
+        if (!panel || !right) return;
+        if (mq.matches) {
+          if (btn.parentNode !== panel) panel.appendChild(btn);
+        } else if (btn.parentNode !== right) {
+          var anchor = $('exportBtn') || $('ctFilterToggle');
+          if (anchor && anchor.parentNode === right) right.insertBefore(btn, anchor);
+          else right.appendChild(btn);
+        }
+      }
+      place();
+      if (mq.addEventListener) mq.addEventListener('change', place);
+      else if (mq.addListener) mq.addListener(place);
+    })();
     if ($('boardReset')) $('boardReset').addEventListener('click', resetBoardFilters);
     if ($('exportBtn')) $('exportBtn').addEventListener('click', exportCsv);
 

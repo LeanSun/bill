@@ -188,6 +188,8 @@ svg { display: block; }
 .nav-item.is-active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
 .nav-ind { position: absolute; left: 0; top: 50%; width: 3px; height: 0; border-radius: 0 4px 4px 0; background: var(--primary); transform: translateY(-50%); transition: height .35s var(--ease); }
 .nav-item.is-active .nav-ind { height: 20px; }
+/* 「更多」只在手机底/顶栏出现（≤760px 放开），桌面侧栏里那五项本来就在 */
+.nav-more { display: none; }
 
 .side-block { margin-top: 28px; padding: 0 4px; }
 .side-label { font-size: 10.5px; font-weight: 600; letter-spacing: .16em; color: var(--muted); margin-bottom: 11px; padding-left: 4px; }
@@ -511,7 +513,7 @@ html[data-theme="dark"] .ico-moon { display: block; }
 .ct-add:hover { transform: translateY(-1px); box-shadow: 0 10px 20px -10px var(--primary); }
 .ct-add svg { width: 13px; height: 13px; }
 
-.ct-right .search-field { width: 150px; flex: 0 0 150px; }
+.ct-right .search-field { width: 132px; flex: 0 0 132px; }
 .ct-right .search-field svg { left: 9px; width: 14px; height: 14px; }
 .ct-right .search-field input { height: 36px; padding: 0 10px 0 28px; border-radius: 9px; font-size: 13.5px; }
 .ct-right .seg-sm { min-width: 150px; padding: 2px; flex: 0 0 auto; }
@@ -1150,7 +1152,7 @@ body.modal-cell .mc-date { display: inline-flex; }
 @media (max-width: 1320px) {
   /* 窄一点先收搜索与收支段，第二行筛选区始终完整 */
   .ct-count { display: none; }
-  .ct-right .search-field { width: 116px; flex: 0 0 116px; }
+  .ct-right .search-field { width: 104px; flex: 0 0 104px; }
   .ct-right .seg-sm { min-width: 130px; }
 }
 @media (max-width: 1240px) { #resetFilters { display: none; } }
@@ -1171,11 +1173,11 @@ body.modal-cell .mc-date { display: inline-flex; }
   .ds-quick { margin-top: 16px; }
   .day-list { padding: 14px; }
   .day-list-head { flex-wrap: wrap; gap: 8px; }
-  .ct-right .search-field { width: 108px; flex: 0 0 108px; }
+  .ct-right .search-field { width: 94px; flex: 0 0 94px; }
   .ct-right .search-field input { padding: 0 8px 0 26px; }
   /* 1024 宽度下第一行收紧，筛选区仍在第二行 */
   .ct-nav { flex: 0 0 250px; width: 250px; }
-  .ct-right .search-field { width: 92px; flex: 0 0 92px; }
+  .ct-right .search-field { width: 86px; flex: 0 0 86px; }
 }
 @media (max-width: 940px) {
   .app-shell { grid-template-columns: 1fr; }
@@ -4007,50 +4009,55 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
 .dd-tip { font-size: 10.5px; color: var(--muted); }
 
 /* ==================================================================
-   v1.0.88 · #20 手机端
+   v1.0.91 · 手机端导航回到顶部 + 入口收拢
    ------------------------------------------------------------------
-   问题的根不是「某些卡片太宽」，而是侧栏：≤940px 时它变成顶部横排，
-   七个入口一个 nowrap 就把整页的最小宽度顶到 453px —— 浏览器只好把
-   布局视口放宽，右边那截被裁掉。所以这里把侧栏改成底部固定标签栏，
-   fixed 元素不参与最小宽度计算，视口才回得到真正的 390。
+   v1.0.88 把侧栏挪到底部的理由（fixed 元素不参与最小宽度计算，布局视口
+   才回得到真正的 390）依然成立，但位置放错了：手指在下方、视线在上方，
+   每次切页都要跑一趟。这一版把标签栏搬回顶端，并且只留「总览 / 日历」，
+   魔方工作台那五项收进「更多」面板 —— 五个 nowrap 入口横排仍然会把
+   最小宽度顶到 450 以上，收起来之后顶栏只有三个胶囊加一枚品牌方块。
    ================================================================== */
 @media (max-width: 760px) {
-  .app-shell { display: block; padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+  /* 顶栏是 fixed 的，正文得自己让出这一步高度。
+     cube-frame / cube-loading / 日历锁屏都以 --main-pt 为基准，改一处全对 */
+  :root { --main-pt: calc(56px + env(safe-area-inset-top) + 8px); }
+
+  .app-shell { display: block; padding-bottom: 0; }
 
   .sidebar {
-    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
-    width: 100%; height: auto; padding: 6px 8px calc(5px + env(safe-area-inset-bottom));
-    flex-direction: row; align-items: center; gap: 0; flex-wrap: nowrap;
-    background: color-mix(in srgb, var(--surface) 97%, var(--bg));
-    border-right: 0; border-top: 1px solid var(--border);
-    box-shadow: 0 -10px 26px -20px rgba(20, 32, 62, .55);
+    position: fixed; left: 0; right: 0; top: 0; bottom: auto;
+    width: 100%; height: calc(56px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 12px 0;
+    flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 10px;
+    background: color-mix(in srgb, var(--surface) 96%, var(--bg));
+    border-right: 0; border-bottom: 1px solid var(--border);
+    box-shadow: 0 12px 26px -22px rgba(20, 32, 62, .6);
     z-index: 70;
   }
-  .brand, .side-foot, .nav-group, .nav-ind { display: none; }
+  /* 品牌只留小方块 + 两个字：顶栏 56px 高，字标带副标题会把三个胶囊挤扁 */
+  .brand { display: flex; padding: 0; gap: 8px; flex: 0 0 auto; }
+  .brand-mark { width: 27px; height: 27px; flex: 0 0 27px; border-radius: 9px; }
+  .brand-mark svg { width: 18px; height: 18px; }
+  .brand-text strong { font-size: 14px; letter-spacing: .04em; }
+  .brand-text span, .side-foot, .nav-group, .nav-ind, .side-nav-glide { display: none; }
 
   .nav {
-    flex-direction: row; flex: 1 1 auto; min-width: 0; gap: 0;
-    overflow-x: auto; overflow-y: hidden;
-    scrollbar-width: none; -ms-overflow-style: none;
-    justify-content: space-between;
+    flex-direction: row; align-items: center; gap: 4px;
+    flex: 0 1 auto; min-width: 0; margin-left: auto; overflow: visible;
   }
-  .nav::-webkit-scrollbar { display: none; }
   .nav-item {
-    flex: 1 1 0; min-width: 0; width: auto;
-    flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    padding: 6px 2px; font-size: 9.5px; font-weight: 600; border-radius: 10px;
-    text-align: center; transform: none;
+    width: auto; flex: 0 0 auto; gap: 5px; padding: 7px 10px;
+    border-radius: 9px; font-size: 12px; font-weight: 600; text-align: center;
   }
   .nav-item:hover { transform: none; }
-  .nav-item svg { width: 19px; height: 19px; flex: 0 0 19px; }
-  .nav-item span {
-    max-width: 100%; font-size: 9.5px; line-height: 1.15;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
+  .nav-item svg { width: 15px; height: 15px; flex: 0 0 15px; }
+  /* 魔方那五项整组进「更多」面板，顶栏只留 总览 / 日历 / 更多 */
+  .nav-item[data-cube-tab] { display: none; }
+  .nav-more { display: inline-flex; }
 
-  /* 「记一笔」从侧栏里搬出来，变成右下角一粒悬浮按钮 */
+  /* 「记一笔」还是右下角那一粒悬浮按钮；常驻底栏没有了，往下坐 18px */
   .side-tools {
-    position: fixed; right: 14px; bottom: calc(72px + env(safe-area-inset-bottom));
+    position: fixed; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom));
     margin: 0; padding: 0; display: block; z-index: 71;
   }
   .side-tools .side-add {
@@ -4061,16 +4068,18 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
   .side-tools .side-add svg { width: 22px; height: 22px; flex: 0 0 22px; }
   .side-tool-col, .side-sync-row { display: none; }
 
-  .main { padding: 10px 10px 18px; }
+  .main { padding: var(--main-pt) 10px 26px; }
 
   /* 工具条：日期一行、粒度一行、搜索与筛选一行，各占各的，谁也不挤谁 */
   .cal-toolbar { padding: 9px 10px; gap: 7px; }
   .ct-nav { flex: 0 0 100%; width: 100%; }
   .ct-right { flex: 1 1 100%; flex-wrap: wrap; gap: 6px; justify-content: flex-start; margin-left: 0; }
-  .ct-right .search-field { flex: 1 1 130px; width: auto; }
+  /* 回到今天贴到搜索框右边之后，搜索框不必再摊满一行：
+     固定 96px 够放一个词，省下的宽度交给收支段 */
+  .ct-right .search-field { flex: 0 0 92px; width: 92px; }
+  .ct-right .search-field svg { left: 8px; width: 13px; height: 13px; }
+  .ct-right .search-field input { padding: 0 8px 0 25px; font-size: 13px; }
   .ct-right .seg-sm { flex: 1 1 auto; min-width: 0; }
-  .ct-today span { display: none; }
-  .ct-today { width: 34px; padding: 0; justify-content: center; }
 
   /* 天页三段变一列：概览 → 明细 → 洞察，跟着页面滚 */
   .cal-day { display: flex; flex-direction: column; }
@@ -4150,4 +4159,77 @@ html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2
 @media (max-width: 1240px) {
   .ts-cell b { font-size: 12.5px; }
   .ts-cell em { font-size: 9px; }
+}
+
+/* ==================================================================
+   v1.0.91 · 「回到今天」挪位 + 手机端「更多」面板
+   ------------------------------------------------------------------
+   1) 回到今天原先挨着 年/月/周/天，和粒度控件共用一个 40px 高度；现在它
+      站到搜索框右边，左右都是 36px 的输入框和图标按钮，高度得跟着换，
+      否则同一行里会凸出一截。
+   2) 更多面板里那几条是初始化时从侧栏那五个入口克隆来的：图标、文案、
+      data-cube-tab 都跟着原节点走，JS 里不用再抄一份清单。
+   ================================================================== */
+.ct-right .ct-today { height: 36px; }
+/* 身边都是 19px 图标的方钮，15px 的时钟在这一行里显得偏弱，补到 17px */
+.ct-right .ct-today svg { width: 17px; height: 17px; }
+
+.nav-more-veil { position: fixed; inset: 0; z-index: 71; background: transparent; }
+.nav-more-veil[hidden] { display: none; }
+
+.nav-more-sheet {
+  position: fixed; z-index: 72;
+  top: calc(56px + env(safe-area-inset-top) + 6px);
+  right: 10px; width: 176px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px; border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 26px 52px -24px rgba(16, 28, 54, .5), 0 2px 10px rgba(16, 28, 54, .07);
+  transform-origin: 100% 0;
+  animation: navSheetIn .2s var(--ease) both;
+}
+.nav-more-sheet[hidden] { display: none; }
+@keyframes navSheetIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+/* 侧栏那套「会走的底色」只服务竖排导航；面板里没有滑块，选中态自己给背景 */
+.nav-more-sheet .nav-item {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: 9px;
+  font-size: 13px; font-weight: 600; color: var(--text-2); text-align: left;
+}
+.nav-more-sheet .nav-item svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.nav-more-sheet .nav-item:hover { background: var(--surface-3) !important; color: var(--text); }
+.nav-more-sheet .nav-item.is-active { background: var(--primary-soft) !important; color: var(--primary); }
+@media (prefers-reduced-motion: reduce) {
+  .nav-more-sheet { animation: none; }
+}
+
+/* 搜索框收窄后，手机上这一行要塞下 搜索 / 今天 / 收支 / 重置 / 筛选 五样东西。
+   v1.0.68 把重置拉成 78px 的胶囊是为了桌面上好看，手机上退回 36px 图标钮
+   —— 否则最后一颗漏斗会被挤到第四行，孤零零占一行高度。 */
+@media (max-width: 760px) {
+  .ct-right #resetFilters { width: 36px; min-width: 0; padding: 0; }
+  .ct-right #resetFilters .reset-label { display: none; }
+}
+/* 360 及以下再少这 42px，搜索 / 今天 / 收支 / 筛选 刚好排成一行。
+   重置没有消失 —— 脚本会把它搬到筛选面板末尾（见 app.js 里的 place），
+   这里只管它在面板里的样子：一行铺满，文字也放得下 */
+/* 380 及以下：这一行真的塞不下五样了（375 的机型就少 15px），
+   重置挪进筛选面板末尾。390 / 393 / 412 这些常见宽度仍然留在工具条里 */
+@media (max-width: 380px) {
+  .ct-right #resetFilters { display: none; }
+  /* 「最近」条写的是 height:100%，在这个会换行的 flex 里被撑到 78px，
+     把「日统计」顶到盒子外面 8px（重置搬进来正好撞上它）。让它回到
+     自身高度，容器顶端对齐，两行各归各位。 */
+  .fx-sub-slot { align-content: flex-start; }
+  .recent-strip { height: auto; }
+  .ct-filters #resetFilters {
+    grid-column: 1; justify-self: stretch;
+    width: 100%; height: 34px; min-width: 0; padding: 0 12px;
+    display: inline-flex; gap: 6px; margin-top: 2px;
+  }
+  .ct-filters #resetFilters .reset-label { display: inline; font-size: 12px; }
 }
