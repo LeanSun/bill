@@ -31,11 +31,17 @@
   --sky: #38a9e8;
   /* 周末标记色：年历表头的「六 / 日」用它，浅粉，和收支红绿都不撞 */
   --weekend-ink: #ff8ba7;
-  /* 「今天」的标记色。v1.0.94 从主色蓝换成紫：蓝底铺在整栏空白上太淡、
-     也太容易和全站的主色按钮混成一片。紫既离开主色四十来度，又和周末的
-     粉拉开一档色相 —— 左粉、中紫、右白，三栏各说各的。
+  /* 「今天」的标记色。v1.0.94 从主色蓝换成紫，v1.0.95 再换成琥珀：
+     紫在整栏空白上偏冷，读起来还是一块「被选中的区域」；琥珀是暖的，
+     像给今天垫了一张暖色衬纸，和左边周末的粉同属暖调，但不撞色相。
+     三个值分开给：
+       --today-ink   平涂与标线的色源（15% 平涂 / 55% 标线）
+       --today-solid 实心徽章底（比平涂那支亮一点，白字太飘，改用深墨字）
+       --today-on    徽章上的字色
      深浅两套分开给值：暗底吃色，同一个 hex 在 #0d121c 上会发灰。 */
-  --today-ink: #8b5cf6;
+  --today-ink: #e0992a;
+  --today-solid: #e8a83c;
+  --today-on: #3b2605;
   /* 分类色板：这套值就是「恢复默认」回到的颜色，改这里等于改出厂配色。
      深浅两套同值 —— 配色自定义写的是同一个 :root 变量，两套主题本来就同色 */
   --cat-food: #ba7517;
@@ -92,7 +98,10 @@ html[data-theme="dark"] {
   --violet: #a78bfa;
   --sky: #55baf0;
   --weekend-ink: #ffa1b8;
-  --today-ink: #a78bfa;
+  /* 暗底上的琥珀要亮一档，否则 20% 平涂会沉成土黄 */
+  --today-ink: #f0b356;
+  --today-solid: #e0a33c;
+  --today-on: #2c1c02;
   /* 深色底沿用同一套分类色：自定义配色本来就两端共用一份值 */
   --cat-food: #ef9f27;
   --cat-daily: #afa9ec;
@@ -670,13 +679,16 @@ html[data-theme="dark"] .cal-item:hover {
 }
 .cal-more:hover { background: color-mix(in srgb, var(--primary) 24%, var(--surface)); }
 .cal-more .cm-mini { display: none; }
-/* 月格：+N 笔 独占底部一行，铺满 + 左侧的整行宽度 */
+/* 手机那档：一条只有 5~6px 高，末位塞不进「+N」两个字，
+   仍旧让它在格子底部独占一行 —— 这条绝对定位只在 narrow 生效 */
 .cal-cell > .cal-more {
   position: absolute; left: 5px; right: 36px; bottom: 4px; z-index: 2;
   height: 28px; width: auto;
 }
 .cal-cell.has-more .cal-items { padding-bottom: 30px; box-sizing: border-box; }
-/* 周格沿用旧的一格预留 */
+/* 日格/周格：「+N 笔」占末位那一格，和条目同尺寸、同圆角。
+   v1.0.95 起桌面月格也用它 —— 月格条目定高 35px 之后，底部再压一条 30px 的
+   横条就只装得下 2 条记录了；占末位之后是「3 条 + 一格 +N」。 */
 .cal-items > .cal-more { justify-self: stretch; align-self: stretch; }
 
 /* 压缩档：单行"名称 …… 金额"。行高不够两块式时自动切换，
@@ -684,11 +696,15 @@ html[data-theme="dark"] .cal-item:hover {
 .cal-items.is-tight { gap: 2px 3px; }
 .cal-items.is-tight .cal-item {
   flex-direction: row; align-items: center; justify-content: space-between;
-  gap: 3px; padding: 1px 4px;
+  gap: 2px; padding: 1px 3px;
 }
-.cal-items.is-tight .ci-name { font-size: clamp(10.5px, calc(var(--row-h, 22px) * .42), 12px); line-height: 1.18; gap: 3px; }
+/* v1.0.95：定高 35px 之后字号不再跟着行高长。35×.42 会顶到 12px 的上限，
+   「房租 −1200」在 77px 宽的格子里就被截成「房…」—— 而这一档本来就是
+   单行式，字号只跟格子宽度有关，跟高度无关。收到 10.5~11.5 之后，
+   两颗四字名 + 四位数金额都完整显示。 */
+.cal-items.is-tight .ci-name { font-size: clamp(10.5px, calc(var(--row-h, 22px) * .34), 11.5px); line-height: 1.18; gap: 3px; }
 .cal-items.is-tight .ci-name i { width: 4px; height: 4px; flex: 0 0 4px; }
-.cal-items.is-tight .cal-item b { font-size: clamp(10.5px, calc(var(--row-h, 22px) * .42), 12px); line-height: 1.18; flex: 0 0 auto; }
+.cal-items.is-tight .cal-item b { font-size: clamp(10.5px, calc(var(--row-h, 22px) * .34), 11.5px); line-height: 1.18; flex: 0 0 auto; }
 .cal-items.is-tight .cal-more { font-size: 11px; }
 /* v1.0.94：定高之后收入条目不再往下让那 3px —— 让了就会比同排的矮 3px，
    同一格里并排的两颗胶囊高低不一，正是「形状不一样」里最刺眼的一处。
@@ -1289,6 +1305,10 @@ body.modal-cell .mc-date { display: inline-flex; }
   .cal-grid .ci-name, .cal-grid .cal-item b { display: none; }
   .cal-grid .cal-item:hover { background: var(--c); }
   .cal-more { padding: 0; background: none; font-size: 10px; }
+  /* 手机那格的「+N 笔」只留一条 12px 的字条贴在格子底部：
+     28px 高的横条在 78px 的格子里要吃掉半格，一条记录都露不出来 */
+  .cal-cell > .cal-more { height: 12px; bottom: 3px; right: 4px; font-size: 9px; border: 0; }
+  .cal-cell.has-more .cal-items { padding-bottom: 16px; }
   .cal-more .cm-full { display: none; }
   .cal-more .cm-mini { display: inline; }
   .cal-add { width: 24px; height: 24px; font-size: 15px; right: 2px; bottom: 2px; }
@@ -3794,9 +3814,11 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
   color: var(--text-2); background: color-mix(in srgb, var(--text-2) 13%, var(--surface));
   white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-/* 今天：实心标记。v1.0.94 起和中间那栏同一支紫，一处标「今天」，全页认同一色 */
+/* 今天：实心标记。v1.0.94 起和中间那栏同一个色，一处标「今天」，全页认同一色。
+   v1.0.95 换琥珀之后字色也跟着换：白字压在琥珀上只有 2.5:1，看不清；
+   深墨（--today-on）是 7:1，小字号才站得住。 */
 .ds-when.is-today {
-  color: #fff; background: var(--today-ink);
+  color: var(--today-on); background: var(--today-solid);
   box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--today-ink) 62%, transparent);
 }
 /* 窄栏时不让「昨天 / 3 天前」把年月挤出头部 */
@@ -3806,13 +3828,13 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 }
 
 /* ==================================================================
-   v1.0.94 · 「今天」这一栏改用紫
+   v1.0.95 · 当日明细的「今天」：紫 → 琥珀
    ----------------------------------------------------------------
-   蓝底（主色 15%）本身不难看，问题是它同时是品牌色和按钮色：一栏淡蓝
-   铺在页面上，读起来像「这块被选中了」，也和顶栏那些蓝色控件混成一片。
-   换紫之后 —— 紫离开主色四十来度，和左边周末的粉又差着一档色相，
-   左粉 / 中紫 / 右白，三栏各有各的身份，谁也不抢谁。
-   手法照旧：平涂 + 内嵌 3px 左标线 + 行卡片浮白，只把色相换掉。
+   紫在整栏空白上还是偏冷，读起来更像「这块被选中了」。琥珀是暖的，
+   垫在下面像一张暖色衬纸，和左边周末的粉同属暖调、色相却差得开：
+   左粉 / 中暖沙 / 右白，三栏各有各的身份，谁也不用抢。
+   手法一字未改：15% 平涂 + 内嵌 3px 左标线 + 行卡片浮白，
+   只把色相换掉 —— 颜色全从 --today-ink 来，改一处整页跟着走。
    ================================================================== */
 .day-list.is-today {
   background: color-mix(in srgb, var(--today-ink) 15%, var(--surface));
@@ -3825,7 +3847,7 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 }
 .day-list.is-today .day-list-head { border-bottom-color: color-mix(in srgb, var(--today-ink) 26%, var(--border)); }
 html[data-theme="dark"] .day-list.is-today {
-  background: color-mix(in srgb, var(--today-ink) 20%, var(--surface));
+  background: color-mix(in srgb, var(--today-ink) 16%, var(--surface));
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--today-ink) 45%, transparent);
 }
 html[data-theme="dark"] .day-list.is-today .dl-cat {
@@ -3837,7 +3859,7 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
   display: inline-flex; align-items: center; height: 17px; padding: 0 7px;
   margin-left: 8px; vertical-align: 2px;
   border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: .04em;
-  color: #fff; background: var(--today-ink);
+  color: var(--today-on); background: var(--today-solid);
   box-shadow: 0 2px 6px -2px color-mix(in srgb, var(--today-ink) 55%, transparent);
 }
 
@@ -4264,4 +4286,28 @@ html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2
 }
 #modalSave.is-dirty:hover {
   box-shadow: 0 12px 26px -10px #5b21b6, var(--shadow-sm);
+}
+
+/* ==================================================================
+   v1.0.95 · 月格右下角的 ＋ 改成悬停才浮出来
+   ----------------------------------------------------------------
+   条目定高 35px 之后，一格正好站两行（2×2 = 4 条）。那颗 ＋ 原来常驻，
+   JS 就得给它让出 28px，于是只站得下一行 ——「3 条」被压成「2 条 +1 笔」。
+   它和条目抢的其实是同一块地方。
+   指针设备本来就要把鼠标移到格子上才有意义，所以让它悬停再出现：
+   出现时压在第 4 条的右下角，垫一圈格子底色把下面隔开，读起来是一颗
+   浮在格子上的按钮，而不是和胶囊糊在一起。平时它不占位，条目铺满整格。
+   触屏没有 hover，这条规则不生效 —— ＋ 照旧常驻、照旧占 28px。
+   ================================================================== */
+@media (hover: hover) and (min-width: 621px) {
+  .cal-cell > .cal-add { opacity: 0; pointer-events: none; }
+  .cal-cell:hover > .cal-add,
+  .cal-cell.is-focus > .cal-add { opacity: 1; pointer-events: auto; }
+  .cal-cell:hover > .cal-add {
+    background: color-mix(in srgb, var(--primary) 20%, var(--surface));
+    box-shadow: 0 0 0 3px var(--surface), 0 6px 14px -6px rgba(20, 32, 62, .5);
+  }
+  /* 满格（右下角那一格也放着条目）就不给 ＋：它正好盖在本日最后一笔的金额上。
+     点格子进当日明细一样能记，不值得为此糊住一个数字。 */
+  .cal-cell.is-full > .cal-add { display: none; }
 }

@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.94';
+  var ASSET_V = '1.0.95';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -707,7 +707,22 @@
     if (exp.cat) return { type: 'expense', cat: exp.cat };
     return null;
   }
+  /* v1.0.95：normalize 记忆化。
+     CPU profile 里它是拖拽卡顿的最大一笔（4 倍降速下 350ms，占全部脚本时间
+     三分之一）—— 每次重绘都要把 500 多条记录重新走一遍正则、键拷贝、
+     子类关键词匹配。记录对象在 store 里是稳定的引用，所以按对象缓存，
+     在键上记下几个原始字段，字段一改就重算。 */
+  var NORM_CACHE = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+  function normKey(r) {
+    return [r.date, r.amount, r.type, r.category, r.note, r.sub === undefined ? '' : r.sub].join('\u0001');
+  }
   function normalize(r) {
+    var key = null;
+    if (NORM_CACHE && r && typeof r === 'object') {
+      key = normKey(r);
+      var hit = NORM_CACHE.get(r);
+      if (hit && hit.key === key) return hit.out;
+    }
     var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(r.date || ''));
     var o = {};
     for (var k in r) if (Object.prototype.hasOwnProperty.call(r, k)) o[k] = r[k];
@@ -722,6 +737,7 @@
     /* 手选了子类就用手选的，否则按名字自动识别——旧账没有 sub 字段，自动走识别 */
     o.subExplicit = !!(r.sub && subCatNames(o.category).indexOf(r.sub) !== -1);
     o.sub = o.subExplicit ? r.sub : guessSub(o.category, o.note);
+    if (NORM_CACHE && key !== null) NORM_CACHE.set(r, { key: key, out: o });
     return o;
   }
   function allRecords() {
@@ -2840,54 +2856,110 @@
      46px 是两块式再高也只是空，不如把空间留给下面的行 */
   var ENTRY_GAP = 3, ENTRY_MIN = 22, ENTRY_MAX = 48;
   /* v1.0.94：月格条目高度改成定值，不再「条少就发胖」。
-     原来的规则是 1 条就撑到 48px、3 条压到 26px，于是同一个月里既有大方块
-     又有细条，扫一眼像两种控件。定死 26px 之后每个胶囊同一个尺寸，
-     一列数字右对齐成一条线；条数多也不缩，放不下就走「+N 笔」。 */
-  var MONTH_ROW = 26;
+     v1.0.95：26 → 35。定高之后每个胶囊同一个尺寸，一列数字右对齐成一条线；
+     条数多也不缩，放不下才走「+N 笔」。 */
+  var MONTH_ROW = 35;
   function narrowGrid() {
     return !!(window.matchMedia && window.matchMedia('(max-width: 620px)').matches);
   }
+  /* 指针设备（有 hover）才把月格右下角那颗 ＋ 收起来。没有 hover 的触屏
+     必须让它常驻，否则快记一笔就没有入口了。 */
+  var HOVER_ML = null;
+  function hoverPointer() {
+    if (!window.matchMedia) return true;
+    if (!HOVER_ML) HOVER_ML = window.matchMedia('(hover: hover)');
+    return HOVER_ML.matches;
+  }
   /* 条少 —— 每条高一截，最多 48px；条多 —— 均分，压到 22px 为止；
      再多的部分折成 "+N 笔"，点格子或它都进当日明细。
-     extraSel 用于底部还有固定条（周视图的汇总）时，把那段高度先扣掉。 */
-  function fitStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside) {
+     extraSel 用于底部还有固定条（周视图的汇总）时，把那段高度先扣掉。
+
+     v1.0.95：拆成 measure / commit 两段。原来一个格子里「读一次 clientHeight
+     写一次 --row-h」，42 个格子就是 42 次强制重排 —— 月历每次重建要 40ms 上下，
+     正好压在滑块动画的尾巴上。现在月历先量完所有格子再统一写，整条重建只剩
+     一次布局。 */
+  function measureStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside, shared) {
     var nodes = box.querySelectorAll('.cal-item');
     var count = nodes.length;
-    var host = moreOutside ? cell : box;
-    var more = host.querySelector('.cal-more');
-    if (!count) {
-      if (more) more.parentNode.removeChild(more);
-      if (moreOutside) cell.classList.remove('has-more');
-      return;
-    }
+    if (!count) return { cell: cell, box: box, count: 0, moreOutside: moreOutside, host: moreOutside ? cell : box };
 
     var head = headSel ? cell.querySelector(headSel) : null;
     var extra = extraSel ? cell.querySelector(extraSel) : null;
-    var cs = window.getComputedStyle(cell);
-    var padT = parseFloat(cs.paddingTop) || 0;
-    var padB = parseFloat(cs.paddingBottom) || 0;
-    var headH = head ? head.offsetHeight + (parseFloat(window.getComputedStyle(head).marginBottom) || 0) : 30;
+    /* 格子内边距与表头下边距在一屏里是同一个值，42 个格子各调一次
+       getComputedStyle 是白花的开销（profile 里它占了重建时间的三分之一）。
+       调用方量一次传进来，量不到再自己读。 */
+    var sh = shared || {};
+    var padT = sh.padT, padB = sh.padB, headMB = sh.headMB;
+    if (padT === undefined || padB === undefined) {
+      var cs = window.getComputedStyle(cell);
+      padT = parseFloat(cs.paddingTop) || 0;
+      padB = parseFloat(cs.paddingBottom) || 0;
+    }
+    if (headMB === undefined) headMB = head ? (parseFloat(window.getComputedStyle(head).marginBottom) || 0) : 4;
+    var headH = head ? head.offsetHeight + headMB : 30;
     var extraH = extra ? extra.offsetHeight + (parseFloat(window.getComputedStyle(extra).marginTop) || 0) : 0;
-    var avail = Math.max(minRow, cell.clientHeight - padT - padB - headH - extraH);
+    /* 整格可用高度（不扣 ＋ 与 +N 笔） */
+    var availFull = Math.max(minRow, cell.clientHeight - padT - padB - headH);
+    var avail = Math.max(minRow, availFull - extraH);
 
     var rowsFit = Math.max(1, Math.floor((avail + ENTRY_GAP) / (minRow + ENTRY_GAP)));
     var capacity = rowsFit * perRow;
     var overflow = count > capacity;
-    /* "+N 笔" 自己占一格，所以溢出时先让出一条 */
-    /* 月格：+N 笔 独立占底部整行，不再挤掉条目格；周格沿用旧的一格预留 */
-    var keep = overflow ? (moreOutside ? capacity : Math.max(1, capacity - 1)) : count;
-    for (var k = keep; k < count; k++) box.removeChild(nodes[k]);
-    var rest = count - keep;
+    /* 溢出时「+N 笔」怎么摆，两档分开：
+       桌面 —— 占末位那一格，和条目同尺寸。月格 35px 的胶囊下面再压一条
+         30px 的横条，两行条目就装不下了（35×2+3 加 30 早超过一格高度），
+         一整天只剩两条可看；占末位之后是「3 条 + 一格 +N」，方块还都一样大。
+       手机 —— 一条只有 5~6px 高，6px 的行里塞不进「+N」两个字，仍旧让它在
+         格子底部独占一行（.cal-cell > .cal-more 那条绝对定位规则）。 */
+    var keep, rest, boxH = avail;
+    if (!overflow) {
+      keep = count; rest = 0;
+    } else if (moreOutside) {
+      /* 手机那条「+N 笔」只要 14px 高（一行 9px 字），比桌面的 28px 横条薄一半，
+         所以只从可用高度里让出 16px —— 让 30px 的话 78px 的格子里只剩一条可见 */
+      var pillH = minRow < 12 ? 16 : 30;
+      boxH = Math.max(minRow, availFull - pillH);
+      var rowsN = Math.max(1, Math.floor((boxH + ENTRY_GAP) / (minRow + ENTRY_GAP)));
+      keep = Math.min(count - 1, rowsN * perRow);
+      rest = count - keep;
+    } else {
+      keep = Math.max(1, capacity - 1);
+      rest = count - keep;
+    }
     var slots = keep + (overflow && !moreOutside ? 1 : 0);
-    var rows = Math.ceil(slots / perRow);
-    var rowH = Math.floor((avail - ENTRY_GAP * (rows - 1)) / rows);
-
+    var rows = Math.max(1, Math.ceil(slots / perRow));
+    var rowH = Math.floor((boxH - ENTRY_GAP * (rows - 1)) / rows);
     rowH = Math.max(minRow, Math.min(maxRow, rowH));
-    box.style.setProperty('--row-h', rowH + 'px');
-    /* 两块式要 34px 才站得住，不够就转单行 */
-    box.classList.toggle('is-tight', rowH < 34);
+    /* 右下角有没有被方块占住：占住了那颗悬停才出现的 ＋ 就会压在本日最后一笔
+       的金额上，宁可这一格不给 ＋（点格子进当日明细一样能记），也不要糊住数字。
+       判据：方块铺满整行（末位的右半格也有东西），且已经站到第二行以下。
+       触屏那档给 ＋ 让过位（extraH > 0），不存在这个冲突。 */
+    var full = !moreOutside && !extraH && slots % perRow === 0 && rows >= 2;
 
-    if (rest > 0) {
+    return {
+      cell: cell, box: box, host: moreOutside ? cell : box, nodes: nodes,
+      count: count, keep: keep, rest: rest, rowH: rowH, moreOutside: moreOutside, full: full
+    };
+  }
+  function commitStack(job) {
+    var cell = job.cell, box = job.box, host = job.host;
+    var more = host.querySelector('.cal-more');
+    if (!job.count) {
+      if (more) more.parentNode.removeChild(more);
+      if (job.moreOutside) cell.classList.remove('has-more');
+      cell.classList.remove('is-full');
+      return;
+    }
+    /* nodes 是活集合，从头往后删，每删一个后面的下标自然前移 */
+    var nodes = job.nodes;
+    for (var k = job.keep; k < job.count; k++) box.removeChild(nodes[k]);
+    box.style.setProperty('--row-h', job.rowH + 'px');
+    /* 两块式（名在上、金额在下）要 40px 才站得住。35px 的月格走单行式，
+       否则同一个月的格子会一半两块式一半单行式 —— 那正是「胶囊形状不一样」。
+       周格一列 130px，行高常常 48px 以上，仍用两块式。 */
+    box.classList.toggle('is-tight', job.rowH < 42);
+
+    if (job.rest > 0) {
       if (!more) {
         more = document.createElement('button');
         more.type = 'button';
@@ -2895,26 +2967,54 @@
         more.setAttribute('data-more', cell.getAttribute('data-date'));
         host.appendChild(more);
       }
-      more.innerHTML = '<span class="cm-full">+' + rest + ' 笔</span><span class="cm-mini">+' + rest + '</span>';
-      more.title = '查看 ' + cell.getAttribute('data-date') + ' 的全部 ' + count + ' 笔';
+      more.innerHTML = '<span class="cm-full">+' + job.rest + ' 笔</span><span class="cm-mini">+' + job.rest + '</span>';
+      more.title = '查看 ' + cell.getAttribute('data-date') + ' 的全部 ' + job.count + ' 笔';
     } else if (more) {
       more.parentNode.removeChild(more);
     }
-    if (moreOutside) cell.classList.toggle('has-more', rest > 0);
+    if (job.moreOutside) cell.classList.toggle('has-more', job.rest > 0);
+    if (job.full !== undefined) cell.classList.toggle('is-full', !!job.full);
+  }
+  function fitStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside) {
+    commitStack(measureStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside));
   }
 
   function fillMonthEntries(grid) {
     var narrow = narrowGrid();
     var perRow = narrow ? 1 : 2;
     var cells = grid.children;
+    /* v1.0.95：月格条目现在占满整格高度，不再给右下角的 ＋ 预留 28px。
+       原因有两条：
+         1. 35px 的胶囊里，一格最多站两行（2×2=4 条）。预留 28px 之后只能站
+            一行，「3 条」就变成了 2 条 + 「+1 笔」—— 这正是要去掉的那种。
+         2. 有 hover 的设备上那颗 ＋ 改成悬停才出现（见 styles.css），
+            平时不占空间也就不该占位置。
+       触屏没有 hover，＋ 必须常驻，所以那里照旧把 28px 让出来。 */
+    var reserveAdd = narrow || !hoverPointer();
+    var extraSel = reserveAdd ? '.cal-add' : null;
+    var minRow = narrow ? 5 : MONTH_ROW;
+    var maxRow = narrow ? 6 : MONTH_ROW;
+
+    /* 先量完所有格子（只读），再统一写回去（只写）—— 一次布局，不是 42 次 */
+    var jobs = [];
+    /* 内边距 / 表头下边距量一次就够，42 个格子共用 */
+    var shared = null;
+    if (cells.length) {
+      var cs0 = window.getComputedStyle(cells[0]);
+      var head0 = cells[0].querySelector('.cal-cell-head');
+      shared = {
+        padT: parseFloat(cs0.paddingTop) || 0,
+        padB: parseFloat(cs0.paddingBottom) || 0,
+        headMB: head0 ? (parseFloat(window.getComputedStyle(head0).marginBottom) || 0) : 4
+      };
+    }
     for (var i = 0; i < cells.length; i++) {
       var box = cells[i].querySelector('.cal-items');
       if (!box) continue;
-      /* 右下角 ＋ 常驻，先把那 28px 让出来，条目不会压到它下面。
-         最小/最大都给同一个值 = 定高，换行数不换高度。 */
-      fitStack(cells[i], box, '.cal-cell-head', perRow,
-        narrow ? 5 : MONTH_ROW, narrow ? 6 : MONTH_ROW, '.cal-add', true);
+      /* narrow 那档的「+N 笔」是格子底部的横条（不是格子里的方块） */
+      jobs.push(measureStack(cells[i], box, '.cal-cell-head', perRow, minRow, maxRow, extraSel, narrow, shared));
     }
+    for (var j = 0; j < jobs.length; j++) commitStack(jobs[j]);
   }
 
   function renderMonthBoard(p, board) {
@@ -3972,24 +4072,50 @@
        关键的起手三四帧全丢，手感就是「先顿一下，再猛地滑过去」。拖拽更糟：
        enableSegDrag 每跨一格都会 click 一次，拖过五格就重建五遍日历。
        现在 —— 按下只挪滑块（--seg-i），拖拽全程只记账，松手才重绘一次；
-       重绘本身再往后放两帧，让合成器先把这一段过渡跑起来。 */
-    var queued = null, queuedBusy = false;
+       重绘本身再往后放两帧，让合成器先把这一段过渡跑起来。
+
+       v1.0.95：「快速连拖几下还是卡」的真因在这一层，两个：
+         1. 每个 pointermove 都做一次 document.elementFromPoint —— 那是强制
+            命中测试，会先把样式和布局算一遍。高刷鼠标一秒能送 200 多个
+            move，一帧里就要算四五遍，正是「越快越卡」。
+         2. 上一次松手排的那次重绘，会在下一次手势正进行时落地（280ms 后），
+            刚好压在滑块动画上。
+       所以：move 只记坐标，命中测试并到每帧一次（用按下时量好的按钮矩形，
+       连 rect 都不用再读）；新手势一按下就取消上一次排着的重绘。 */
+    /* v1.0.95：记账用「已经画出来的那一档」__segDone，而不是「上一次点到的」。
+       两件事靠它变得可靠：
+         1. 新手势取消掉的那次重绘，值不会被记成已画 —— 松手时发现画面对不上，
+            还会补一次，不会出现「滑块停在支出、列表还是全部」。
+         2. 同一档反复点、反复拖，只要画面对得上就一次都不重绘。 */
+    var queued = null, queuedBusy = false, qTimer = 0, qToken = 0;
     function queueRender(v, delay) {
       queued = v;
       if (queuedBusy) return;
       queuedBusy = true;
+      var my = ++qToken;
       function run() {
+        qTimer = 0;
         var raf = window.requestAnimationFrame ?
           window.requestAnimationFrame.bind(window) : function (f) { return setTimeout(f, 16); };
         raf(function () {
           raf(function () {
+            if (my !== qToken) return;          /* 已被新手势取消 */
             var val = queued;
             queued = null; queuedBusy = false;
-            if (val !== null && val !== undefined) handler(val);
+            if (val !== null && val !== undefined) {
+              el.__segDone = val;
+              handler(val);
+            }
           });
         });
       }
-      if (delay) setTimeout(run, delay); else run();
+      if (delay) qTimer = setTimeout(run, delay); else run();
+    }
+    function cancelRender() {
+      if (qTimer) { clearTimeout(qTimer); qTimer = 0; }
+      qToken++;
+      queued = null;
+      queuedBusy = false;
     }
     function apply(b, now) {
       if (!b || b.parentNode !== el) return;
@@ -4006,14 +4132,18 @@
         var prev = el.__segLast;
         el.__segLast = v;
         if (v !== prev) {
-          /* 拖拽中只记账，等松手：拖过几格就重绘几次，正是卡顿的主因 */
-          if (el.classList.contains('is-dragging')) el.__segPending = v;
+          /* 手势还没走完（按下到松手之间）只记账：这一段的重绘由 pointerup
+             统一排队，拖过的还要再等回弹走完 —— 拖过几格就重绘几次正是卡顿主因 */
+          if (inGesture || el.classList.contains('is-dragging')) el.__segPending = v;
           else queueRender(v);
         }
       }
     }
     var active = el.querySelector('button.' + 'is-active[' + attr + ']');
-    if (active) el.__segLast = active.getAttribute(attr);
+    if (active) {
+      el.__segLast = active.getAttribute(attr);
+      el.__segDone = el.__segLast;
+    }
     el.addEventListener('click', function (e) {
       var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
       apply(b, true);
@@ -4022,38 +4152,82 @@
        之前和 enableSegDrag 共用 data-seg-drag，而后者在绑定时把它永久置 1，
        导致 bindSeg 的 pointermove 守卫恒通过 —— 纯 hover 就跟随滑块，
        点一下 pointerup 置 0 才恢复。改用独立标记彻底隔离两个系统。 */
-    var pressBtn = null;
+    var pressBtn = null, pressRects = null, moved = false, inGesture = false;
+    var moveRaf = 0, mx = 0, my = 0;
+    /* 命中测试：用按下那一刻量好的矩形算，不再每次 elementFromPoint。
+       一次手势里控件不会动，矩形是常量。 */
+    function btnAt(x, y) {
+      if (!pressRects) return null;
+      for (var i = 0; i < pressRects.length; i++) {
+        var r = pressRects[i];
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return r.btn;
+      }
+      return null;
+    }
+    function flushMove() {
+      moveRaf = 0;
+      if (el.dataset.segPress !== '1') return;
+      var b = btnAt(mx, my);
+      if (b && b !== pressBtn) {
+        pressBtn = b;
+        moved = true;
+        apply(b, false);
+        /* 落点记在 DOM 上：拖拽中只攒着，等松手再重绘一次 */
+        el.__segLast = b.getAttribute(attr);
+        el.__segPending = b.getAttribute(attr);
+      }
+    }
     el.addEventListener('pointerdown', function (e) {
       var b = e.target.closest ? e.target.closest('button[' + attr + ']') : null;
       if (!b) return;
+      /* 上一次松手排的那次重绘，不能落在这次手势中间 */
+      cancelRender();
       el.dataset.segPress = '1';
       pressBtn = b;
+      moved = false;
+      inGesture = true;
+      mx = e.clientX; my = e.clientY;
+      pressRects = btns().map(function (x) {
+        var r = x.getBoundingClientRect();
+        return { btn: x, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      });
       /* 手还没抬，只挪滑块；数据等 pointerup 再说 */
       apply(b, false);
     });
     el.addEventListener('pointermove', function (e) {
       if (el.dataset.segPress !== '1') return;
       if (e.pointerType === 'mouse' && !(e.buttons & 1)) { el.dataset.segPress = '0'; pressBtn = null; return; }
-      var t = document.elementFromPoint(e.clientX, e.clientY);
-      var b = t && t.closest ? t.closest('button[' + attr + ']') : null;
-      if (b && b !== pressBtn) { pressBtn = b; apply(b, false); }
+      mx = e.clientX; my = e.clientY;
+      /* 一帧只算一次：高刷设备一秒送两百个 move，逐个处理等于白烧四五遍 */
+      if (!moveRaf) moveRaf = window.requestAnimationFrame ?
+        window.requestAnimationFrame(flushMove) : setTimeout(flushMove, 16);
     });
     document.addEventListener('pointerup', function () {
-      var pend = el.__segPending;
-      if (pend !== null && pend !== undefined) {
-        el.__segPending = null;
-        /* 等回弹走完再重绘：那 320ms 主线程得空着，滑块才不掉帧 */
-        queueRender(pend, 280);
+      if (moveRaf) {
+        if (window.cancelAnimationFrame) window.cancelAnimationFrame(moveRaf);
+        moveRaf = 0;
+        flushMove();
       }
-      if (el.dataset.segPress !== '1') return;
+      if (el.dataset.segPress !== '1') { el.__segPending = null; return; }
+      var dragging = moved || el.classList.contains('is-dragging');
       el.dataset.segPress = '0';
       var b = pressBtn;
       pressBtn = null;
+      pressRects = null;
+      var final = b ? b.getAttribute(attr) : null;
       if (b) apply(b, true);
+      el.__segPending = null;
+      inGesture = false;
+      /* 跟画面对不上才重绘。拖过一段的手势等回弹走完（280ms）再画 ——
+         那段时间主线程得空着，滑块才不掉帧；这期间再按下会被 cancelRender 撤掉。 */
+      if (final !== null && final !== el.__segDone) queueRender(final, dragging ? 280 : 0);
     });
     document.addEventListener('pointercancel', function () {
       el.dataset.segPress = '0';
       pressBtn = null;
+      pressRects = null;
+      inGesture = false;
+      el.__segPending = null;
     });
   }
   function setSegActive(el, attr, value) {
@@ -4068,8 +4242,10 @@
     el.dataset.active = String(idx);
     el.style.setProperty('--seg-n', String(btns.length || 1));
     el.style.setProperty('--seg-i', String(idx));
-    /* 同步给 bindSeg 的去重标记，否则程序化改选中态之后，下一次点回同值会被吞 */
+    /* 同步给 bindSeg 的去重标记，否则程序化改选中态之后，下一次点回同值会被吞。
+       __segDone 一并写：调用方改完选中态通常会自己重绘，这之后画面对得上。 */
     el.__segLast = String(value);
+    el.__segDone = String(value);
     resetSegInd(el);
   }
 
@@ -6822,7 +6998,6 @@
     function paint() {
       var n = indEl();
       if (!n) return;
-      n.style.transition = 'none';
       n.style.transform = 'translateX(' + cur.toFixed(2) + 'px)';
     }
     /* 交还给 CSS：--seg-i 已经停在目标段上，内联一撤就是同一位置，看不出跳变 */
@@ -6851,8 +7026,15 @@
         return;
       }
       if (!act) { raf = 0; return; }
-      /* 拖拽中：软跟随，0.40 的插值让滑块几乎贴住指针但不失重 */
-      cur += (target - cur) * .40;
+      /* v1.0.95：目标位置在每帧里算，不再跟着 pointermove 一事件一算。
+         高刷鼠标一秒两百多个 move，逐个改 transform 等于一帧写四五次样式；
+         现在只记最后落点（act.px），一帧挪一次。
+         0.55 的插值比原来的 0.40 更贴手 —— 快拖时那点滞后会被读成「卡」。 */
+      var tx = act.px - act.rLeft - pad - unit / 2;
+      target = Math.max(-unit * .12, Math.min(trackW + unit * .12, tx));
+      var i = idxAt(act.px);
+      if (i >= 0) act.last = i;
+      cur += (target - cur) * .55;
       if (cur < -unit * .14) cur = -unit * .14;
       if (cur > trackW + unit * .14) cur = trackW + unit * .14;
       paint();
@@ -6873,7 +7055,7 @@
       if (n) { n.dataset.busy = '1'; n.style.transition = 'none'; }
       var r = metrics(), idx = activeIdx();
       cur = target = idx * unit;
-      act = { x: e.clientX, y: e.clientY, rLeft: r.left, last: idx, moved: false };
+      act = { x: e.clientX, y: e.clientY, px: e.clientX, py: e.clientY, rLeft: r.left, last: idx, moved: false };
     });
     function onMove(e) {
       if (!act) return;
@@ -6883,17 +7065,17 @@
       if (e.pointerType === 'mouse' && !(e.buttons & 1)) { up(); return; }
       if (!act.moved && Math.abs(e.clientX - act.x) < 4 && Math.abs(e.clientY - act.y) < 4) return;
       if (!act.moved) { act.moved = true; el.classList.add('is-dragging'); }
-      target = Math.max(-unit * .12, Math.min(trackW + unit * .12, e.clientX - act.rLeft - pad - unit / 2));
-      var i = idxAt(e.clientX);
-      if (i >= 0 && i !== act.last) {
-        act.last = i;
-        var b = btns()[i];
-        if (b && !b.classList.contains('is-active')) b.click();
-      }
+      /* v1.0.95：这里只记落点。算目标位置、判跨到哪一段、改 transform，
+         全部挪到每帧的 tick 里做一次 —— 一帧内来四个 move 也只算一遍。
+         跨段时的选中态由 bindSeg 那边同一帧统一改（它按矩形算，不做命中测试），
+         这里不再 b.click()，省掉每次跨段的整套样式回写。 */
+      act.px = e.clientX;
+      act.py = e.clientY;
       start();
     }
     function up() {
       if (!act) return;
+      if (act.moved && act.px !== undefined) act.last = idxAt(act.px);
       if (act.moved) {
         suppress = true;
         el.classList.remove('is-dragging');
