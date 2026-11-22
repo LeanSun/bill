@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.85';
+  var ASSET_V = '1.0.86';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2165,43 +2165,63 @@
     }
   }
 
-  /* ---------------- 数字动效 ---------------- */
-  /* 数字滚动计数：#force 用于每次进入总览时强制从 0 重播。
-     之前的坑：只靠 data-value 比对，第二次进页面 prev===target 直接 return，
-     所以只有首次有动画、之后再也不动 —— 用户看到的就是「没生效」。 */
-  function animateValue(el, target, formatter, opt) {
-    if (!el) return;
-    opt = opt || {};
-    var prev = opt.force ? 0 : Number(el.dataset.value || 0);
-    el.dataset.value = String(target);
-    if (!opt.force && Math.abs(prev - target) < .005) { el.textContent = formatter(target); return; }
-    var start = performance.now(), dur = opt.dur || 900, delay = opt.delay || 0;
-    var fired = false;
-    function step(now) {
-      if (now - start < delay) { requestAnimationFrame(step); return; }
-      if (!fired) { fired = true; start = now; }
-      var t = Math.min(1, (now - start) / dur);
-      /* 尾段缓停：quartic ease-out 比 cubic 在最后 30% 慢得多，
-         数字会先快后慢慢「落定」，不是匀速冲到终点硬停。 */
-      var e = 1 - Math.pow(1 - t, 5);
-      el.textContent = formatter(prev + (target - prev) * e);
-      if (t < 1) requestAnimationFrame(step);
-      else el.textContent = formatter(target);
+  /* ---------------- 数字动效：一条时间轴 ---------------- */
+  /* 数字、比例条、折线必须共用一条 rAF 和同一条缓动，否则永远「不同步」。
+     之前三轨道各写各的，有两个稳定的误差源：
+     ① 缓动不同：比例条/折线走 CSS transition 的 cubic-bezier(.16,1,.3,1)，
+        它在前半段比 quint ease-out 快很多（进度 25% 时条已到 82%、数字才 76%，
+        进度 10% 时是 49% vs 41%），看起来就是「条长完了、数字还在滚」；
+     ② 起算点不同：CSS transition-delay 从样式生效那一帧起算，rAF 从回调
+        时间戳起算，两边天然差一两帧，错峰延迟（90/180/270ms）又会各自漂移。
+     所以这里只留一条轴：谁要动就 add 一个任务，同一帧里拿到同一个 e。 */
+  function axis() {
+    var list = [], start = 0, raf = 0;
+    function tick(now) {
+      if (!start) start = now;
+      var pending = 0;
+      for (var i = 0; i < list.length; i++) {
+        var it = list[i];
+        if (it.done) continue;
+        var left = now - start - it.delay;
+        if (left < 0) { pending++; continue; }
+        var t = left / it.dur;
+        if (t >= 1) { it.apply(1); it.done = true; }
+        else { it.apply(1 - Math.pow(1 - t, 5)); pending++; }
+      }
+      raf = pending ? requestAnimationFrame(tick) : 0;
     }
-    requestAnimationFrame(step);
+    return {
+      add: function (delay, apply, dur) {
+        list.push({ delay: delay || 0, apply: apply, dur: dur || 2500 });
+        if (!raf) raf = requestAnimationFrame(tick);
+      }
+    };
+  }
+  /* 数字从 0 滚到 target，进度 e 与同一轴上比例条/折线完全一致 */
+  function rollNumber(ax, el, target, formatter, delay, dur) {
+    if (!el) return;
+    el.dataset.value = String(target);
+    el.textContent = formatter(0);          /* 立刻归零，别让旧值多挂 270ms */
+    ax.add(delay, function (e) {
+      el.textContent = e >= 1 ? formatter(target) : formatter(target * e);
+    }, dur);
   }
   /* 洞察区读数与进度条一起动。
      之前只滚 .ins-key（卡片标题右侧的小数），卡里面真正显眼的
      「过往对比 / 本月剩余 / 年度结余」数字用的是 .ir-line b，
-     进度条是 .ir-bar i —— 两类都没被选中，所以截图里它们全是静止的。 */
+     进度条是 .ir-bar i —— 两类都没被选中，所以截图里它们全是静止的。
+     现在两者同轴：横条不按下标排队，而是跟「它正上方那个数字」用同一个
+     delay，卡内一行数字配一行条才是一组，跨卡错峰也不会错位。 */
   function animateInsights(root) {
     if (!root) return;
+    var ax = axis();
     /* ---- 1) 数字滚动 ---- */
     var groups = [
       { sel: '.ir-line b', dur: 2500, step: 140 },   /* 卡内大数，主力 */
       { sel: '.ins-mtd > b', dur: 2500, step: 0 },
       { sel: '.ins-key', dur: 900, step: 60 }          /* 标题旁小字，快一点 */
     ];
+    var bigs = [];   /* 卡内大数节点 + 它的 delay，给同卡横条对时间用 */
     groups.forEach(function (g) {
       var els = root.querySelectorAll(g.sel);
       Array.prototype.forEach.call(els, function (el, i) {
@@ -2212,32 +2232,38 @@
         var target = Number(m[2].replace(/,/g, ''));
         if (!isFinite(target)) return;
         var pre = m[1], suf = m[3], dec = (m[2].split('.')[1] || '').length;
-        var start = performance.now(), dur = g.dur, delay = i * g.step, fired = false;
-        function step(now) {
-          if (now - start < delay) { requestAnimationFrame(step); return; }
-          if (!fired) { fired = true; start = now; }
-          var t = Math.min(1, (now - start) / dur);
-          var e = 1 - Math.pow(1 - t, 5);
+        var delay = i * g.step;
+        if (g.sel === '.ir-line b') bigs.push({ el: el, delay: delay });
+        el.textContent = pre + (dec ? '0.' + new Array(dec + 1).join('0') : '0') + suf;
+        ax.add(delay, function (e) {
+          if (e >= 1) { el.textContent = text; return; }
           var v = target * e;
           el.textContent = pre + (dec
             ? v.toFixed(dec)
             : Math.round(v).toLocaleString('zh-CN')) + suf;
-          if (t < 1) requestAnimationFrame(step);
-          else el.textContent = text;
-        }
-        requestAnimationFrame(step);
+        }, g.dur);
       });
     });
-    /* ---- 2) 进度条从 0 长到目标 ---- */
+    /* ---- 2) 横条：与正上方 .ir-line 里的数字同 delay 同缓动 ---- */
     var bars = root.querySelectorAll('.ir-bar i, .ins-prog i, .tb-track i');
     Array.prototype.forEach.call(bars, function (bar, i) {
-      var target = bar.style.width || '';
-      if (!target || target === '0%' || target === '0') return;
+      var raw = bar.style.width || '';
+      if (!raw || raw === '0%' || raw === '0') return;
+      var targetPct = parseFloat(raw);
+      if (!isFinite(targetPct)) return;
+      var delay = i * 90;                      /* 没有配对数字时的兜底节奏 */
+      var ln = bar.parentElement && bar.parentElement.previousElementSibling;
+      if (ln && ln.classList && ln.classList.contains('ir-line')) {
+        var b = ln.querySelector('b');
+        for (var k = 0; k < bigs.length; k++) {
+          if (bigs[k].el === b) { delay = bigs[k].delay; break; }
+        }
+      }
       bar.style.transition = 'none';
       bar.style.width = '0%';
-      void bar.offsetWidth;
-      bar.style.transition = 'width 2500ms cubic-bezier(.16,1,.3,1) ' + (i * 90) + 'ms';
-      bar.style.width = target;
+      ax.add(delay, function (e) {
+        bar.style.width = (targetPct * e).toFixed(2) + '%';
+      }, 2500);
     });
   }
   function sparkline(svg, values, color, w, h, opt) {
@@ -2259,8 +2285,17 @@
        preserveAspectRatio="none" + vector-effect:non-scaling-stroke，
        路径在 viewBox 里的长度和实际渲染像素长度不一致，dash 用完后
        后面一段画不出来 —— 就是截图里那种「折线分成几截」的现象。
-       clip-path 直接裁整个图形，跟路径长度无关，不会再分段。 */
-    if (opt && opt.animate) {
+       clip-path 直接裁整个图形，跟路径长度无关，不会再分段。
+       这里也走统一时间轴：CSS transition 与数字的 rAF 缓动不同，
+       拆开写会看到「线跑在前面、数字慢慢追」。 */
+    if (opt && opt.ax) {
+      svg.style.transition = 'none';
+      svg.style.clipPath = 'inset(0 100% 0 0)';
+      opt.ax.add(opt.delay || 0, function (e) {
+        svg.style.clipPath = e >= 1 ? 'inset(0 0% 0 0)'
+          : 'inset(0 ' + ((1 - e) * 100).toFixed(2) + '% 0 0)';
+      }, opt.dur || 2500);
+    } else if (opt && opt.animate) {
       var dur = opt.dur || 2500, delay = opt.delay || 0;
       svg.style.transition = 'none';
       svg.style.clipPath = 'inset(0 100% 0 0)';
@@ -2332,11 +2367,14 @@
       ? Math.max(1, Math.round((new Date(dates[dates.length - 1] + 'T00:00:00') - new Date(dates[0] + 'T00:00:00')) / 864e5) + 1)
       : 1;
 
-    /* 每次渲染都重播滚动；KPI 大数字 2s，四张卡错峰 90ms */
-    animateValue($('kpiIncome'), income, fmtBig, { force: true, dur: 2500, delay: 0 });
-    animateValue($('kpiExpense'), expense, fmtBig, { force: true, dur: 2500, delay: 90 });
-    animateValue($('kpiBalance'), balance, fmtBig, { force: true, dur: 2500, delay: 180 });
-    animateValue($('kpiRate'), rate, function (v) { return v.toFixed(1) + '%'; }, { force: true, dur: 2500, delay: 270 });
+    /* 四个数字 + 比例条 + 三条折线，全部挂在同一条时间轴上：
+       同样的 2.5s、同样的 quint 缓动、同样的 90ms 错峰步长。
+       缓动曲线选择说明见 axis() 上方的注释。 */
+    var ax = axis();
+    rollNumber(ax, $('kpiIncome'), income, fmtBig, 0);
+    rollNumber(ax, $('kpiExpense'), expense, fmtBig, 90);
+    rollNumber(ax, $('kpiBalance'), balance, fmtBig, 180);
+    rollNumber(ax, $('kpiRate'), rate, function (v) { return v.toFixed(1) + '%'; }, 270);
 
     var balEl = $('kpiBalance');
     if (balEl) { balEl.classList.toggle('pos', balance > 0); balEl.classList.toggle('neg', balance < 0); }
@@ -2359,20 +2397,21 @@
     setText('kpiRateSub', balance >= 0 ? '结余 ' + fmtBig(balance) : '超支 ' + fmtBig(-balance));
     setText('kpiRateSub2', prevRate === null ? '近 ' + months + ' 个月' : '去年 ' + prevRate.toFixed(1) + '%');
 
-    /* 比例条与储蓄率数字同步：从 0 起、同样 2s、同样错峰 270ms 与 quart 缓停 */
+    /* 比例条与储蓄率数字同一任务槽（270ms），逐帧同 e：条长到几成就代表
+       数字滚到几成，不会再出现「条已经满了、百分数还在爬」 */
     var fill = $('rateFill');
     if (fill) {
-      var targetW = Math.max(0, Math.min(100, rate)).toFixed(1) + '%';
+      var pct = Math.max(0, Math.min(100, rate));
       fill.style.transition = 'none';
       fill.style.width = '0%';
-      void fill.offsetWidth;
-      fill.style.transition = 'width 2500ms cubic-bezier(.16,1,.3,1) 270ms';
-      fill.style.width = targetW;
+      ax.add(270, function (e) {
+        fill.style.width = e >= 1 ? pct.toFixed(1) + '%' : (pct * e).toFixed(2) + '%';
+      });
     }
 
-    sparkline($('sparkIncome'), rows.map(function (r) { return r.income; }), p.income, 100, 26, { animate: true, dur: 2500, delay: 0 });
-    sparkline($('sparkExpense'), rows.map(function (r) { return r.expense; }), p.expense, 100, 26, { animate: true, dur: 2500, delay: 90 });
-    sparkline($('sparkBalance'), rows.map(function (r) { return r.balance; }), p.primary, 100, 26, { animate: true, dur: 2500, delay: 180 });
+    sparkline($('sparkIncome'), rows.map(function (r) { return r.income; }), p.income, 100, 26, { ax: ax, delay: 0 });
+    sparkline($('sparkExpense'), rows.map(function (r) { return r.expense; }), p.expense, 100, 26, { ax: ax, delay: 90 });
+    sparkline($('sparkBalance'), rows.map(function (r) { return r.balance; }), p.primary, 100, 26, { ax: ax, delay: 180 });
   }
 
   function setText(id, v) {
@@ -3554,9 +3593,9 @@
         if (reusedIns) animateInsights(reusedIns);
       }
       resizeAll();
-      /* 每次切进总览都重渲 KPI：renderKpis 里的 animateValue 带 force，
-         数字会从 0 重新滚动。原先只在 renderAll（数据变化）时调用，
-         所以从日历切回来 KPI 根本不重绘，动画自然不播。 */
+      /* 每次切进总览都重渲 KPI：renderKpis 里的 rollNumber 一律从 0 起播，
+         数字、比例条、折线共用一个轴同起同落。原先只在 renderAll（数据变化）
+         时调用，所以从日历切回来 KPI 根本不重绘，动画自然不播。 */
       if (view === 'overview') renderKpis();
       renderCharts(view);
     });
