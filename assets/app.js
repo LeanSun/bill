@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.88';
+  var ASSET_V = '1.0.89';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3200,6 +3200,11 @@
     return out;
   }
 
+  /* 从「每月固定」提醒点进来的补记。补完不能把视图拽到那个历史日期 ——
+     提醒只显示在「今天」，一拽走其余几条就跟着消失了，等于补一条丢一条。
+     关弹窗（取消）时也要复位，否则下一次普通记账会误判成补记、不再定位新记录。 */
+  var dueSaveOnce = false;
+
   /* 打开记账弹窗并预填。不直接给 openModal 传伪记录：
      那样它会以为在编辑、把「删除」按钮亮出来，而这条记录并不存在。 */
   function prefillEntry(o) {
@@ -4487,6 +4492,7 @@
   var modalCloseTimer = 0;
   function closeModal(reason) {
     if (reason === 'esc' && !state.editingId) clearEntryDraft();
+    dueSaveOnce = false;
     var back = $('modalBackdrop');
     closeDp();
     document.body.classList.remove('modal-cell');
@@ -4598,11 +4604,14 @@
     }
     saveStore();
     renderAll();
-    if (!v.editingId) focusNewRecord(rec);
-    else {
+    /* 补记的固定支出不定位到历史日期：留在今天，剩下的提醒才还在眼前。
+       其余新增记录照旧闪一下并滚到它自己那一行。 */
+    if (!v.editingId && !dueSaveOnce) focusNewRecord(rec);
+    else if (v.editingId) {
       var edited = document.querySelector('.cal-item[data-id="' + rec.id + '"]');
       if (edited) { edited.classList.add('is-new'); setTimeout(function () { edited.classList.remove('is-new'); }, 3200); }
     }
+    dueSaveOnce = false;
     return '';
   }
   function dupHint(msg) {
@@ -5718,12 +5727,26 @@
       var add = e.target.closest('[data-add]');
       if (add) { openModal(null, add.dataset.add, 'cell'); return; }
 
-      /* 固定支出提醒上的「记一笔」：预填名目 / 金额 / 分类，日期用今天 */
+      /* 固定支出提醒上的「记一笔」：预填名目 / 金额 / 分类，
+         日期用这条账「通常记的日号」，不是今天 —— 房租是 5 号交的，
+         今天 22 号才看到提醒并补记，就应该落回 5 号，否则当月的
+         「哪几天有支出」和日均可支配金额都会被这笔错的日期带偏。 */
       var due = e.target.closest('[data-due]');
       if (due) {
         var f = dueList[Number(due.getAttribute('data-due'))];
-        if (f) prefillEntry({ note: f.note, amount: f.amount, category: f.category, sub: f.sub, type: 'expense', date: todayStr() });
-        return;
+        if (f) {
+          var now = new Date();
+          /* 日号可能超出当月天数（31 号遇到 2 月），收到月末 */
+          var dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          var dd = Math.min(f.day, dim);
+          var back = dateKey(new Date(now.getFullYear(), now.getMonth(), dd));
+          /* 通常日还没到就已经记过了？那说明这条是提前记的，落今天更合理 */
+          if (back > todayStr()) back = todayStr();
+          dueSaveOnce = true;
+          prefillEntry({ note: f.note, amount: f.amount, category: f.category, sub: f.sub, type: 'expense', date: back });
+          if (back !== todayStr()) toast('日期已按你通常的 ' + f.day + ' 号填好', 'info');
+          return;
+        }
       }
 
       var item = e.target.closest('[data-id]');

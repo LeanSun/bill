@@ -3896,13 +3896,21 @@ html[data-theme="dark"] .day-list.is-today {
    3. 重复记账提示的语气（#3）
    ================================================================== */
 
-/* #8 重月：支出高于全年月均 15% 的月份，整格淡染 + 标题数字转支出色 + 一枚小圆点。
-   只在至少 3 个月有数据时启用（JS 里判断），避免样本太少时满屏都是「重」。 */
-.ym.is-heavy { background: color-mix(in srgb, var(--expense) 8%, var(--surface)); }
+/* #8 重月：支出高于全年月均 15% 的月份，整格淡染 + 标题数字转支出色。
+   只在至少 3 个月有数据时启用（JS 里判断），避免样本太少时满屏都是「重」。
+   v1.0.89：原来只跟一个小圆点，渲染出来是「7月·」，看着像打字打错了一个符号，
+   谁也不知道整格淡绿是什么意思；换成两字标签，不用悬停也能读懂。 */
+.ym.is-heavy { background: color-mix(in srgb, var(--expense) 9%, var(--surface)); }
 .ym.is-heavy .ym-head b { color: var(--expense); }
 .ym.is-heavy .ym-head b::after {
-  content: ''; display: inline-block; width: 4px; height: 4px; margin-left: 4px;
-  border-radius: 50%; background: var(--expense); vertical-align: 2px;
+  content: '偏高';
+  display: inline-block; margin-left: 4px;
+  font-size: 9px; font-weight: 700; line-height: 1;
+  letter-spacing: 0; white-space: nowrap;
+  padding: 2px 4px; border-radius: 4px;
+  vertical-align: 1px;
+  color: var(--expense);
+  background: color-mix(in srgb, var(--expense) 15%, var(--surface));
 }
 .ym.is-heavy .ym-msum i.c-expense { color: var(--expense); }
 
