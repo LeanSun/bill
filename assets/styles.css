@@ -1640,6 +1640,9 @@ html[data-theme="dark"] .ds-quick select, html[data-theme="dark"] .field select 
   flex: 0 0 auto; gap: 6px; align-content: start;
   grid-auto-rows: minmax(100px, auto);
 }
+/* 周几卡是紧凑横条，单独放宽行高下限 */
+.day-insights .ins-card:last-child { grid-row-end: span 1; }
+.day-insights:has(.ins-wdheat) { grid-auto-rows: minmax(72px, auto); }
 .ins-card { min-height: 0; overflow: hidden; padding: 7px 11px 8px; }
 .ins-card h4 { margin: 0 0 5px; font-size: 12px; }
 .ins-bars { height: 32px; }
@@ -3180,11 +3183,10 @@ html[data-theme="dark"] .ins-wd.is-today span { color: #ff9c74; }
 }
 .spend-row:hover { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); background: var(--surface); }
 .spend-rank {
-  flex: 0 0 16px; width: 16px; height: 16px; border-radius: 5px;
+  flex: 0 0 10px; width: 10px; height: 10px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--dot, var(--surface-3)); color: #fff;
-  font-size: 9px; font-weight: 750;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  background: var(--dot, var(--surface-3)); color: transparent;
+  font-size: 0; margin-right: 2px;
 }
 .spend-name { flex: 0 0 40px; width: 40px; font-weight: 700; white-space: nowrap; }
 .spend-track {
@@ -3823,12 +3825,15 @@ html[data-theme="dark"] .day-list.is-today {
 .toast .t-ico-sm svg { width: 100%; height: 100%; display: block; }
 
 /* #4 报销空状态：插图 + 文案两行，和天页空状态同一套语言 */
-.pay-reimb-hint:not([hidden]) { flex-direction: column; gap: 6px; min-height: 130px; }
+.pay-reimb-hint:not([hidden]) {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 7px; min-height: 130px;
+}
 .pay-reimb-hint .empty-ico { width: 30px; height: 30px; color: var(--muted); opacity: .75; }
 
 /* #3 数字入场：核心读数首次解锁时上浮淡入，只跑一次 */
 body.nums-in .ins-key,
-body.nums-in .stat-strip b,
+body.nums-in .stat-strip .sc-value,
 body.nums-in .pay-hero .ph-net {
   animation: numRise .5s var(--ease) both;
 }
@@ -3840,35 +3845,35 @@ body.nums-in .ins-key:nth-child(3) { animation-delay: .12s; }
 }
 @media (prefers-reduced-motion: reduce) {
   body.nums-in .ins-key,
-  body.nums-in .stat-strip b,
+  body.nums-in .stat-strip .sc-value,
   body.nums-in .pay-hero .ph-net { animation: none; }
 }
 
 /* ==================================================================
    v1.0.78 · C 组：异常标记 / 周几热力 / 占比趋势
    ================================================================== */
-/* #7 异常消费：右上角一颗红点，不说话但能看出"这笔不寻常" */
-.cal-item.is-anomaly .ci-name i::after {
-  content: ''; position: absolute; top: -2px; right: -3px;
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--danger); box-shadow: 0 0 0 1.5px var(--surface);
+/* #7 异常消费：金额前的感叹号徽标，不压住项目名 */
+.cal-item .ci-warn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; margin-right: 4px; vertical-align: -1px;
+  border-radius: 50%; background: var(--danger); color: #fff;
+  font-size: 10px; font-weight: 800; font-style: normal; line-height: 1;
 }
-.cal-item.is-anomaly .ci-name i { position: relative; }
 
 /* #9 周几消费热力：七根小柱，最高那根用主色 */
 .ins-wdheat {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
-  height: 74px; align-items: end; padding-top: 4px;
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
+  height: 34px; align-items: end; padding-top: 2px;
 }
-.iwh-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+.iwh-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; }
 .iwh-col i {
-  display: block; width: 100%; max-width: 18px; border-radius: 4px 4px 2px 2px;
+  display: block; width: 100%; max-width: 15px; border-radius: 3px 3px 1px 1px;
   background: color-mix(in srgb, var(--primary) 26%, var(--surface-3));
 }
 .iwh-col.is-top i { background: var(--primary); }
-.iwh-col span { font-size: 10px; color: var(--muted); }
+.iwh-col span { font-size: 9px; line-height: 10px; color: var(--muted); }
 .iwh-col.is-top span { color: var(--primary); font-weight: 700; }
-.iwh-note { margin-top: 6px; font-size: 10.5px; color: var(--muted); text-align: center; }
+.iwh-note { margin-top: 2px; font-size: 10px; color: var(--muted); text-align: center; }
 
 /* #12 趋势模式下，金额榜的 is-percent 样式不干扰画布 */
 #chartDonut.is-percent { color-scheme: normal; }

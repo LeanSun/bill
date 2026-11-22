@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.78';
+  var ASSET_V = '1.0.79';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -799,10 +799,8 @@
     return Object.keys(map).map(function (name) { return { name: name, value: round(map[name]), category: cats[name] }; })
       .sort(function (a, b) { return b.value - a.value; }).slice(0, n);
   }
-  /* v1.0.78 #8：固定支出识别 —— 同名支出在近 6 个自然月里出现在 >=4 个月，
-     就算「固定」（房租、会员这类）。只看名字、不看金额，按月去重。 */
   /* #7 异常消费：同分类近 6 个月的单笔均值 ×2.5 当阈值。
-     只看已发生的支出，样本少于 3 笔不判（避免新分类误报）。 */
+     样本少于 3 笔不判，避免新分类误报。 */
   function anomalyMap(records) {
     var byCat = {}, now = new Date(), cut = dateKey(new Date(now.getFullYear(), now.getMonth() - 5, 1));
     records.forEach(function (r) {
@@ -822,22 +820,6 @@
   }
   function isAnomaly(r, amap) {
     return r.type === 'expense' && amap[r.category || '其它'] && r.amount >= amap[r.category || '其它'];
-  }
-  function fixedNames(records) {
-    var byName = {}, now = new Date(), cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    var cutKey = dateKey(cutoff);
-    records.forEach(function (r) {
-      if (r.type !== 'expense' || !r.date || r.date < cutKey) return;
-      var k = r.note || r.category || '';
-      if (!k) return;
-      if (!byName[k]) byName[k] = {};
-      byName[k][String(r.date).slice(0, 7)] = true;
-    });
-    var out = {};
-    Object.keys(byName).forEach(function (k) {
-      if (Object.keys(byName[k]).length >= 4) out[k] = true;
-    });
-    return out;
   }
   function calendarData(year) {
     var map = {}, cnt = {};
@@ -1412,7 +1394,9 @@
 
   /* 支出构成：HTML 金额榜。右上角「金额 / 占比」切换两种读法，
      条目本身仍可点，跳到对应分类的日历明细。 */
-  /* #12 占比随时间：每月各分类支出占比，堆叠面积到 100% */
+  /* #12 占比趋势：改成分组柱状图 —— 每月每类一根独立柱，
+     比之前的 100% 堆叠面积清楚得多：堆叠面积颜色叠一起糊成一片，
+     分组柱能直接看出每月各类金额高低和相互对比。 */
   function renderDonutTrend(p, el) {
     var recs = scopeRecords().filter(function (r) {
       return r.type === 'expense' && (state.donutYear === 'all' || String(r.year) === String(state.donutYear));
@@ -1437,30 +1421,33 @@
     var idx = {}; EXPENSE_CATS.forEach(function (c, i) { idx[c] = i; });
     var series = cats.map(function (c) {
       return {
-        name: c, type: 'line', stack: 'pct', smooth: true, symbol: 'none',
-        lineStyle: { width: 0 },
-        areaStyle: { opacity: .82, color: colors[idx[c]] },
+        name: c, type: 'bar',
+        barMaxWidth: 14, barGap: '12%', barCategoryGap: '32%',
+        itemStyle: { color: colors[idx[c]], borderRadius: [3, 3, 0, 0] },
         emphasis: { focus: 'series' },
-        data: months.map(function (m) {
-          var t = 0;
-          cats.forEach(function (cc) { t += byMonth[m][cc] || 0; });
-          return t ? round((byMonth[m][c] || 0) / t * 100) : 0;
-        })
+        data: months.map(function (m) { return round(byMonth[m][c] || 0); })
       };
     });
     setOpt('chartDonut', {
       backgroundColor: 'transparent',
-      color: cats.map(function (c) { return colors[idx[c]]; }),
-      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+      animationDuration: RENDER_MODE === 'instant' ? 0 : 560,
       textStyle: { fontFamily: p.font },
       tooltip: tooltipCommon(p, {
         trigger: 'axis',
-        valueFormatter: function (v) { return Number(v).toFixed(1) + '%'; }
+        axisPointer: { type: 'shadow', shadowStyle: { color: withAlpha(p.muted, .07) } },
+        valueFormatter: function (v) { return fmtYuan(v); }
       }),
-      legend: { bottom: 0, itemWidth: 9, itemHeight: 9, itemGap: 12, textStyle: { color: p.text2, fontSize: 10.5, fontFamily: p.font }, data: cats },
-      grid: { left: 8, right: 12, top: 10, bottom: 34, containLabel: true },
+      legend: {
+        bottom: 0, itemWidth: 9, itemHeight: 9, itemGap: 11,
+        textStyle: { color: p.text2, fontSize: 10.5, fontFamily: p.font }, data: cats
+      },
+      grid: { left: 6, right: 12, top: 12, bottom: 34, containLabel: true },
       xAxis: catAxis(p, months.map(function (m) { return m.slice(5) + '月'; }), { axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font } }),
-      yAxis: { type: 'value', max: 100, min: 0, axisLabel: { color: p.muted, fontSize: 10, formatter: '{value}%', fontFamily: p.font }, splitLine: { lineStyle: { color: p.border, type: 'dashed' } } },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font, formatter: function (v) { return v >= 1000 ? (v / 1000) + 'k' : v; } },
+        splitLine: { lineStyle: { color: p.border, type: 'dashed' } }
+      },
       series: series
     });
   }
@@ -1890,17 +1877,16 @@
 
   function renderTop(p) {
     var data = topItems(scopeRecords(), 10);
-    var fixed = fixedNames(scopeRecords());
-    /* #2 几何标识：给每行标签前面加一枚分类色小方块；#8 固定项加「固」角标。
+    /* #2 几何标识：给每行标签前面加一枚分类色小圆点。
        ECharts 的 axisLabel 用 rich 段拼出来，比在画布外再叠 DOM 稳。 */
     var colorMap = catColors(p);
     var catIdx = {}; EXPENSE_CATS.forEach(function (c, i) { catIdx[c] = i; });
-    var rich = { dot: { fontSize: 10, color: p.primary } };
+    var rich = {};
     var rows = data.map(function (d) {
       var col = colorMap[catIdx[d.category]] || p.primary;
       var key = 'c' + Math.abs(col.replace(/[^a-zA-Z0-9]/g, '')).toString(36);
       rich[key] = { fontSize: 13, color: col, fontWeight: 700 };
-      var mark = '{' + key + '|■} ' + esc(d.name) + (fixed[d.name] ? ' 固' : '');
+      var mark = '{' + key + '|●} ' + esc(d.name);
       return { name: mark, value: d.value };
     });
     setOpt('chartTop', rankBar(p, rows, {
@@ -2614,7 +2600,8 @@
       (isNew ? ' is-new' : '') + (bad ? ' is-anomaly' : '') +
       '" data-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + ink + '" title="' + esc(tip) + '">' +
       '<span class="ci-name"><i></i><span>' + esc(label) + '</span></span>' +
-      (opts && opts.noAmount ? '' : '<b>' + sign + fmtChip(r.amount) + '</b>') + '</button>';
+      (opts && opts.noAmount ? '' : '<b>' + (bad ? '<em class="ci-warn" title="高于这类平时水平">!</em>' : '') +
+        sign + fmtChip(r.amount) + '</b>') + '</button>';
   }
   /* 右上角收支胶囊：净额 + 一颗呼吸点，代替原来的整块填色 */
   function daySumHTML(p, items) {
@@ -3194,8 +3181,10 @@
 
     /* 「关于这一天」按内容签名复用 DOM：轮询 / 筛选重绘时只要数据没变，
        节点原样保留，insIn 入场动画不会重播 —— 这是消除自动闪烁的关键。 */
-    var insSig = [key, document.documentElement.getAttribute('data-theme'), storeRev,
-      items.map(function (r) { return r.id + ':' + r.amount; }).join(','), de, di].join('|');
+    /* 搜索 / 分类筛选只改 items（当日明细），「关于这一天」用的是 allRecords 全量，
+       所以签名里绝不能含 items / de / di —— 否则每敲一个字就重建一次、动画重播。
+       数据真变化由 storeRev 捕捉，日期变化由 key 捕捉。 */
+    var insSig = [key, document.documentElement.getAttribute('data-theme'), storeRev].join('|');
     var oldIns = box.querySelector('.day-ins-col .day-insights');
     var reuseIns = (oldIns && oldIns.getAttribute('data-sig') === insSig) ? oldIns : null;
     if (reuseIns && reuseIns.parentNode) reuseIns.parentNode.removeChild(reuseIns);
@@ -3609,7 +3598,8 @@
     var kindIcons = {
       success: '<svg viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       warn: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 6v8M12 17.5v.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
-      error: '<svg viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>'
+      error: '<svg viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
+      info: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>'
     };
     var mark = opts.center
       ? '<i class="t-ico" aria-hidden="true">' + kindIcons.success + '</i>'
@@ -5080,6 +5070,14 @@
         closeModal('esc');
         return;
       }
+      /* Delete 快速删除：只在编辑态弹窗打开、且焦点不在输入框时触发。
+         用 Delete 不用 Backspace，免得打字删字误触。 */
+      if (e.key === 'Delete' && state.editingId) {
+        var mb = $('modalBackdrop'), cb = $('confirmBackdrop');
+        if (mb && !mb.hidden && cb && cb.hidden) {
+          e.preventDefault(); openConfirm(state.editingId); return;
+        }
+      }
       /* #22 快捷键：N 记一笔、/ 聚焦搜索。输入框里打字时不抢键。 */
       var tag = (e.target && e.target.tagName || '').toLowerCase();
       var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
@@ -5663,7 +5661,7 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 12,
+    v: 13,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
@@ -5675,7 +5673,7 @@
       cubeyear: [6, 5], cubetype: [6, 5],
       cubebrand: [4, 5], cubeprice: [4, 5], compyear: [4, 5],
       compprov: [6, 5], compprice: [6, 5],
-      salary: [6, 11], reimb: [6, 8]
+      salary: [6, 16], reimb: [6, 12]
     }
   };
   var ovGrid = null, ovEditing = false;
@@ -5698,7 +5696,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 12 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 13 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -5714,7 +5712,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 8, order: [], spans: {} };
+    var L = { v: 13, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;
