@@ -3829,22 +3829,23 @@ html[data-theme="dark"] .day-list.is-today {
 }
 .pay-reimb-hint .empty-ico { width: 30px; height: 30px; color: var(--muted); opacity: .75; }
 
-/* #3 数字入场：核心读数首次解锁时上浮淡入，只跑一次 */
-body.nums-in .ins-key,
-body.nums-in .stat-strip .sc-value,
-body.nums-in .pay-hero .ph-net {
-  animation: numRise 2s var(--ease) both;
+/* 数字入场：每次进总览由 replayNumIntro() 逐元素重播。
+   时长分档：KPI 大数字 2s 慢、洞察小字 .62s 快 —— 大数字是主角，值得铺垫；
+   小字只是补充读数，快进快出才不拖沓。具体时长由 JS 内联覆盖，这里是兜底。 */
+/* 基础规则必须保留：JS 只覆盖 duration/delay，animation-name 由这里提供 */
+#view-overview .sc-value,
+.day-insights .ins-key,
+.pay-hero .ph-net {
+  animation: numRise 1s var(--ease) both;
 }
-body.nums-in .ins-key:nth-child(2) { animation-delay: .06s; }
-body.nums-in .ins-key:nth-child(3) { animation-delay: .12s; }
 @keyframes numRise {
   from { opacity: 0; transform: translateY(7px); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  body.nums-in .ins-key,
-  body.nums-in .stat-strip .sc-value,
-  body.nums-in .pay-hero .ph-net { animation: none; }
+  #view-overview .sc-value,
+  .day-insights .ins-key,
+  .pay-hero .ph-net { animation: none !important; }
 }
 
 /* ==================================================================
@@ -3904,27 +3905,3 @@ body.nums-in .ins-key:nth-child(3) { animation-delay: .12s; }
 .back-top:hover { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
 .back-top svg { width: 19px; height: 19px; }
 @media (max-width: 720px) { .back-top { right: 14px; bottom: 18px; width: 36px; height: 36px; } }
-
-/* ==================================================================
-   v1.0.80 · 支出构成「趋势」档：每类一行迷你折线
-   ================================================================== */
-.sp-trend-row {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; padding: 7px 8px; border-radius: 8px;
-  border: 1px solid transparent; background: transparent;
-  font-family: var(--font); color: var(--text); cursor: pointer;
-  text-align: left; transition: background .18s var(--ease), border-color .18s var(--ease);
-}
-.sp-trend-row:hover { background: var(--surface-2); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
-.sp-dot { flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: var(--dot); }
-.sp-name { flex: 0 0 40px; font-size: 12px; font-weight: 650; white-space: nowrap; }
-.sp-spark { flex: 1 1 auto; min-width: 40px; height: 24px; overflow: visible; }
-.sp-last { flex: 0 0 auto; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.sp-trend { flex: 0 0 38px; text-align: right; font-size: 10.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.sp-trend.is-up { color: var(--expense); }
-.sp-trend.is-down { color: var(--income); }
-@media (max-width: 560px) {
-  .sp-trend-row { gap: 5px; padding: 6px 4px; }
-  .sp-name { flex-basis: 34px; font-size: 11px; }
-  .sp-trend { display: none; }
-}

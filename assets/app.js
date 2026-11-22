@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.80';
+  var ASSET_V = '1.0.81';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1394,9 +1394,7 @@
 
   /* 支出构成：HTML 金额榜。右上角「金额 / 占比」切换两种读法，
      条目本身仍可点，跳到对应分类的日历明细。 */
-  /* #12 分类趋势：窄卡片里堆叠面积会糊、分组柱又太挤（5类×12月=60根柱）。
-     改成每个分类一行的迷你折线：左边圆点+名字，中间 sparkline 看走势，
-     右边最新月金额与环比。保留金额榜的熟悉形式，一屏能看全。 */
+  /* #12 占比随时间：每月各分类支出占比，堆叠面积到 100% —— 恢复第一版 */
   function renderDonutTrend(p, el) {
     var recs = scopeRecords().filter(function (r) {
       return r.type === 'expense' && (state.donutYear === 'all' || String(r.year) === String(state.donutYear));
@@ -1409,53 +1407,43 @@
       var c = r.category || '其它';
       byMonth[m][c] = (byMonth[m][c] || 0) + r.amount;
     });
-    var months = Object.keys(byMonth).sort().slice(-12);
+    var months = Object.keys(byMonth).sort();
     if (months.length < 2) {
       el.innerHTML = '<div class="spend-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>至少两个月才有趋势</div>';
       return;
     }
-    var byCat = {};
-    recs.forEach(function (r) {
-      var c = r.category || '其它';
-      if (!byCat[c]) byCat[c] = 0;
-      byCat[c] += r.amount;
+    var cats = EXPENSE_CATS.filter(function (c) {
+      return months.some(function (m) { return (byMonth[m][c] || 0) > 0; });
     });
-    var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
     var colors = catColors(p);
     var idx = {}; EXPENSE_CATS.forEach(function (c, i) { idx[c] = i; });
-
-    el.innerHTML = cats.map(function (c) {
-      var col = colors[idx[c]] || p.primary;
-      var vals = months.map(function (m) { return byMonth[m][c] || 0; });
-      var hi = Math.max.apply(null, vals.concat([1]));
-      var lo = Math.min.apply(null, vals);
-      var span = Math.max(1, hi - lo);
-      var pts = vals.map(function (v, i) {
-        var x = vals.length > 1 ? i / (vals.length - 1) * 100 : 0;
-        var y = 21 - ((v - lo) / span) * 17;
-        return x.toFixed(1) + ',' + y.toFixed(1);
-      }).join(' ');
-      var area = '0,24 ' + pts + ' 100,24';
-      var last = vals[vals.length - 1], prev = vals[vals.length - 2] || 0;
-      var dlt = prev > 0 ? (last - prev) / prev * 100 : 0;
-      var trend = prev > 0
-        ? '<span class="sp-trend ' + (dlt >= 0 ? 'is-up' : 'is-down') + '">' +
-          (dlt >= 0 ? '↑' : '↓') + Math.abs(dlt).toFixed(0) + '%</span>'
-        : '';
-      return '<button type="button" class="sp-trend-row" data-cat="' + esc(c) + '"' +
-        ' title="' + esc(c + ' · 近 ' + vals.length + ' 个月走势，点击查看明细') + '">' +
-        '<span class="sp-dot" style="--dot:' + col + '"></span>' +
-        '<span class="sp-name">' + esc(c) + '</span>' +
-        '<svg class="sp-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true" style="--line:' + col + '">' +
-        '<polygon points="' + area + '" fill="var(--line)" opacity=".12"/>' +
-        '<polyline points="' + pts + '" fill="none" stroke="var(--line)" stroke-width="1.6" ' +
-        'vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>' +
-        '</svg>' +
-        '<span class="sp-last">' + fmtYuan(last) + '</span>' + trend +
-        '</button>';
-    }).join('');
-    Array.prototype.forEach.call(el.querySelectorAll('.sp-trend-row'), function (row) {
-      row.onclick = function () { jumpToDetail({ reset: true, category: row.getAttribute('data-cat') }); };
+    var series = cats.map(function (c) {
+      return {
+        name: c, type: 'line', stack: 'pct', smooth: true, symbol: 'none',
+        lineStyle: { width: 0 },
+        areaStyle: { opacity: .82, color: colors[idx[c]] },
+        emphasis: { focus: 'series' },
+        data: months.map(function (m) {
+          var t = 0;
+          cats.forEach(function (cc) { t += byMonth[m][cc] || 0; });
+          return t ? round((byMonth[m][c] || 0) / t * 100) : 0;
+        })
+      };
+    });
+    setOpt('chartDonut', {
+      backgroundColor: 'transparent',
+      color: cats.map(function (c) { return colors[idx[c]]; }),
+      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+      textStyle: { fontFamily: p.font },
+      tooltip: tooltipCommon(p, {
+        trigger: 'axis',
+        valueFormatter: function (v) { return Number(v).toFixed(1) + '%'; }
+      }),
+      legend: { bottom: 0, itemWidth: 9, itemHeight: 9, itemGap: 12, textStyle: { color: p.text2, fontSize: 10.5, fontFamily: p.font }, data: cats },
+      grid: { left: 8, right: 12, top: 10, bottom: 34, containLabel: true },
+      xAxis: catAxis(p, months.map(function (m) { return m.slice(5) + '月'; }), { axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font } }),
+      yAxis: { type: 'value', max: 100, min: 0, axisLabel: { color: p.muted, fontSize: 10, formatter: '{value}%', fontFamily: p.font }, splitLine: { lineStyle: { color: p.border, type: 'dashed' } } },
+      series: series
     });
   }
   function renderDonut(p) {
@@ -2148,12 +2136,35 @@
   }
 
   /* 数字入场：每次进入总览都重播。
-     先移除 class + 读一次 offsetWidth 强制 reflow，再重新加上，动画才会从头跑。 */
+     直接对元素逐个重启动画（清 animation → 强制 reflow → 恢复），
+     比切 body class 可靠：不受上一次 class 残留、也不依赖嵌套 rAF 的时序。
+     KPI 大数字慢（2s），错落但收得住；洞察区小字走 replayInsights()。 */
+  /* 天页洞察区读数：切到日历·天时单独播一段快速上浮 */
+  function replayInsights() {
+    var els = document.querySelectorAll('.day-insights .ins-key');
+    Array.prototype.forEach.call(els, function (el, i) {
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.animation = '';
+      el.style.animationDuration = '.62s';
+      el.style.animationDelay = (i * 0.05) + 's';
+    });
+  }
   function replayNumIntro() {
-    var body = document.body;
-    body.classList.remove('nums-in');
-    void body.offsetWidth;
-    requestAnimationFrame(function () { body.classList.add('nums-in'); });
+    var groups = [
+      { sel: '#view-overview .sc-value', dur: 2, step: 0.09 },
+      { sel: '.pay-hero .ph-net', dur: 1.2, step: 0 }
+    ];
+    groups.forEach(function (g) {
+      var els = document.querySelectorAll(g.sel);
+      Array.prototype.forEach.call(els, function (el, i) {
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = '';
+        el.style.animationDuration = g.dur + 's';
+        el.style.animationDelay = (i * g.step) + 's';
+      });
+    });
   }
   function renderCharts(view, mode) {
     if (view === 'overview') {
@@ -3480,6 +3491,7 @@
       resizeAll();
       renderCharts(view);
       if (view === 'overview') replayNumIntro();
+      if (view === 'calendar' && state.scale === 'day') replayInsights();
     });
   }
   /* ---------------- 路由 ----------------

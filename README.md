@@ -1086,3 +1086,15 @@ mock 实测：`insSig` 搜索前后一致且 DOM 是同一个节点；周几卡 
 
 **验证**：确认框按 Enter 后正常关闭（走删除链路）；序号 `border-radius=5px` 且内容为数字 `1`；sparkline 4 行；动画 `animationDuration=2s`；洞察卡 5 张、周几卡残留 0；`errs=[]`。
 
+
+## v1.0.81 · 数字入场分档 / 趋势图恢复第一版（2026-11-22）
+
+1. **数字入场真正生效并分档**：v1.0.80 靠 body class + 嵌套 `requestAnimationFrame` 触发，切页时序上来不及，实际看不到。改为逐元素重启动画：清 `animation` → 读 `offsetWidth` 强制 reflow → 恢复并写入分档时长——
+   - KPI 大数字 `.sc-value`：**2s**，四张卡间隔 0.09s 依次入场
+   - 天页洞察小字 `.ins-key`：**0.62s**，间隔 0.05s，快进快出
+   - 天页到手大数 `.ph-net`：1.2s
+   每次切进对应视图都重播。
+2. **趋势图恢复第一版**：撤回 v1.0.80 的迷你折线，恢复 100% 堆叠面积图（`type:line / stack:'pct' / areaStyle`），同时清掉 sparkline 样式。
+
+**验证**：`kpiAnim=numRise / 2s`、`insAnim=numRise / 0.62s`、切走再切回仍重播；趋势 `type=line / stack=pct / area=yes`，sparkline 残留 0，`errs=[]`。
+
