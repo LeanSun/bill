@@ -3182,7 +3182,9 @@ html[data-theme="dark"] .ins-wd.is-today span { color: #ff9c74; }
 .spend-rank {
   flex: 0 0 16px; width: 16px; height: 16px; border-radius: 5px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--surface-3); color: var(--muted); font-size: 9px; font-weight: 750;
+  background: var(--dot, var(--surface-3)); color: #fff;
+  font-size: 9px; font-weight: 750;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
 }
 .spend-name { flex: 0 0 40px; width: 40px; font-weight: 700; white-space: nowrap; }
 .spend-track {
@@ -3810,3 +3812,107 @@ html[data-theme="dark"] .day-list.is-today {
   color: #fff; background: var(--primary);
   box-shadow: 0 2px 6px -2px color-mix(in srgb, var(--primary) 55%, transparent);
 }
+
+/* ==================================================================
+   v1.0.78 · A/B 组：分类标识 / 报销空状态 / Toast 图标 / 数字入场
+   ================================================================== */
+/* #5 Toast 分级图标（勾/叹号/叉），沿用 center 那颗的圆形底 */
+.toast .t-ico-sm { width: 16px; height: 16px; flex: 0 0 16px; padding: 2px; border-radius: 50%; background: var(--income-soft); color: var(--income); }
+.toast.warn .t-ico-sm { background: var(--danger-soft); color: var(--danger); }
+.toast.info .t-ico-sm { background: var(--primary-soft); color: var(--primary); }
+.toast .t-ico-sm svg { width: 100%; height: 100%; display: block; }
+
+/* #4 报销空状态：插图 + 文案两行，和天页空状态同一套语言 */
+.pay-reimb-hint:not([hidden]) { flex-direction: column; gap: 6px; min-height: 130px; }
+.pay-reimb-hint .empty-ico { width: 30px; height: 30px; color: var(--muted); opacity: .75; }
+
+/* #3 数字入场：核心读数首次解锁时上浮淡入，只跑一次 */
+body.nums-in .ins-key,
+body.nums-in .stat-strip b,
+body.nums-in .pay-hero .ph-net {
+  animation: numRise .5s var(--ease) both;
+}
+body.nums-in .ins-key:nth-child(2) { animation-delay: .06s; }
+body.nums-in .ins-key:nth-child(3) { animation-delay: .12s; }
+@keyframes numRise {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.nums-in .ins-key,
+  body.nums-in .stat-strip b,
+  body.nums-in .pay-hero .ph-net { animation: none; }
+}
+
+/* ==================================================================
+   v1.0.78 · C 组：异常标记 / 周几热力 / 占比趋势
+   ================================================================== */
+/* #7 异常消费：右上角一颗红点，不说话但能看出"这笔不寻常" */
+.cal-item.is-anomaly .ci-name i::after {
+  content: ''; position: absolute; top: -2px; right: -3px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--danger); box-shadow: 0 0 0 1.5px var(--surface);
+}
+.cal-item.is-anomaly .ci-name i { position: relative; }
+
+/* #9 周几消费热力：七根小柱，最高那根用主色 */
+.ins-wdheat {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+  height: 74px; align-items: end; padding-top: 4px;
+}
+.iwh-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+.iwh-col i {
+  display: block; width: 100%; max-width: 18px; border-radius: 4px 4px 2px 2px;
+  background: color-mix(in srgb, var(--primary) 26%, var(--surface-3));
+}
+.iwh-col.is-top i { background: var(--primary); }
+.iwh-col span { font-size: 10px; color: var(--muted); }
+.iwh-col.is-top span { color: var(--primary); font-weight: 700; }
+.iwh-note { margin-top: 6px; font-size: 10.5px; color: var(--muted); text-align: center; }
+
+/* #12 趋势模式下，金额榜的 is-percent 样式不干扰画布 */
+#chartDonut.is-percent { color-scheme: normal; }
+
+/* ==================================================================
+   v1.0.78 · D 组：用途分区 / 魔方折叠 / 编辑卡名 / 返回顶部
+   ================================================================== */
+/* #17 用途分区：卡片顶部 2px 细条按组染色，不占空间 */
+.ov-panel[data-ov-group]::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: var(--radius, 14px) var(--radius, 14px) 0 0;
+  opacity: .72; pointer-events: none; z-index: 1;
+}
+.ov-panel[data-ov-group="money"]::before { background: var(--expense); }
+.ov-panel[data-ov-group="life"]::before { background: var(--violet); }
+.ov-panel[data-ov-group="cube"]::before { background: var(--amber); }
+.ov-panel[data-ov-group="finance"]::before { background: var(--sky); }
+
+/* #14 编辑模式：卡片中央的名字浮层 */
+.ov-name-tag {
+  display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  z-index: 5; padding: 3px 10px; border-radius: 20px;
+  background: var(--text); color: var(--surface);
+  font-size: 11px; font-weight: 650; white-space: nowrap; pointer-events: none;
+}
+.is-editing .ov-name-tag { display: block; }
+
+/* #13 魔方板块折叠 */
+#view-overview.is-cube-folded .ov-panel[data-ov-group="cube"] { display: none; }
+#ovCubeFold[aria-pressed="true"] { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 40%, transparent); background: var(--primary-soft); }
+#ovCubeFold[aria-pressed="true"] svg { transform: rotate(180deg); }
+#ovCubeFold svg { transition: transform .2s var(--ease); }
+
+/* #16 返回顶部 */
+.back-top {
+  position: fixed; right: 22px; bottom: 26px; z-index: 60;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-2);
+  box-shadow: var(--shadow-md); cursor: pointer;
+  opacity: 0; transform: translateY(10px) scale(.94); pointer-events: none;
+  transition: opacity .24s var(--ease), transform .24s var(--ease), color .18s, border-color .18s;
+}
+.back-top.is-on { opacity: 1; transform: none; pointer-events: auto; }
+.back-top:hover { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+.back-top svg { width: 19px; height: 19px; }
+@media (max-width: 720px) { .back-top { right: 14px; bottom: 18px; width: 36px; height: 36px; } }

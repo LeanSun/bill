@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.77';
+  var ASSET_V = '1.0.78';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -799,6 +799,46 @@
     return Object.keys(map).map(function (name) { return { name: name, value: round(map[name]), category: cats[name] }; })
       .sort(function (a, b) { return b.value - a.value; }).slice(0, n);
   }
+  /* v1.0.78 #8：固定支出识别 —— 同名支出在近 6 个自然月里出现在 >=4 个月，
+     就算「固定」（房租、会员这类）。只看名字、不看金额，按月去重。 */
+  /* #7 异常消费：同分类近 6 个月的单笔均值 ×2.5 当阈值。
+     只看已发生的支出，样本少于 3 笔不判（避免新分类误报）。 */
+  function anomalyMap(records) {
+    var byCat = {}, now = new Date(), cut = dateKey(new Date(now.getFullYear(), now.getMonth() - 5, 1));
+    records.forEach(function (r) {
+      if (r.type !== 'expense' || !r.date || r.date < cut) return;
+      var c = r.category || '其它';
+      if (!byCat[c]) byCat[c] = [];
+      byCat[c].push(r.amount);
+    });
+    var out = {};
+    Object.keys(byCat).forEach(function (c) {
+      var a = byCat[c];
+      if (a.length < 3) return;
+      var avg = a.reduce(function (x, y) { return x + y; }, 0) / a.length;
+      out[c] = avg * 2.5;
+    });
+    return out;
+  }
+  function isAnomaly(r, amap) {
+    return r.type === 'expense' && amap[r.category || '其它'] && r.amount >= amap[r.category || '其它'];
+  }
+  function fixedNames(records) {
+    var byName = {}, now = new Date(), cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    var cutKey = dateKey(cutoff);
+    records.forEach(function (r) {
+      if (r.type !== 'expense' || !r.date || r.date < cutKey) return;
+      var k = r.note || r.category || '';
+      if (!k) return;
+      if (!byName[k]) byName[k] = {};
+      byName[k][String(r.date).slice(0, 7)] = true;
+    });
+    var out = {};
+    Object.keys(byName).forEach(function (k) {
+      if (Object.keys(byName[k]).length >= 4) out[k] = true;
+    });
+    return out;
+  }
   function calendarData(year) {
     var map = {}, cnt = {};
     allRecords().forEach(function (r) {
@@ -1372,6 +1412,58 @@
 
   /* 支出构成：HTML 金额榜。右上角「金额 / 占比」切换两种读法，
      条目本身仍可点，跳到对应分类的日历明细。 */
+  /* #12 占比随时间：每月各分类支出占比，堆叠面积到 100% */
+  function renderDonutTrend(p, el) {
+    var recs = scopeRecords().filter(function (r) {
+      return r.type === 'expense' && (state.donutYear === 'all' || String(r.year) === String(state.donutYear));
+    });
+    var byMonth = {};
+    recs.forEach(function (r) {
+      var m = String(r.date || '').slice(0, 7);
+      if (!m) return;
+      if (!byMonth[m]) byMonth[m] = {};
+      var c = r.category || '其它';
+      byMonth[m][c] = (byMonth[m][c] || 0) + r.amount;
+    });
+    var months = Object.keys(byMonth).sort();
+    if (months.length < 2) {
+      el.innerHTML = '<div class="spend-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>至少两个月才有趋势</div>';
+      return;
+    }
+    var cats = EXPENSE_CATS.filter(function (c) {
+      return months.some(function (m) { return (byMonth[m][c] || 0) > 0; });
+    });
+    var colors = catColors(p);
+    var idx = {}; EXPENSE_CATS.forEach(function (c, i) { idx[c] = i; });
+    var series = cats.map(function (c) {
+      return {
+        name: c, type: 'line', stack: 'pct', smooth: true, symbol: 'none',
+        lineStyle: { width: 0 },
+        areaStyle: { opacity: .82, color: colors[idx[c]] },
+        emphasis: { focus: 'series' },
+        data: months.map(function (m) {
+          var t = 0;
+          cats.forEach(function (cc) { t += byMonth[m][cc] || 0; });
+          return t ? round((byMonth[m][c] || 0) / t * 100) : 0;
+        })
+      };
+    });
+    setOpt('chartDonut', {
+      backgroundColor: 'transparent',
+      color: cats.map(function (c) { return colors[idx[c]]; }),
+      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+      textStyle: { fontFamily: p.font },
+      tooltip: tooltipCommon(p, {
+        trigger: 'axis',
+        valueFormatter: function (v) { return Number(v).toFixed(1) + '%'; }
+      }),
+      legend: { bottom: 0, itemWidth: 9, itemHeight: 9, itemGap: 12, textStyle: { color: p.text2, fontSize: 10.5, fontFamily: p.font }, data: cats },
+      grid: { left: 8, right: 12, top: 10, bottom: 34, containLabel: true },
+      xAxis: catAxis(p, months.map(function (m) { return m.slice(5) + '月'; }), { axisLabel: { color: p.muted, fontSize: 10, fontFamily: p.font } }),
+      yAxis: { type: 'value', max: 100, min: 0, axisLabel: { color: p.muted, fontSize: 10, formatter: '{value}%', fontFamily: p.font }, splitLine: { lineStyle: { color: p.border, type: 'dashed' } } },
+      series: series
+    });
+  }
   function renderDonut(p) {
     fillDonutYears();
     var data = catTotals(scopeRecords().filter(function (r) {
@@ -1383,6 +1475,10 @@
       if (old) { old.dispose(); delete charts['chartDonut']; }
     } catch (e) { /* 还没建过实例 */ }
     el.classList.toggle('is-percent', state.donutMode === 'percent');
+    if (state.donutMode === 'trend') {
+      renderDonutTrend(p, el);
+      return;
+    }
     if (!data.length) { el.innerHTML = '<div class="spend-empty"><svg class="empty-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.5 12h-13z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>这一年还没有支出记录</div>'; return; }
     var total = data.reduce(function (sum, d) { return sum + d.value; }, 0);
     /* v1.0.67：月均预算 = 近 6 个有支出月份的均值，给每行算「占预算 %」 */
@@ -1406,7 +1502,7 @@
       var pct = total ? d.value / total * 100 : 0;
       return '<button type="button" class="spend-row" data-cat="' + esc(d.name) + '"' +
         ' title="' + esc(d.name + ' ' + fmtYuan(d.value) + ' · ' + pctText(pct) + '，点击看明细') + '">' +
-        '<span class="spend-rank">' + (i + 1) + '</span>' +
+        '<span class="spend-rank" style="--dot:' + (colors[nameIndex[d.name]] || p.primary) + '">' + (i + 1) + '</span>' +
         '<span class="spend-name">' + esc(d.name) + '</span>' +
         '<span class="spend-track"><i style="width:' + pct.toFixed(1) + '%;background:' +
         (colors[nameIndex[d.name]] || p.primary) + '"></i></span>' +
@@ -1637,7 +1733,8 @@
         axisTick: { show: false }, axisLine: { show: false },
         axisLabel: {
           color: p.text2, fontSize: opt.labelSize || 11, fontWeight: 600, fontFamily: p.font,
-          width: opt.labelWidth || 92, overflow: 'truncate', margin: 10
+          width: opt.labelWidth || 92, overflow: 'truncate', margin: 10,
+          rich: opt.labelRich || undefined
         }
       },
       series: [{
@@ -1793,10 +1890,23 @@
 
   function renderTop(p) {
     var data = topItems(scopeRecords(), 10);
-    var rows = data.map(function (d) { return { name: d.name, value: d.value }; });
+    var fixed = fixedNames(scopeRecords());
+    /* #2 几何标识：给每行标签前面加一枚分类色小方块；#8 固定项加「固」角标。
+       ECharts 的 axisLabel 用 rich 段拼出来，比在画布外再叠 DOM 稳。 */
+    var colorMap = catColors(p);
+    var catIdx = {}; EXPENSE_CATS.forEach(function (c, i) { catIdx[c] = i; });
+    var rich = { dot: { fontSize: 10, color: p.primary } };
+    var rows = data.map(function (d) {
+      var col = colorMap[catIdx[d.category]] || p.primary;
+      var key = 'c' + Math.abs(col.replace(/[^a-zA-Z0-9]/g, '')).toString(36);
+      rich[key] = { fontSize: 13, color: col, fontWeight: 700 };
+      var mark = '{' + key + '|■} ' + esc(d.name) + (fixed[d.name] ? ' 固' : '');
+      return { name: mark, value: d.value };
+    });
     setOpt('chartTop', rankBar(p, rows, {
       fmt: function (v) { return fmtYuan(v); },
-      labelWidth: 98, right: 82, barWidth: 11
+      labelWidth: 98, right: 82, barWidth: 11,
+      labelRich: rich
     }));
     bindClick('chartTop', function (params) {
       if (params.name) jumpToDetail({ reset: true, q: params.name, label: '已搜索：' + params.name });
@@ -2497,10 +2607,11 @@
     var ink = catInk(p, c);
     var sign = r.type === 'income' ? '+' : '−';
     var label = r.note || r.sub;
-    var tip = label + ' · ' + r.sub + ' · ' + fmtYuan(r.amount);
+    var bad = isAnomaly(r, anomalyMap(allRecords()));
+    var tip = label + ' · ' + r.sub + ' · ' + fmtYuan(r.amount) + (bad ? ' · 高于这类平时水平' : '');
     var isNew = r.id && r.id === state.newId && Date.now() < state.newUntil;
     return '<button type="button" class="cal-item' + (r.type === 'income' ? ' is-inc' : '') +
-      (isNew ? ' is-new' : '') +
+      (isNew ? ' is-new' : '') + (bad ? ' is-anomaly' : '') +
       '" data-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + ink + '" title="' + esc(tip) + '">' +
       '<span class="ci-name"><i></i><span>' + esc(label) + '</span></span>' +
       (opts && opts.noAmount ? '' : '<b>' + sign + fmtChip(r.amount) + '</b>') + '</button>';
@@ -2905,6 +3016,27 @@
       ' · 存下 ' + yLeftPct.toFixed(0) + '%</div>' +
       '</div>';
 
+    /* #9 周几消费热力：所有支出按周一~周日汇总，指出「哪天最容易花钱」 */
+    var wdSum = [0, 0, 0, 0, 0, 0, 0], wdCnt = [0, 0, 0, 0, 0, 0, 0];
+    allRecords().forEach(function (r) {
+      if (r.type !== 'expense' || !r.date) return;
+      var dt = new Date(r.date + 'T00:00:00');
+      if (isNaN(dt.getTime())) return;
+      var i = (dt.getDay() + 6) % 7;
+      wdSum[i] += r.amount; wdCnt[i]++;
+    });
+    var wdMax = Math.max.apply(null, wdSum.concat([1]));
+    var wdTop = wdSum.indexOf(wdMax);
+    var wdNames = ['一', '二', '三', '四', '五', '六', '日'];
+    var wdCard =
+      '<div class="ins-wdheat">' + wdSum.map(function (v, i) {
+        var h = Math.max(5, v / wdMax * 100);
+        return '<div class="iwh-col' + (i === wdTop ? ' is-top' : '') + '"' +
+          ' data-tip="' + esc('周' + wdNames[i] + ' · ' + fmtYuan(v) + ' · ' + wdCnt[i] + ' 笔') + '">' +
+          '<i style="height:' + h.toFixed(1) + '%"></i><span>' + wdNames[i] + '</span></div>';
+      }).join('') + '</div>' +
+      '<div class="iwh-note">周' + wdNames[wdTop] + '最多 · ' + fmtYuan(wdMax) + '</div>';
+
     return card('近 7 日支出', line7, 0, '',
         '<span class="ins-key">' + fmtYuan(de) + '</span>') +
       card('今天花得多吗', cmpCard, 1, '', cmpKey) +
@@ -2912,7 +3044,8 @@
         '<span class="ins-key' + (mNow < 0 ? ' is-over' : '') + '">' + fmtYuan(mNow) + '</span>') +
       card('当日分类构成', catCard, 3, '',
         '<span class="ins-key">' + fmtYuan(catTotal) + '</span>') +
-      card('体重记录', weightCard, 4, 'is-weight', weightKey);
+      card('体重记录', weightCard, 4, 'is-weight', weightKey) +
+      card('周几最容易花', wdCard, 5, '', '<span class="ins-key">周' + wdNames[wdTop] + '</span>');
   }
 
   /* 左栏内容随当天分类数变化：先按紧凑排版，仍超高就整体等比缩小，
@@ -3471,11 +3604,18 @@
     var el = document.createElement('div');
     el.className = 'toast' + (kind ? ' ' + kind : '') + (opts.center ? ' is-center' : '') + (opts.low ? ' is-low' : '');
     /* 正中那颗带一个勾：一眼是「成了」，不是「有事」。其余提示还是小圆点。 */
+    /* #5 分级图标：success 勾、warn 叹号、error 叉、info 圆点，
+       center 那颗保留原来的大勾。不靠颜色单独传递语义。 */
+    var kindIcons = {
+      success: '<svg viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      warn: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 6v8M12 17.5v.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
+      error: '<svg viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>'
+    };
     var mark = opts.center
-      ? '<i class="t-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none">' +
-        '<path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="3" ' +
-        'stroke-linecap="round" stroke-linejoin="round"/></svg></i>'
-      : '<i></i>';
+      ? '<i class="t-ico" aria-hidden="true">' + kindIcons.success + '</i>'
+      : (kindIcons[kind]
+        ? '<i class="t-ico t-ico-sm" aria-hidden="true">' + kindIcons[kind] + '</i>'
+        : '<i></i>');
     el.innerHTML = mark + '<span class="t-main">' + esc(msg) + '</span>' +
       (opts.sub ? '<span class="t-sub">' + esc(opts.sub) + '</span>' : '');
     stack.appendChild(el);
@@ -4719,6 +4859,16 @@
   }
 
   function bindEvents() {
+    /* #16 返回顶部：滚动超过一屏才出现，点一下平滑回顶 */
+    var backTop = $('backTop');
+    if (backTop) {
+      var onScroll = function () { backTop.classList.toggle('is-on', (window.scrollY || document.documentElement.scrollTop) > 520); };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+      backTop.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
     window.addEventListener('resize', function () { moveSideGlide(false); });
     var navs = document.querySelectorAll('.nav-item');
     for (var i = 0; i < navs.length; i++) {
@@ -4797,6 +4947,29 @@
 
     /* 表单 */
     var form = $('entryForm');
+    /* #20 自然语言快速记账：在「内容」里写「午餐 35」「打车 28.5」，
+       失焦或回车时把末尾的数字抽出来填进金额框，人只需确认分类。
+       只在金额为空时填，避免覆盖用户已经输入的值。 */
+    var noteEl = $('fNote'), amtEl = $('fAmount');
+    function parseQuickAmount() {
+      if (!noteEl || !amtEl || amtEl.value) return false;
+      var txt = String(noteEl.value || '').trim();
+      var m = /^(.+?)[\s：:]+([¥￥]?\d+(?:\.\d{1,2})?)\s*$/.exec(txt);
+      if (!m || !m[1].trim()) return false;
+      var v = Number(m[2].replace(/[¥￥]/g, ''));
+      if (!isFinite(v) || v <= 0) return false;
+      amtEl.value = v.toFixed(2);
+      noteEl.value = m[1].trim();
+      toast('已填金额 ' + fmtYuan(v), 'info');
+      return true;
+    }
+    if (noteEl) {
+      noteEl.addEventListener('blur', parseQuickAmount);
+      noteEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); parseQuickAmount(); if (amtEl) amtEl.focus(); }
+      });
+      noteEl.placeholder = '午餐 35、房租 2800（写数字自动填金额）';
+    }
     if (form) form.addEventListener('submit', submitEntry);
     if ($('typeToggle')) $('typeToggle').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-type]');
@@ -4906,6 +5079,20 @@
         if (!$('confirmBackdrop').hidden) { closeConfirm(); return; }
         closeModal('esc');
         return;
+      }
+      /* #22 快捷键：N 记一笔、/ 聚焦搜索。输入框里打字时不抢键。 */
+      var tag = (e.target && e.target.tagName || '').toLowerCase();
+      var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
+      if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault(); openModal(); return;
+        }
+        if (e.key === '/') {
+          e.preventDefault();
+          var si = $('searchInput');
+          if (si) { setView('calendar'); si.focus(); }
+          return;
+        }
       }
       /* ← → 翻页：年 / 月 / 周 / 天 四种粒度都走 softStep，
          和两颗箭头、滚轮同一套出入动效 */
@@ -5598,7 +5785,34 @@
     view.appendChild(grid);
     ovGrid = grid;
     applyLayout(validLayout(state.layout) ? state.layout : DEFAULT_LAYOUT);
+    /* #13/#17 用途分区：给卡片打 group 属性，顶部细条按组染色。
+       不插入额外节点，避免打乱 ovGrid.children 的拖拽顺序。 */
+    var GROUPS = {
+      kpi: 'money', calheat: 'life', trend: 'money', donut: 'money', balance: 'money',
+      weight: 'life', stack: 'money', top: 'money',
+      cubestats: 'cube', cubeyear: 'cube', cubetype: 'cube',
+      cubebrand: 'cube', cubeprice: 'cube', compyear: 'cube', compprov: 'cube', compprice: 'cube',
+      salary: 'finance', reimb: 'finance'
+    };
+    Array.prototype.forEach.call(grid.querySelectorAll('.ov-panel'), function (el) {
+      var g = GROUPS[el.dataset.ovId] || 'money';
+      el.dataset.ovGroup = g;
+    });
     bindOverviewEditor();
+    bindCubeFold();
+  }
+  /* #13 魔方板块折叠：给 view 加 class，CSS 隐藏 cube 组卡片。
+     只改显隐，不动 DOM 顺序，布局保存不受影响。 */
+  function bindCubeFold() {
+    var btn = $('ovCubeFold'), view = $('view-overview');
+    if (!btn || !view) return;
+    btn.addEventListener('click', function () {
+      var on = view.classList.toggle('is-cube-folded');
+      btn.setAttribute('aria-pressed', String(on));
+      btn.querySelector('span').textContent = on ? '展开魔方' : '魔方板块';
+      toast(on ? '魔方板块已收起' : '魔方板块已展开', 'info');
+      requestAnimationFrame(resizeAll);
+    });
   }
   function bindOverviewEditor() {
     var editBtn = $('ovEditBtn'), saveBtn = $('ovSaveBtn'), resetBtn = $('ovResetBtn'),
@@ -5613,6 +5827,13 @@
       if (hint) hint.textContent = ovEditing
         ? '拖左上角手柄换位置，拖右下角改大小，排好点「保存布局」'
         : '点「排列布局」可自由调整各板块的位置与大小';
+      /* #14 编辑模式：给每块打上名字，拖的时候看得出手里是哪张卡 */
+      var panels = document.querySelectorAll('#view-overview .ov-panel');
+      Array.prototype.forEach.call(panels, function (el) {
+        var tag = el.querySelector('.ov-name-tag');
+        if (!tag) { tag = document.createElement('span'); tag.className = 'ov-name-tag'; el.appendChild(tag); }
+        tag.textContent = ovTitleOf(el);
+      });
       requestAnimationFrame(resizeAll);
     });
     if (saveBtn) saveBtn.addEventListener('click', function () {
@@ -5928,6 +6149,11 @@
       function () { applyDataset({}); startApp(); });
   }
   function startApp() {
+    /* #3 数字入场：解锁后给核心读数加一次轻微上浮淡入。
+       只跑一次，靠 body 上的 once 标记，避免后续重绘反复触发。 */
+    if (!document.body.classList.contains('nums-in')) {
+      requestAnimationFrame(function () { document.body.classList.add('nums-in'); });
+    }
     document.body.classList.remove('is-booting');
     var pv = window.QZPrivate && window.QZPrivate.status && window.QZPrivate.status();
     if (pv && pv.error) toast('私人数据未载入：' + pv.error + '（当前显示空账本）', 'warn');
