@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.89';
+  var ASSET_V = '1.0.90';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -1214,6 +1214,89 @@
   }
 
   /* ---------------- 图表：总览 ---------------- */
+  /* ---------------- 月度收支小结（v1.0.90） ----------------
+     趋势图只占三分之一宽度（383px），23 个月压进去横轴只剩「25/01、25/07」
+     几个刻度，柱子高低能看个形状，具体数字和「这个月比上个月怎么样」全读
+     不出来。所以在这张图上面补一行硬数字：支出 / 收入 / 结余。
+     当月是不完整的，所以环比拿**上月同一个日号**之前的部分来比 —— 否则每月
+     初打开都是「暴跌 90%」，这种对比还不如没有。 */
+  function renderTrendSum(p, rows) {
+    var box = $('trendSum');
+    if (!box) return;
+    if (!rows || !rows.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+
+    var last = rows[rows.length - 1];
+    var now = new Date();
+    var isCur = last.year === now.getFullYear() && last.month === now.getMonth() + 1;
+    var cut = isCur ? now.getDate() : 31;
+    var prev = rows.length > 1 ? rows[rows.length - 2] : null;
+
+    function moneyText(v) {
+      var n = Math.round(Number(v) || 0);
+      return (n < 0 ? '−¥' : '¥') + Math.abs(n).toLocaleString('zh-CN');
+    }
+
+    /* 上月同期：同一个月、日号 <= 当前日号的那部分 */
+    var pE = null, pI = null;
+    if (prev) {
+      var pe = 0, pi = 0, any = false;
+      scopeRecords().forEach(function (r) {
+        if (r.year !== prev.year || r.month !== prev.month) return;
+        var d = Number(String(r.date || '').slice(8, 10)) || 31;
+        if (d > cut) return;
+        any = true;
+        if (r.type === 'income') pi += r.amount; else pe += r.amount;
+      });
+      if (any) { pE = round(pe); pI = round(pi); }
+    }
+
+    function delta(cur, base) {
+      /* 没有可比的基数（没有上个月，或上月同期是 0）就给一条短横，
+         不显示空白 —— 三格一样高，少一个会更像漏了 */
+      if (base == null || !Math.abs(base)) return '<em class="is-flat">—</em>';
+      /* 结余可能上月为负，环比除以 |上月| 才不会算出「改善 160%」这种怪数 */
+      var b = Math.abs(base);
+      var d = (cur - base) / b * 100;
+      if (!isFinite(d)) return '<em class="is-flat">—</em>';
+      if (Math.abs(d) < .05) return '<em class="is-flat">持平</em>';
+      return '<em class="' + (d > 0 ? 'is-up' : 'is-down') + '">' +
+        (d > 0 ? '↑' : '↓') + Math.abs(d).toFixed(1) + '%</em>';
+    }
+
+    var pB = (pE === null || pI === null) ? null : round(pI - pE);
+
+    box.innerHTML =
+      '<div class="ts-cap"><span>' + last.month + ' 月' +
+        (isCur ? ' · 截至 ' + now.getDate() + ' 日' : '') + '</span>' +
+        '<em>' + (prev ? '较上月同期' : '') + '</em></div>' +
+      '<div class="ts-row">' +
+        '<div class="ts-cell" title="本月支出' + (pE === null ? '' : '，上月同期 ' + moneyText(pE)) + '">' +
+          '<i class="ts-e">支出</i><b data-ts="e">¥0</b>' + delta(last.expense, pE) + '</div>' +
+        '<div class="ts-cell" title="本月收入' + (pI === null ? '' : '，上月同期 ' + moneyText(pI)) + '">' +
+          '<i class="ts-i">收入</i><b data-ts="i">¥0</b>' + delta(last.income, pI) + '</div>' +
+        '<div class="ts-cell" title="本月结余' + (pB === null ? '' : '，上月同期 ' + moneyText(pB)) + '">' +
+          '<i class="ts-b">结余</i><b data-ts="b">¥0</b>' + delta(last.balance, pB) + '</div>' +
+      '</div>';
+
+    var ax = axis();
+    rollNumber(ax, box.querySelector('[data-ts="e"]'), last.expense, moneyText, 0, 2000);
+    rollNumber(ax, box.querySelector('[data-ts="i"]'), last.income, moneyText, 70, 2000);
+    rollNumber(ax, box.querySelector('[data-ts="b"]'), last.balance, moneyText, 140, 2000);
+
+    /* 这块插进来会把下面的图表容器压矮。echarts 的画布高度是 init 那一刻
+       量出来的，容器后变矮它不会自己跟——不补这一下，横轴那排月份刻度会被
+       裁掉。用 ResizeObserver 而不是单次 rAF：卡片高度受栅格行高与标题换行
+       影响，量一次未必是最终值。 */
+    var el = $('chartTrend');
+    if (el && typeof ResizeObserver !== 'undefined' && !el.__ro) {
+      el.__ro = new ResizeObserver(function () {
+        if (charts && charts.chartTrend) charts.chartTrend.resize();
+      });
+      el.__ro.observe(el);
+    }
+  }
+
   function renderTrend(p) {
     var rows = monthlyAgg(scopeRecords());
     var labels = rows.map(function (r) { return r.label; });
@@ -1232,18 +1315,21 @@
         name: '收入', type: 'line', smooth: .34, symbol: 'circle', symbolSize: 6,
         showSymbol: rows.length <= 14, z: 3,
         data: rows.map(function (r) { return r.income; }),
-        lineStyle: { width: 2.6, color: p.income },
+        lineStyle: { width: 2.4, color: p.income },
         itemStyle: { color: p.income, borderColor: p.surface, borderWidth: 2 },
-        areaStyle: { color: gradV(withAlpha(p.income, .26), withAlpha(p.income, 0)) },
+        /* 不再铺面积：工资这种每月几乎一样的收入会是一条贴在顶上的水平线，
+           面积一直填到轴底，整张图变成一块红底，柱子全被盖住。
+           细线 + 上方的小结数字，比一片色块读得清楚。 */
         emphasis: { focus: 'series' }
       });
     }
     var o = baseOption(p);
     o.color = [p.expense, p.income];
-    o.grid = { left: 6, right: 12, top: 40, bottom: 6, containLabel: true };
-    o.legend = { top: 2, right: 2, itemWidth: 10, itemHeight: 10, itemGap: 16, icon: 'roundRect',
-      formatter: function (name) { return name === '收入' ? '收入 ↑' : name === '支出' ? '支出 ↓' : name; },
-      textStyle: { color: p.text2, fontSize: 11.5, fontFamily: p.font } };
+    /* 图上不放图例：上面那行小结里「支出 / 收入」两个词已经用同一个色标了，
+       既省掉 40px 的顶部留白（这张卡只剩 185px 给图，横轴刻度会被挤没），
+       也不用在同一张卡里出现两套「谁是谁」。 */
+    o.legend = { show: false };
+    o.grid = { left: 6, right: 12, top: 16, bottom: 6, containLabel: true };
     o.tooltip = tooltipCommon(p, {
       trigger: 'axis',
       axisPointer: { type: 'shadow', shadowStyle: { color: withAlpha(p.muted, .09) } },
@@ -1258,6 +1344,9 @@
        鼠标停在趋势图上时整页滚不动。数据最多 36 个月，本来也不需要缩放。 */
     o.dataZoom = [];
     o.series = series;
+    /* 先铺小结再画图：容器的最终高度是由这块决定的，晚一步 echarts 就会
+       按旧高度开画布，底部那排月份刻度会被裁掉。 */
+    renderTrendSum(p, rows);
     setOpt('chartTrend', o);
     lastTrendRows = rows;
     bindAxisClick('chartTrend', function (idx) { jumpMonthFromRow(lastTrendRows[idx]); });

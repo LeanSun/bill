@@ -3785,24 +3785,32 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 }
 
 /* ==================================================================
-   v1.0.74 · 当日明细栏的「今天」填充
+   v1.0.90 · 当日明细栏的「今天」底色（重做）
    ----------------------------------------------------------------
-   左栏粉底 = 周末（中性日期属性），这一栏的蓝 = 今天（「你正在看此刻」）。
-   两套色各管一件事，今天恰好是周末时左粉右蓝并排也不混淆。
-   v1.0.77：只保留背景渐变填充 —— 去掉左侧竖条、顶部色带、分隔线染色。
-   用户要的是「背景颜色填充」，边框类装饰不要。
+   旧版是一条从左到右的横向渐变：左边缘 26% 主色、右端 8%。一列 500px
+   高的竖长区域被劈成「深左—浅右」，像刷墙刷到一半停手；行本身是浅灰
+   卡片，压在偏蓝的底上还会泛出一层脏紫。
+   问题的根不在深浅，在手法不一致：左栏用平铺粉表达周末，这一栏却用
+   横向渐变，两块并排时谁都不像谁。现在改成同一套语言 ——
+   整栏一层很淡的平涂蓝（纸面），行级卡片换成白底（浮在纸面上）。
+   于是「今天」是：淡蓝纸 + 白卡片 + 标题旁的蓝色徽章，三层说同一件事，
+   而数字读在纯白上，比读在灰卡上更清楚。
    ================================================================== */
 .day-list.is-today {
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--primary) 26%, var(--surface)) 0%,
-    color-mix(in srgb, var(--primary) 17%, var(--surface)) 46%,
-    color-mix(in srgb, var(--primary) 8%, var(--surface)) 100%);
+  background: color-mix(in srgb, var(--primary) 6.5%, var(--surface));
 }
+/* 淡蓝纸面 + 白卡片：让每一行从底色上真正「浮」起来 */
+.day-list.is-today .dl-cat {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--primary) 12%, var(--border));
+}
+.day-list.is-today .day-list-head { border-bottom-color: color-mix(in srgb, var(--primary) 16%, var(--border)); }
 html[data-theme="dark"] .day-list.is-today {
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--primary) 34%, var(--surface)) 0%,
-    color-mix(in srgb, var(--primary) 24%, var(--surface)) 46%,
-    color-mix(in srgb, var(--primary) 13%, var(--surface)) 100%);
+  background: color-mix(in srgb, var(--primary) 13%, var(--surface));
+}
+html[data-theme="dark"] .day-list.is-today .dl-cat {
+  background: color-mix(in srgb, var(--surface) 92%, var(--primary));
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
 }
 /* 标题旁的小徽章，和左栏日期卡的「今天」同一套视觉，只是缩一档 */
 .dl-today {
@@ -4085,4 +4093,61 @@ html[data-theme="dark"] .day-list.is-today {
   /* 月格里的「＋」在触屏上会 42 个同时显形（没有 hover 可收），
      点格子进当天就能记，这里直接收掉 */
   .cal-grid .cal-add { display: none; }
+}
+
+/* ==================================================================
+   v1.0.90 · 总览「月度收支」补数字
+   ------------------------------------------------------------------
+   这张卡只有 383px 宽（12 栅格里占 4），23 个月压进去后横轴只剩几个
+   刻度，柱子能看形状、读不出数。图上面补一行：支出 / 收入 / 结余，
+   支出与收入各带一个「较上月同期」的百分比，结余带「占收入」。
+   ================================================================== */
+.tr-sum {
+  display: flex; flex-direction: column; gap: 5px;
+  margin: 2px 0 4px; padding: 8px 11px 9px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 76%, var(--surface));
+}
+html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2) 90%, var(--surface)); }
+.ts-cap {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-size: 10.5px; color: var(--muted); line-height: 1.1;
+}
+.ts-cap span { font-weight: 700; color: var(--text-2); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.ts-cap em { font-style: normal; font-size: 10px; white-space: nowrap; }
+.ts-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ts-cell { display: flex; align-items: baseline; gap: 2px; min-width: 0; overflow: hidden; }
+.ts-cell i { font-style: normal; font-size: 10.5px; color: var(--muted); flex: 0 0 auto; }
+/* 三个词兼作图例：图上的柱=支出、线=收入，颜色一致就不用再放 ECharts 图例 */
+.ts-cell i.ts-e { color: color-mix(in srgb, var(--expense) 88%, var(--text)); }
+.ts-cell i.ts-i { color: color-mix(in srgb, var(--income) 88%, var(--text)); }
+.ts-cell i.ts-b { color: color-mix(in srgb, var(--primary) 82%, var(--text)); }
+.ts-cell b {
+  font-size: 13.5px; font-weight: 700; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ts-cell em {
+  font-style: normal; font-size: 9.5px; font-weight: 700; color: var(--text-2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* 变化量统一用次级文字色，箭头表达方向就够：
+   这个 App 里绿=支出、红=收入，再拿它们表示「涨了好/跌了糟」会打架 ——
+   收入跌显示绿色，第一眼会读成好事。 */
+.ts-cell em.is-flat { color: var(--muted); font-weight: 600; }
+/* 窗口一窄，这张卡从 383px 缩到 ~280px，一行放不下「标签 + 金额 + 百分比」。
+   不让它被裁掉半截：改成两行，百分比落到金额正下方。 */
+@media (max-width: 1400px) {
+  .ts-cell { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 5px; row-gap: 0; }
+  .ts-cell i { grid-column: 1; grid-row: 1; }
+  .ts-cell b { grid-column: 2; grid-row: 1; }
+  .ts-cell em { grid-column: 2; grid-row: 2; }
+  .ts-cell b, .ts-cell em { overflow: hidden; text-overflow: ellipsis; }
+  /* 让出标题的位置：原来这颗分段控件锁 210px，卡片一窄就把「月度收支趋势」
+     挤成两行、副标题再折一行，卡片头上半截全是换行 */
+  #trendScope { min-width: 146px; }
+  #trendScope button { font-size: 12px; }
+}
+@media (max-width: 1240px) {
+  .ts-cell b { font-size: 12.5px; }
+  .ts-cell em { font-size: 9px; }
 }

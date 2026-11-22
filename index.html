@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#f5f7fa" data-page-node-id="YNZhYru6j3RsrXDah5InT4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%234a6cf7'/%3E%3Crect x='8' y='21' width='6' height='12' rx='2.5' fill='white' opacity='.55'/%3E%3Crect x='17' y='13' width='6' height='20' rx='2.5' fill='white' opacity='.8'/%3E%3Crect x='26' y='7' width='6' height='26' rx='2.5' fill='white'/%3E%3C/svg%3E" data-page-node-id="ljD9H3EvTZuStNxnHHhOfD">
 <title>轻账 · 收支看板</title>
-<link rel="stylesheet" href="assets/ui-select.css?v=1.0.89">
-<link rel="stylesheet" href="assets/styles.css?v=1.0.89" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
+<link rel="stylesheet" href="assets/ui-select.css?v=1.0.90">
+<link rel="stylesheet" href="assets/styles.css?v=1.0.90" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
 </head>
 <body class="is-booting" data-page-node-id="tMyPJ5SSZhJcCq6bXrfJH7">
 <script>setTimeout(function(){document.body.classList.remove("is-booting")},3000)</script>
@@ -188,6 +188,7 @@
                 <button type="button" data-scope="income" data-page-node-id="DDx9DU0qnWAP9iiVZ9XmH5">收入</button>
               </div>
             </div>
+            <div class="tr-sum" id="trendSum" hidden></div>
             <div class="chart chart-lg" id="chartTrend" data-page-node-id="mJu3KpV3T8w4ukwD8yJUem"></div>
           </article>
 
@@ -705,22 +706,37 @@
   </button>
 </div>
 
-<script src="assets/echarts.min.js?v=1.0.89" defer></script>
-<script src="assets/vault.js?v=1.0.89"></script>
-<script src="assets/boot.js?v=1.0.89"></script>
-<script src="assets/ui-select.js?v=1.0.89"></script>
-<script src="assets/app.js?v=1.0.89"></script>
+<script src="assets/echarts.min.js?v=1.0.90" defer></script>
+<script src="assets/vault.js?v=1.0.90"></script>
+<script src="assets/boot.js?v=1.0.90"></script>
+<script src="assets/ui-select.js?v=1.0.90"></script>
+<script src="assets/app.js?v=1.0.90"></script>
 <script>window.addEventListener("load",function(){try{UISelect.init()}catch(e){}});</script>
-<script src="assets/sync.js?v=1.0.89"></script>
+<script src="assets/sync.js?v=1.0.90"></script>
 <script>
-/* 离线加速：静态资源走本地缓存，页面本身始终取最新（详见 sw.js 顶部说明） */
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+/* 离线加速：静态资源走本地缓存，页面本身始终取最新（详见 sw.js 顶部说明）。
+   localhost 也算安全上下文，本地调试同样注册，省得两套行为。
+
+   v1.0.90：这条提示之前一直不弹，根因不在这一段 —— 浏览器判断「有没有新版」
+   只看 sw.js 自己的字节有没有变。我一直只改 app.js 的 ?v=，sw.js 一个字符
+   都没动，于是 skipWaiting 从不触发、controllerchange 从不发生，提示自然
+   永远等不到。现在 sw.js 里加了 BUILD 戳，每次发版跟着改，这条才会真的出现。
+   这里顺手补两件事：
+     1) 页面在后台放了很久（没关也没刷）—— 回到前台主动问一次有没有新版；
+     2) 强制刷新过的标签页 controller 是空的，不能只拿 hadCtl 判「首次安装」，
+        页面活过 8 秒之后再被接管，同样算更新。 */
+(function () {
+  var secure = location.protocol === 'https:' ||
+    location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!('serviceWorker' in navigator) || !secure) return;
+
   window.addEventListener('load', function () {
     var bar = document.getElementById('updateBar');
-    /* 这次打开时页面是否已经被某个 SW 接管 —— 没有的话说明是首次安装，
-       新 SW 上线不算「有新版本」，不该弹条。 */
+    var t0 = Date.now(), lastCheck = Date.now(), snoozed = false, reg = null;
+    /* 这次打开时页面是否已被某个 SW 接管；没有 = 首次安装，别弹 */
     var hadCtl = !!navigator.serviceWorker.controller;
-    var snoozed = false;
+
+    function isUpdateMoment() { return hadCtl || Date.now() - t0 > 8000; }
     function showBar() {
       if (!bar || snoozed || !bar.hidden) return;
       bar.hidden = false;
@@ -731,7 +747,15 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
       bar.classList.remove('is-on');
       setTimeout(function () { bar.hidden = true; }, 220);
     }
-    navigator.serviceWorker.register('sw.js', { scope: './' }).then(function (reg) {
+    function checkUpdate() {
+      if (!reg) return;
+      if (Date.now() - lastCheck < 5 * 60 * 1000) return;   /* 5 分钟内不重复问 */
+      lastCheck = Date.now();
+      try { reg.update(); } catch (e) {}
+    }
+
+    navigator.serviceWorker.register('sw.js', { scope: './' }).then(function (r) {
+      reg = r;
       /* 上次没刷新的旧页面：新 SW 已经在排队 */
       if (reg.waiting && hadCtl) showBar();
       /* 跳过等待后 controllerchange 也会触发，这里只是兜底（Safari 时序略有不同） */
@@ -739,7 +763,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
         var nw = reg.installing;
         if (!nw) return;
         nw.addEventListener('statechange', function () {
-          if (nw.state === 'installed' && hadCtl) showBar();
+          if (nw.state === 'installed' && isUpdateMoment()) showBar();
         });
       });
       document.getElementById('updateNow').addEventListener('click', function () {
@@ -747,16 +771,24 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
         location.reload();
       });
     }).catch(function () {});
+
     document.getElementById('updateLater').addEventListener('click', function () {
       snoozed = true;
       hideBar();
     });
+
     /* 新 SW 接管当前页面：页面里跑的仍是旧 JS，提示刷新一次 */
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (hadCtl) showBar();
+      if (isUpdateMoment()) showBar();
+    });
+
+    /* 回到前台才检查：不影响首屏，也不会在后台偷偷跑网络 */
+    window.addEventListener('focus', checkUpdate);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) checkUpdate();
     });
   });
-}
+})();
 </script>
 </body>
 </html>
