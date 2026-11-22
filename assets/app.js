@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.95';
+  var ASSET_V = '1.0.96';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2856,19 +2856,28 @@
      46px 是两块式再高也只是空，不如把空间留给下面的行 */
   var ENTRY_GAP = 3, ENTRY_MIN = 22, ENTRY_MAX = 48;
   /* v1.0.94：月格条目高度改成定值，不再「条少就发胖」。
-     v1.0.95：26 → 35。定高之后每个胶囊同一个尺寸，一列数字右对齐成一条线；
-     条数多也不缩，放不下才走「+N 笔」。 */
-  var MONTH_ROW = 35;
+     v1.0.96：容量固定成「2 列 × 2 行」四格，行高由整格高度按两行反推。
+       不再按「这一格能站几行」算的原因：能站几行取决于窗口高度 —— 1000px
+       高的窗口一格 84px（站得下两行 35px），900px 只剩 68px（只站得下一行），
+       于是同一份数据在大窗口是「3 条全显示」、小窗口变成「2 条 + 1 笔」。
+       容量现在是一条规则而不是算出来的结果：≤4 条全显示，>4 条前 3 条 +
+       第 4 格「+N 笔」，窗口多高都一个样子。
+     行高只跟高度有关，且两行永远取同一个值 —— 只放 1 条的格子也不发胖，
+     全月胶囊因此完全同尺寸。 */
+  var MONTH_SLOTS = 4;        /* 2 列 × 2 行 */
+  /* 两行各 20px 是可读底线：10.5px 的字行高 12.4px，上下还各留得下 3.8px。
+     这个数不是「理想行高」而是「两行模式的准入门槛」—— 1366×768 的笔记本
+     一格只有 47px，门槛要是卡在 24（需要 52px）就整片降级成一行，
+     三条记录只能显示一条 + 「+2 笔」，那正是要避免的。 */
+  var MONTH_ROW_MIN = 20;
+  var MONTH_ROW_MAX = 40;     /* 再高就是一颗胖胶囊：77px 宽的身子拉到 44px 会显臃肿，
+                                 多出来的高度留成底部呼吸更好看 */
+  var MONTH_GAP = 4;          /* 两行之间 4px —— 40px 的胶囊旁边 3px 的缝看着是黏住的 */
+  /* 行高低于这个数走单行式（名称 …… 金额）。40 是两块式的最低身高：
+     名称 15.6 + 金额 15 + 上下内边距 5 = 35.6，再多抠就挤在一起了。 */
+  var ENTRY_TIGHT_AT = 40;
   function narrowGrid() {
     return !!(window.matchMedia && window.matchMedia('(max-width: 620px)').matches);
-  }
-  /* 指针设备（有 hover）才把月格右下角那颗 ＋ 收起来。没有 hover 的触屏
-     必须让它常驻，否则快记一笔就没有入口了。 */
-  var HOVER_ML = null;
-  function hoverPointer() {
-    if (!window.matchMedia) return true;
-    if (!HOVER_ML) HOVER_ML = window.matchMedia('(hover: hover)');
-    return HOVER_ML.matches;
   }
   /* 条少 —— 每条高一截，最多 48px；条多 —— 均分，压到 22px 为止；
      再多的部分折成 "+N 笔"，点格子或它都进当日明细。
@@ -2878,7 +2887,7 @@
      写一次 --row-h」，42 个格子就是 42 次强制重排 —— 月历每次重建要 40ms 上下，
      正好压在滑块动画的尾巴上。现在月历先量完所有格子再统一写，整条重建只剩
      一次布局。 */
-  function measureStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside, shared) {
+  function measureStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside, shared, fixedCap) {
     var nodes = box.querySelectorAll('.cal-item');
     var count = nodes.length;
     if (!count) return { cell: cell, box: box, count: 0, moreOutside: moreOutside, host: moreOutside ? cell : box };
@@ -2901,6 +2910,36 @@
     /* 整格可用高度（不扣 ＋ 与 +N 笔） */
     var availFull = Math.max(minRow, cell.clientHeight - padT - padB - headH);
     var avail = Math.max(minRow, availFull - extraH);
+
+    /* ---- 固定四格档（桌面月格）--------------------------------------
+       行数由规则定、不由可用高度定：永远按两行算，只放 1 条的格子也用同一个
+       行高 —— 一格一个高度，全月胶囊才一样大。
+       available 真不够两行（矮窗口）时才退回一行：两行各 12px 的方块里连
+       11px 的字都塞不下，不如老老实实一行 + 「+N 笔」。 */
+    if (fixedCap) {
+      var twoRows = avail >= minRow * 2 + MONTH_GAP;
+      var rowsF = twoRows ? Math.max(1, Math.round(fixedCap / perRow)) : 1;
+      var capF = rowsF * perRow;
+      var keepF = count < capF ? count : capF;
+      var restF = count - keepF;
+      if (restF > 0) {
+        /* 第 4 格让给「+N 笔」：前 3 条照常显示，末格挂一个 +N。
+           restF 是"还有多少笔没露出来"，不是"总数"。 */
+        keepF = Math.max(1, capF - 1);
+        restF = count - keepF;
+      }
+      var rowHF = Math.floor((avail - MONTH_GAP * (rowsF - 1)) / rowsF);
+      rowHF = Math.max(minRow, Math.min(maxRow, rowHF));
+      /* 月格一律单行式（名称 …… 金额）。两块式（名在上、金额在下）是给
+         周视图那种 130px 宽的一列一条用的；77px 宽的月格套两块式，名称贴
+         左上角、金额贴右下角，中间空出一大块，看起来像两块碎片而不是一颗
+         胶囊 —— 这是 v1.0.96 加高行高之后才暴露出来的。 */
+      return {
+        cell: cell, box: box, host: box, nodes: nodes,
+        count: count, keep: keepF, rest: restF, rowH: rowHF,
+        moreOutside: false, tight: true
+      };
+    }
 
     var rowsFit = Math.max(1, Math.floor((avail + ENTRY_GAP) / (minRow + ENTRY_GAP)));
     var capacity = rowsFit * perRow;
@@ -2930,15 +2969,10 @@
     var rows = Math.max(1, Math.ceil(slots / perRow));
     var rowH = Math.floor((boxH - ENTRY_GAP * (rows - 1)) / rows);
     rowH = Math.max(minRow, Math.min(maxRow, rowH));
-    /* 右下角有没有被方块占住：占住了那颗悬停才出现的 ＋ 就会压在本日最后一笔
-       的金额上，宁可这一格不给 ＋（点格子进当日明细一样能记），也不要糊住数字。
-       判据：方块铺满整行（末位的右半格也有东西），且已经站到第二行以下。
-       触屏那档给 ＋ 让过位（extraH > 0），不存在这个冲突。 */
-    var full = !moreOutside && !extraH && slots % perRow === 0 && rows >= 2;
 
     return {
       cell: cell, box: box, host: moreOutside ? cell : box, nodes: nodes,
-      count: count, keep: keep, rest: rest, rowH: rowH, moreOutside: moreOutside, full: full
+      count: count, keep: keep, rest: rest, rowH: rowH, moreOutside: moreOutside
     };
   }
   function commitStack(job) {
@@ -2947,17 +2981,16 @@
     if (!job.count) {
       if (more) more.parentNode.removeChild(more);
       if (job.moreOutside) cell.classList.remove('has-more');
-      cell.classList.remove('is-full');
       return;
     }
     /* nodes 是活集合，从头往后删，每删一个后面的下标自然前移 */
     var nodes = job.nodes;
     for (var k = job.keep; k < job.count; k++) box.removeChild(nodes[k]);
     box.style.setProperty('--row-h', job.rowH + 'px');
-    /* 两块式（名在上、金额在下）要 40px 才站得住。35px 的月格走单行式，
+    /* 两块式（名在上、金额在下）要 40px 才站得住。月格在 40px 以下走单行式，
        否则同一个月的格子会一半两块式一半单行式 —— 那正是「胶囊形状不一样」。
        周格一列 130px，行高常常 48px 以上，仍用两块式。 */
-    box.classList.toggle('is-tight', job.rowH < 42);
+    box.classList.toggle('is-tight', job.tight !== undefined ? job.tight : job.rowH < ENTRY_TIGHT_AT);
 
     if (job.rest > 0) {
       if (!more) {
@@ -2973,7 +3006,6 @@
       more.parentNode.removeChild(more);
     }
     if (job.moreOutside) cell.classList.toggle('has-more', job.rest > 0);
-    if (job.full !== undefined) cell.classList.toggle('is-full', !!job.full);
   }
   function fitStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside) {
     commitStack(measureStack(cell, box, headSel, perRow, minRow, maxRow, extraSel, moreOutside));
@@ -2983,17 +3015,14 @@
     var narrow = narrowGrid();
     var perRow = narrow ? 1 : 2;
     var cells = grid.children;
-    /* v1.0.95：月格条目现在占满整格高度，不再给右下角的 ＋ 预留 28px。
-       原因有两条：
-         1. 35px 的胶囊里，一格最多站两行（2×2=4 条）。预留 28px 之后只能站
-            一行，「3 条」就变成了 2 条 + 「+1 笔」—— 这正是要去掉的那种。
-         2. 有 hover 的设备上那颗 ＋ 改成悬停才出现（见 styles.css），
-            平时不占空间也就不该占位置。
-       触屏没有 hover，＋ 必须常驻，所以那里照旧把 28px 让出来。 */
-    var reserveAdd = narrow || !hoverPointer();
-    var extraSel = reserveAdd ? '.cal-add' : null;
-    var minRow = narrow ? 5 : MONTH_ROW;
-    var maxRow = narrow ? 6 : MONTH_ROW;
+    /* v1.0.96：右下角那颗 ＋ 取消了，整格高度都归条目，不给任何东西预留 28px。
+       于是「3 条」不会再被压成「2 条 + 1 笔」，2×2 四格也才站得下。 */
+    var extraSel = null;
+    /* 手机窄档仍是一列 5~6px 的纯色条（一格 50px 宽放不下两颗带字的胶囊）；
+       桌面按规则固定四格，行高 24~44 之间由整格高度反推。 */
+    var minRow = narrow ? 5 : MONTH_ROW_MIN;
+    var maxRow = narrow ? 6 : MONTH_ROW_MAX;
+    var fixedCap = narrow ? 0 : MONTH_SLOTS;
 
     /* 先量完所有格子（只读），再统一写回去（只写）—— 一次布局，不是 42 次 */
     var jobs = [];
@@ -3012,7 +3041,7 @@
       var box = cells[i].querySelector('.cal-items');
       if (!box) continue;
       /* narrow 那档的「+N 笔」是格子底部的横条（不是格子里的方块） */
-      jobs.push(measureStack(cells[i], box, '.cal-cell-head', perRow, minRow, maxRow, extraSel, narrow, shared));
+      jobs.push(measureStack(cells[i], box, '.cal-cell-head', perRow, minRow, maxRow, extraSel, narrow, shared, fixedCap));
     }
     for (var j = 0; j < jobs.length; j++) commitStack(jobs[j]);
   }
@@ -3039,13 +3068,16 @@
       if (key === today) cls += ' is-today';
       if (key === state.focusDate) cls += ' is-focus';
       /* 先把全部条目都写进去，裁几条、每条多高，交给第二遍按真实高度算 */
+      /* v1.0.96：不再生成右下角那颗 ＋。月格四格都被条目占满，它没地方站。
+         入口没丢 —— 单击格子就是「记一笔」（和这颗 ＋ 同一个动作），
+         双击进当日明细，侧栏也常年有「+ 记一笔」。
+         周视图的 ＋ 仍在（见 renderWeekBoard）—— 一列一条的宽栏底部有空位。 */
       html += '<div class="' + cls + '" data-date="' + key + '" data-other="' + (other ? '1' : '0') + '">' +
         (!other && key === today ? '<i class="cal-beam" aria-hidden="true"></i>' : '') +
         '<div class="cal-cell-head"><div class="cal-dayleft"><span class="cal-daynum">' + d.getDate() + '</span>' +
         (d.getDate() === 1 ? '<span class="cal-monthtag">' + (d.getMonth() + 1) + '月</span>' : '') + '</div>' +
         daySumHTML(p, items) + '</div>' +
         '<div class="cal-items">' + items.map(function (r) { return itemHTML(p, r); }).join('') + '</div>' +
-        (other ? '' : '<button type="button" class="cal-add" data-add="' + key + '" aria-label="在 ' + key + ' 新增">+</button>') +
         '</div>';
     }
     grid.innerHTML = html;
