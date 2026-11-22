@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.83';
+  var ASSET_V = '1.0.84';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2181,7 +2181,9 @@
       if (now - start < delay) { requestAnimationFrame(step); return; }
       if (!fired) { fired = true; start = now; }
       var t = Math.min(1, (now - start) / dur);
-      var e = 1 - Math.pow(1 - t, 3);
+      /* 尾段缓停：quartic ease-out 比 cubic 在最后 30% 慢得多，
+         数字会先快后慢慢「落定」，不是匀速冲到终点硬停。 */
+      var e = 1 - Math.pow(1 - t, 4);
       el.textContent = formatter(prev + (target - prev) * e);
       if (t < 1) requestAnimationFrame(step);
       else el.textContent = formatter(target);
@@ -2206,7 +2208,7 @@
         if (now - start < delay) { requestAnimationFrame(step); return; }
         if (!fired) { fired = true; start = now; }
         var t = Math.min(1, (now - start) / dur);
-        var e = 1 - Math.pow(1 - t, 3);
+        var e = 1 - Math.pow(1 - t, 4);
         var v = target * e;
         el.textContent = pre + (dec
           ? v.toFixed(dec)
@@ -2217,7 +2219,7 @@
       requestAnimationFrame(step);
     });
   }
-  function sparkline(svg, values, color, w, h) {
+  function sparkline(svg, values, color, w, h, opt) {
     if (!svg) return;
     if (!values.length) { svg.innerHTML = ''; return; }
     w = w || 120; h = h || 34;
@@ -2231,6 +2233,29 @@
     var d = pts.map(function (pt, i) { return (i ? 'L' : 'M') + pt[0].toFixed(1) + ',' + pt[1].toFixed(1); }).join(' ');
     var area = d + ' L' + (w - pad) + ',' + h + ' L' + pad + ',' + h + ' Z';
     svg.innerHTML = '<path class="area" d="' + area + '" fill="' + color + '"/><path class="line" d="' + d + '" stroke="' + color + '"/>';
+    /* 折线与数字同步增长：从左到右描边，淡填充随后浮出 */
+    if (opt && opt.animate) {
+      var line = svg.querySelector('.line'), fillPath = svg.querySelector('.area');
+      var dur = opt.dur || 2000, delay = opt.delay || 0;
+      if (line) {
+        var len = 0;
+        try { len = line.getTotalLength(); } catch (err) { len = 0; }
+        if (!len || !isFinite(len)) len = w * 2;
+        line.style.transition = 'none';
+        line.style.strokeDasharray = len + ' ' + len;
+        line.style.strokeDashoffset = String(len);
+        void line.getBoundingClientRect();
+        line.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(.22,1,.36,1) ' + delay + 'ms';
+        line.style.strokeDashoffset = '0';
+      }
+      if (fillPath) {
+        fillPath.style.transition = 'none';
+        fillPath.style.opacity = '0';
+        void fillPath.getBoundingClientRect();
+        fillPath.style.transition = 'opacity ' + Math.round(dur * .8) + 'ms ease-out ' + (delay + 160) + 'ms';
+        fillPath.style.opacity = '';
+      }
+    }
   }
 
   /* ---------------- 概览条 ---------------- */
@@ -2322,12 +2347,20 @@
     setText('kpiRateSub', balance >= 0 ? '结余 ' + fmtBig(balance) : '超支 ' + fmtBig(-balance));
     setText('kpiRateSub2', prevRate === null ? '近 ' + months + ' 个月' : '去年 ' + prevRate.toFixed(1) + '%');
 
+    /* 比例条与储蓄率数字同步：从 0 起、同样 2s、同样错峰 270ms 与 quart 缓停 */
     var fill = $('rateFill');
-    if (fill) fill.style.width = Math.max(0, Math.min(100, rate)).toFixed(1) + '%';
+    if (fill) {
+      var targetW = Math.max(0, Math.min(100, rate)).toFixed(1) + '%';
+      fill.style.transition = 'none';
+      fill.style.width = '0%';
+      void fill.offsetWidth;
+      fill.style.transition = 'width 2000ms cubic-bezier(.22,1,.36,1) 270ms';
+      fill.style.width = targetW;
+    }
 
-    sparkline($('sparkIncome'), rows.map(function (r) { return r.income; }), p.income, 100, 26);
-    sparkline($('sparkExpense'), rows.map(function (r) { return r.expense; }), p.expense, 100, 26);
-    sparkline($('sparkBalance'), rows.map(function (r) { return r.balance; }), p.primary, 100, 26);
+    sparkline($('sparkIncome'), rows.map(function (r) { return r.income; }), p.income, 100, 26, { animate: true, dur: 2000, delay: 0 });
+    sparkline($('sparkExpense'), rows.map(function (r) { return r.expense; }), p.expense, 100, 26, { animate: true, dur: 2000, delay: 90 });
+    sparkline($('sparkBalance'), rows.map(function (r) { return r.balance; }), p.primary, 100, 26, { animate: true, dur: 2000, delay: 180 });
   }
 
   function setText(id, v) {
@@ -3170,7 +3203,7 @@
       '</div>' +
       /* 顺序照他改的来：先说内容（写的时候顺手就把分类认出来了），
          分类子类其次，金额压到最后一行跟保存并排 */
-      '<label class="dq-note"><span>内容</span><input type="text" id="qNote" maxlength="40" placeholder="例如：午餐、房租" autocomplete="off"></label>' +
+      '<label class="dq-note"><span>内容</span><input type="text" id="qNote" maxlength="40" placeholder="例如：午餐 35、房租 2800" autocomplete="off"></label>' +
       '<div class="dq-row">' +
       '<label><span>分类</span><select id="qCategory"></select></label>' +
       '<label><span>子类</span><select id="qSub"></select></label>' +
@@ -3995,8 +4028,27 @@
     renderAll();
     toast('已删除这天的体重', 'info');
   }
+  /* 天页快速表单：备注末尾写数字就自动填金额，和弹窗表单同一套体验。
+     支持「午餐 35」「午餐35」「房租 2800.50」「¥88」；只在金额为空时填，
+     不覆盖已经手填的数。失焦 / 回车 / 保存前各调用一次，确保任何操作路径都能识别。 */
+  function quickParseAmount() {
+    var note = $('qNote'), amt = $('qAmount');
+    if (!note || !amt || amt.value) return false;
+    var txt = String(note.value || '').trim();
+    var m = /^(.+?)[\s：:]*[¥￥]?\s*(\d+(?:\.\d{1,2})?)\s*$/.exec(txt);
+    if (!m || !m[1].trim()) return false;
+    var v = Number(m[2]);
+    if (!isFinite(v) || v <= 0) return false;
+    /* 「¥88」这种写法会把 ¥ 留在备注里，顺手去掉 */
+    note.value = m[1].trim().replace(/^[¥￥]\s*/, '').trim();
+    amt.value = v.toFixed(2);
+    toast('已填金额 ' + fmtYuan(v), 'info');
+    return true;
+  }
   function submitQuick(e) {
     e.preventDefault();
+    /* 点「保存这笔」时 blur 未必先到，这里兜底解析一次 */
+    quickParseAmount();
     var err = $('qError');
     var msg = commitEntry({
       amount: $('qAmount') ? $('qAmount').value : '',
@@ -5359,6 +5411,21 @@
           }
         }
       });
+      /* 备注失焦 / 回车：自动把末尾数字抽成金额 */
+      boardEl.addEventListener('focusout', function (e) {
+        if (e.target && e.target.id === 'qNote') quickParseAmount();
+      });
+      boardEl.addEventListener('keydown', function (e) {
+        if (!e.target || e.target.id !== 'qNote') return;
+        /* 有弹窗盖着时交给全局键盘逻辑（确认框 Enter = 删除），别在这里抢 */
+        var mb = $('modalBackdrop'), cb = $('confirmBackdrop');
+        if ((mb && !mb.hidden) || (cb && !cb.hidden)) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (quickParseAmount()) { var a = $('qAmount'); if (a) a.focus(); }
+          else { var f = $('quickEntryForm'); if (f) f.requestSubmit ? f.requestSubmit() : submitQuick({ preventDefault: function () {} }); }
+        }
+      });
       boardEl.addEventListener('change', function (e) {
         if (e.target && e.target.id === 'qCategory') { quickCatManual = true; paintSelect($('qCategory')); fillQuickSubs(); }
         if (e.target && e.target.id === 'qSub') paintSelect($('qSub'));
@@ -5556,11 +5623,28 @@
     pageTurn(dir);
   }
 
+  /* 滚轮落在可滚动的子容器（天页左栏表单、下拉列表等）里时，
+     先看它自己还能不能沿这个方向滚 —— 能滚就让它滚，别抢走翻页；
+     已经滚到边界了再把事件交给日历翻页。这样表单再长也不会被滚轮跳过。 */
+  function keepsNativeScroll(target, root, dy) {
+    var n = target && target.nodeType === 1 ? target : null;
+    while (n && n !== root) {
+      var st = window.getComputedStyle ? getComputedStyle(n) : null;
+      var oy = st && st.overflowY;
+      if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && n.scrollHeight > n.clientHeight + 2) {
+        var max = n.scrollHeight - n.clientHeight;
+        if ((dy < 0 && n.scrollTop > 1) || (dy > 0 && n.scrollTop < max - 1)) return true;
+      }
+      n = n.parentElement;
+    }
+    return false;
+  }
+
   function bindWheelPaging() {
     [
       { el: $('calGrid'), skip: '' },
       { el: $('calWeekGrid'), skip: '' },
-      { el: $('calDayBoard'), skip: '.day-side' },  /* 左栏表单自己要能滚，不抢它的滚轮 */
+      { el: $('calDayBoard'), skip: '' },  /* 左栏表单：能滚就滚，到边界再翻页（见 keepsNativeScroll） */
       { el: $('calYearBoard'), skip: '' }           /* 年历：滚轮直接换年份 */
     ].forEach(function (z) {
       if (!z.el) return;
@@ -5572,6 +5656,9 @@
         /* 横着滚认横、竖着滚认竖：鼠标滚轮和触控板两个方向都吃得下 */
         var raw = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
         if (!raw) return;
+        /* 顺序要紧：先判断「内部还能滚」再 preventDefault。
+           否则就算决定放行，浏览器的原生滚动也已经被我们拦掉了。 */
+        if (keepsNativeScroll(e.target, z.el, raw)) return;
         e.preventDefault();
         /* 统一成像素：按行滚的老设备 ×16，按页滚的 ×320 */
         var d = raw;
