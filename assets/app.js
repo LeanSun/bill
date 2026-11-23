@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.107';
+  var ASSET_V = '1.0.108';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -40,6 +40,11 @@
   var STORE_KEY = 'qingzhang.ledger.v1';
   var THEME_KEY = 'qingzhang.theme.v1';
   var CATCOLOR_KEY = 'qingzhang.catcolors.v1';
+  /* v1.0.108：备份节奏。BACKUP = 上次导出 CSV 的时间，TIP = 上次提醒的时间。
+     两个分开存：提醒过不代表备份过，30 天内不再重复提醒，但提醒记录只压 7 天。 */
+  var BACKUP_KEY = 'qingzhang.backup.v1';
+  var BACKUP_TIP_KEY = 'qingzhang.backupTip.v1';
+  var BUDGET_KEY = 'qingzhang.budget.v1';
   var EXPENSE_CATS = ['餐饮', '日常', '交通', '服饰', '娱乐'];
   var INCOME_CATS = ['收入'];
   var ALL_CATS = EXPENSE_CATS.concat(INCOME_CATS);
@@ -57,13 +62,15 @@
   /* 图表重绘模式：
      'animate' 首次入场有生长动画；
      'instant' 原地换色不重放动画（用于配色自定义等需要立刻到位的场合）；
-     'theme'   v1.0.106 换肤专用：不重放入场，但颜色走 420ms 补间，
+     'theme'   v1.0.106 换肤专用：不重放入场，但颜色走 260ms 补间，
                配合 CSS 补间让 canvas 图表和板块同步柔和过渡。 */
   var RENDER_MODE = 'animate';
-  var THEME_FADE_MS = 420;
+  /* v1.0.108：420ms 的换肤偏慢，眼睛能跟住每一帧就显得拖；260ms 仍是补间，
+     但像"按一下开关"而不是"等一次动画"。CSS .theme-morph 与图表补间同源。 */
+  var THEME_FADE_MS = 260;
   /* v1.0.106：需要在换肤时逐帧插值的主题色变量。
      CSS @property 的 transition 在根元素自定义属性上实测不生效（会瞬跳），
-     所以由 JS 读新旧 computed 值、rAF 插值写到内联 style，420ms 后清除。 */
+     所以由 JS 读新旧 computed 值、rAF 插值写到内联 style，到点后清除。 */
   var THEME_VARS = ('--bg --bg-glow-1 --bg-glow-2 --surface --surface-2 --surface-3 ' +
     '--border --border-strong --text --text-2 --muted --primary --primary-2 --primary-soft ' +
     '--income --income-soft --expense --expense-soft --danger --danger-soft --amber --violet --sky ' +
@@ -193,6 +200,9 @@
        近 12 个月固定只有 12 根柱，柱顶才放得下具体数字 —— 之前一次铺
        23 个自然月，横轴挤得只剩几个刻度，柱子上更放不下数，只能靠悬浮读。 */
     trendRange: '12m',
+    /* v1.0.108：对比口径。mom = 环比（上月同期），yoy = 同比（去年同月同期）。
+       仅近 12 个月那档有效，年份范围本身就是跟去年同年比。 */
+    trendCmp: 'mom',
     calendarYear: Y_LAST,
     filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all' },
     editingId: null,
@@ -207,6 +217,9 @@
     weightYear: 'all',
     store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     catColors: {},
+    /* v1.0.108：分类月预算（元/月，按月循环用）。存在 BUDGET_KEY，
+       不写进 store —— 它是"设定"而不是账目，云端快照不该被它污染。 */
+    budgets: {},
     layout: null
   };
 
@@ -874,8 +887,29 @@
     });
     return out;
   }
+  /* v1.0.108：异常分两级。原来只有"超了/没超"，一笔 3 倍均值和一笔 12 倍均值
+     长得一模一样，真出大额时反而看不出轻重。
+       1 级（≥均值×2.5）：单感叹号，红底白字；
+       2 级（≥均值×4）  ：双感叹号 + 更深的红 + 一圈微光。
+     amap 里存的是均值×2.5，所以 2 级阈值 = amap × 1.6（4 / 2.5）。 */
+  function anomalyLevel(r, amap) {
+    if (r.type !== 'expense') return 0;
+    var th = amap[r.category || '其它'];
+    if (!th || !(r.amount >= th)) return 0;
+    return r.amount >= th * 1.6 ? 2 : 1;
+  }
   function isAnomaly(r, amap) {
-    return r.type === 'expense' && amap[r.category || '其它'] && r.amount >= amap[r.category || '其它'];
+    return anomalyLevel(r, amap) > 0;
+  }
+  /* 徽标只在一个地方拼：颜色/尺寸在 CSS，文案与无障碍标签在这里。
+     role="img" + aria-label 让读屏也能听见"异常"，而不是读一个感叹号。 */
+  function warnHTML(lv) {
+    if (!lv) return '';
+    var severe = lv >= 2;
+    var text = severe ? '远高于这类平时水平（约 4 倍以上）' : '高于这类平时水平';
+    return '<em class="ci-warn' + (severe ? ' is-severe' : '') +
+      '" role="img" aria-label="' + text + '" title="' + text + '">' +
+      (severe ? '!!' : '!') + '</em>';
   }
   function calendarData(year) {
     var map = {}, cnt = {};
@@ -1295,6 +1329,11 @@
       var d = (cur - base) / b * 100;
       if (!isFinite(d)) return '<em class="is-flat">—</em>';
       if (Math.abs(d) < .05) return '<em class="is-flat">持平</em>';
+      /* 基数很小时百分比会飙到四位数（上月同期只花了 10 块，这个月 2000），
+         这种数写全了会把这一格撑爆、把百分号挤出可视区，直接截到 999%+ */
+      if (Math.abs(d) >= 1000) {
+        return '<em class="' + (d > 0 ? 'is-up' : 'is-down') + '">' + (d > 0 ? '↑' : '↓') + '999%+</em>';
+      }
       return '<em class="' + (d > 0 ? 'is-up' : 'is-down') + '">' +
         (d > 0 ? '↑' : '↓') + Math.abs(d).toFixed(1) + '%</em>';
     }
@@ -1320,7 +1359,21 @@
       tipPrefix = y + ' 年';
     } else {
       curE = last.expense; curI = last.income; curB = last.balance;
-      if (prev) {
+      if (state.trendCmp === 'yoy') {
+        /* v1.0.108：同比 —— 拿去年同一个自然月、同一个日号之前的部分来比。
+           近 12 个月这份数据里通常没有去年同月（正好 12 格滚动），
+           所以直接翻原始记录，而不是从 rows 里找。 */
+        var ly = last.year - 1, le = 0, li = 0, anyY = false;
+        scopeRecords().forEach(function (r) {
+          if (r.year !== ly || r.month !== last.month) return;
+          var dy = Number(String(r.date || '').slice(8, 10)) || 31;
+          if (dy > cut) return;
+          anyY = true;
+          if (r.type === 'income') li += r.amount; else le += r.amount;
+        });
+        if (anyY) { pE = round(le); pI = round(li); }
+        cmpText = anyY ? '较去年同月' : '去年同月无数据';
+      } else if (prev) {
         var pe2 = 0, pi2 = 0, any2 = false;
         scopeRecords().forEach(function (r) {
           if (r.year !== prev.year || r.month !== prev.month) return;
@@ -1330,9 +1383,9 @@
           if (r.type === 'income') pi2 += r.amount; else pe2 += r.amount;
         });
         if (any2) { pE = round(pe2); pI = round(pi2); }
+        cmpText = '较上月同期';
       }
       capText = last.month + ' 月' + (isCur ? ' · 截至 ' + now.getDate() + ' 日' : '');
-      cmpText = prev ? '较上月同期' : '';
       tipPrefix = '本月';
     }
 
@@ -1341,9 +1394,19 @@
     var avgNote = (state.trendScope !== 'income' && avgExp > 0)
       ? ' · 月均 ' + moneyText(avgExp) : '';
 
+    /* v1.0.108：这一行右边那半句"较上月同期"，本身就是环比/同比的开关。
+       做成按钮而不是再加一个 seg：卡片头部已经排了年份和范围两排控件，
+       再塞一枚分段控件会把标题挤到第三行去；而"跟谁比"恰好就是这句话在说的事。 */
+    var cmpHTML = (isYear || !cmpText)
+      ? '<em>' + cmpText + '</em>'
+      : '<button type="button" class="ts-cmp" data-cmp="' + (state.trendCmp === 'yoy' ? 'mom' : 'yoy') + '"' +
+        ' title="点击切换环比 / 同比" aria-label="当前' + (state.trendCmp === 'yoy' ? '同比' : '环比') +
+        '，点击切换为' + (state.trendCmp === 'yoy' ? '环比' : '同比') + '">' + cmpText +
+        '<i aria-hidden="true">⇄</i></button>';
+
     box.innerHTML =
       '<div class="ts-cap"><span>' + capText + avgNote + '</span>' +
-        '<em>' + cmpText + '</em></div>' +
+        cmpHTML + '</div>' +
       '<div class="ts-row">' +
         '<div class="ts-cell" title="' + tipPrefix + '支出' + (pE === null ? '' : '，对比期 ' + moneyText(pE)) + '">' +
           '<i class="ts-e">支出</i><b data-ts="e">¥0</b>' + delta(curE, pE) + '</div>' +
@@ -1432,6 +1495,16 @@
     var rows = trendRows(scopeRecords());
     var labels = rows.map(function (r) { return r.label; });
     var isYear = String(state.trendRange) !== '12m';
+    /* v1.0.108：同比时把去年同月的数据也算一份，挂在提示气泡里对照 */
+    var yoyMap = null;
+    if (!isYear && state.trendCmp === 'yoy') {
+      yoyMap = {};
+      scopeRecords().forEach(function (r) {
+        var k = r.year * 12 + (r.month - 1);
+        if (!yoyMap[k]) yoyMap[k] = { e: 0, i: 0 };
+        if (r.type === 'income') yoyMap[k].i += r.amount; else yoyMap[k].e += r.amount;
+      });
+    }
     /* 只有 12 根柱，柱顶放得下数；收入走折线时数字会和柱子上的数错位，
        所以只在「只看收入」时才给折线挂标签。 */
     var showBarLabel = true;
@@ -1505,10 +1578,20 @@
             '<span style="color:' + p.text2 + '">' + it.seriesName + '</span>' +
             '<b style="margin-left:auto;font-variant-numeric:tabular-nums">' + fmtYuan(v) + '</b></div>';
         }).join('');
+        /* 同比：把去年同月的支出/收入补一行，比完还能直接看到基数是多少 */
+        var yoyLine = '';
+        if (yoyMap) {
+          var ly = yoyMap[row.key - 12];
+          yoyLine = ly
+            ? '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + p.border +
+              ';color:' + p.muted + '">去年同月 支出 ' + fmtYuan(ly.e) + ' · 收入 ' + fmtYuan(ly.i) + '</div>'
+            : '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + p.border +
+              ';color:' + p.muted + '">去年同月无记录</div>';
+        }
         return '<div style="font-weight:700;margin-bottom:5px">' + row.year + ' 年 ' + row.month + ' 月</div>' +
           body +
           '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + p.border +
-          ';color:' + p.muted + '">结余 ' + fmtYuan(row.balance) + '</div>';
+          ';color:' + p.muted + '">结余 ' + fmtYuan(row.balance) + '</div>' + yoyLine;
       }
     });
     o.xAxis = catAxis(p, labels, {
@@ -1768,6 +1851,198 @@
       series: series
     });
   }
+  /* ---------------- 分类月预算（v1.0.108） ----------------
+     预算按月循环：设一次，每个月都按这个数比。花钱口径取「本月自然月」的
+     真实支出（不受筛选影响）—— 预算说的是"这个月我花了多少"，不是"当前
+     筛选下花了多少"。存储独立于账本，改动不触发云同步。 */
+  function loadBudgets() {
+    var out = {};
+    try {
+      var raw = JSON.parse(localStorage.getItem(BUDGET_KEY) || '{}') || {};
+      ALL_CATS.forEach(function (c) {
+        var v = Number(raw[c]);
+        if (v > 0) out[c] = Math.round(v);
+      });
+    } catch (e) { /* 坏数据当没设过 */ }
+    state.budgets = out;
+  }
+  function writeBudgets() {
+    try { localStorage.setItem(BUDGET_KEY, JSON.stringify(state.budgets || {})); } catch (e) { /* noop */ }
+  }
+  /* 本月各分类的支出合计（含种子数据） */
+  function monthSpentByCat() {
+    var now = new Date();
+    var key = now.getFullYear() + '-' + pad2(now.getMonth() + 1);
+    var out = {};
+    allRecords().forEach(function (r) {
+      if (r.type === 'income') return;
+      if (String(r.date || '').slice(0, 7) !== key) return;
+      var c = r.category || '其它';
+      out[c] = (out[c] || 0) + r.amount;
+    });
+    return { ym: key, year: now.getFullYear(), month: now.getMonth() + 1, spent: out };
+  }
+
+  function renderBudget(p) {
+    var box = $('budgetList');
+    if (!box) return;
+    var info = monthSpentByCat();
+    var bud = state.budgets || {};
+    var sub = $('budgetSub');
+    if (sub) sub.textContent = info.month + ' 月 · 点一行设置预算';
+
+    var rows = EXPENSE_CATS.map(function (c) {
+      var b = bud[c] || 0, s = info.spent[c] || 0;
+      var pct = b ? s / b * 100 : 0;
+      var over = !!b && s > b;
+      var col = catColor(p, c);
+      var barW = b ? Math.min(100, pct) : 0;
+      var num = b
+        ? '<b>' + fmtYuan(s).replace('¥', '') + '</b><i>/' + fmtYuan(b).replace('¥', '') + '</i>'
+        : '<i class="is-empty">未设置</i>';
+      var tip = c + '：本月已花 ' + fmtYuan(s) +
+        (b ? '，预算 ' + fmtYuan(b) + (over ? '（超支）' : '') : '，还没设预算');
+      /* tabindex/role：预算行是靠点击进编辑的 div，不加这个键盘用户完全够不到（v1.0.108） */
+      return '<div class="bud-row' + (over ? ' is-over' : '') + (b ? '' : ' is-unset') + '" data-bud="' + esc(c) + '"' +
+        ' role="button" tabindex="0" aria-label="' + esc(tip + '，按回车设置预算') + '"' +
+        ' style="--c:' + col + '" title="' + esc(tip) + '">' +
+        '<span class="bud-name"><i class="bud-dot"></i>' + esc(c) + '</span>' +
+        '<span class="bud-bar"><i style="width:' + barW.toFixed(1) + '%;background:' + (over ? 'var(--danger)' : col) + '"></i></span>' +
+        '<span class="bud-num">' + num + '</span>' +
+        (over ? '<em class="bud-over">超 ' + fmtYuan(s - b).replace('¥', '') + '</em>' : (b ? '<em class="bud-pct">' + Math.round(pct) + '%</em>' : '')) +
+        '</div>';
+    }).join('');
+    var totalB = 0, totalS = 0;
+    EXPENSE_CATS.forEach(function (c) { totalB += bud[c] || 0; totalS += info.spent[c] || 0; });
+    /* 合计行一直在：没设预算时写「未设置」，占住卡片底部，也顺带说明这张卡在算什么 */
+    var totalRow = '<div class="bud-total"><span>合计</span>' +
+      (totalB > 0
+        ? '<i>' + fmtYuan(totalS).replace('¥', '') + ' / ' + fmtYuan(totalB).replace('¥', '') + '</i>' +
+          '<em class="' + (totalS > totalB ? 'is-over' : '') + '">' + Math.round(totalS / totalB * 100) + '%</em>'
+        : '<i class="is-empty">还没有设置任何预算</i>') + '</div>';
+    box.innerHTML = rows + totalRow;
+    box.dataset.sig = JSON.stringify(bud) + '|' + Math.round(totalS * 100);
+  }
+
+  /* 行内改预算：点一行 → 原位换成输入框，Enter 存、Esc 撤、失焦也算存。
+     不用 prompt()：手机上那个系统框丑，而且会被某些浏览器拦。 */
+  function bindBudgetEdit() {
+    var box = $('budgetList');
+    if (!box || box.__bound) return;
+    box.__bound = true;
+    function openRow(row) {
+      if (!row || row.classList.contains('is-editing')) return;
+      var cat = row.dataset.bud;
+      row.classList.add('is-editing');
+      var cur = (state.budgets || {})[cat] || '';
+      var slot = row.querySelector('.bud-num');
+      slot.innerHTML = '<input class="bud-input" type="number" min="0" step="10" inputmode="decimal" value="' +
+        (cur || '') + '" aria-label="' + esc(cat) + '月预算，单位元">';
+      var inp = row.querySelector('.bud-input');
+      inp.focus();
+      if (inp.select) inp.select();
+      var done = false;
+      function commit(ok) {
+        if (done) return;
+        done = true;
+        var v = Number(inp.value);
+        if (ok) {
+          if (v > 0) state.budgets[cat] = Math.round(v);
+          else delete state.budgets[cat];
+          writeBudgets();
+          toast(v > 0 ? cat + ' 月预算 ' + fmtYuan(v) : '已清除 ' + cat + ' 的预算', v > 0 ? 'success' : 'info');
+        }
+        var p = palette();
+        renderBudget(p);
+        renderDonut(p);
+      }
+      inp.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(true); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); commit(false); }
+      });
+      inp.addEventListener('blur', function () { commit(true); });
+    }
+    box.addEventListener('click', function (e) {
+      openRow(e.target.closest ? e.target.closest('.bud-row') : null);
+    });
+    box.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var row = e.target.closest ? e.target.closest('.bud-row') : null;
+      if (!row || e.target !== row) return;
+      e.preventDefault();
+      openRow(row);
+    });
+  }
+
+  /* ---------------- 消费节奏（v1.0.108） ----------------
+     「哪天最花钱」两个角度：一周里的星期几、每月里的几号。用纯 DOM 的
+     小柱条画（不占 ECharts 实例）—— 31 根 4px 的柱子用 canvas 反而糊。 */
+  function renderRhythm(p) {
+    var box = $('rhythmBody');
+    if (!box) return;
+    var now = new Date();
+    var from = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    var cut = dateKey(from);
+    var wSum = [0, 0, 0, 0, 0, 0, 0], wCnt = [0, 0, 0, 0, 0, 0, 0];
+    var dSum = [], dCnt = [];
+    for (var i = 0; i < 31; i++) { dSum.push(0); dCnt.push(0); }
+    allRecords().forEach(function (r) {
+      if (r.type === 'income' || !r.date || r.date < cut) return;
+      var d = new Date(r.date + 'T00:00:00');
+      if (isNaN(d.getTime())) return;
+      /* getDay(): 0=周日。这里按「周一开头」排，和 WEEKDAYS 一致 */
+      var wi = (d.getDay() + 6) % 7;
+      wSum[wi] += r.amount; wCnt[wi]++;
+      var di = d.getDate() - 1;
+      dSum[di] += r.amount; dCnt[di]++;
+    });
+    var wMax = Math.max.apply(null, wSum) || 1;
+    var dMax = Math.max.apply(null, dSum) || 1;
+    var wPeak = wSum.indexOf(Math.max.apply(null, wSum));
+    var dPeak = dSum.indexOf(Math.max.apply(null, dSum));
+    var hasData = wCnt.some(function (n) { return n > 0; });
+
+    /* 一列 = 柱子 + 标签。整组撑满卡片宽度，而不是挤在左边一小块 */
+    var bars = WEEKDAYS.map(function (name, i) {
+      var h = Math.round(wSum[i] / wMax * 100);
+      return '<span class="rh-col' + (i === wPeak && hasData ? ' is-peak' : '') + '">' +
+        '<i style="--h:' + Math.max(hasData ? 6 : 0, h) + '%" title="' +
+        esc(name + ' 合计 ' + fmtYuan(wSum[i]) + ' · ' + wCnt[i] + ' 笔') + '"></i>' +
+        '<b>' + name.slice(1) + '</b></span>';
+    }).join('');
+    var days = '';
+    for (var k = 0; k < 31; k++) {
+      var h2 = Math.round(dSum[k] / dMax * 100);
+      /* 0 的那天不留 2px 的碎点：31 个碎点连起来像一条虚线，反而看不出高峰 */
+      var vis = dSum[k] > 0 ? Math.max(6, h2) : 0;
+      days += '<i class="' + (k === dPeak && hasData ? 'is-peak' : '') + '" style="--h:' + vis + '%"' +
+        ' title="' + esc('每月 ' + (k + 1) + ' 号 合计 ' + fmtYuan(dSum[k]) + ' · ' + dCnt[k] + ' 笔') + '"></i>';
+    }
+    box.innerHTML =
+      '<div class="rh-sec"><span class="rh-lab">一周里</span>' +
+      '<div class="rh-week">' + bars + '</div></div>' +
+      '<div class="rh-sec"><span class="rh-lab">每月几号</span>' +
+      '<div class="rh-bars rh-days">' + days + '</div>' +
+      '<div class="rh-x rh-x31"><i>1</i><i>10</i><i>20</i><i>31</i></div></div>' +
+      (hasData
+        ? '<p class="rh-note">近 12 个月：<b>' + WEEKDAYS[wPeak] + '</b>花得最多，每月 <b>' + (dPeak + 1) + ' 号</b>是高峰</p>'
+        : '<p class="rh-note">还没有支出记录</p>');
+  }
+
+  /* 12 个月的分类迷你折线：一根 34×12 的 polyline，够看出"在涨还是在落" */
+  function catSparkSVG(vals, color) {
+    var max = Math.max.apply(null, vals) || 1;
+    var n = vals.length;
+    var pts = vals.map(function (v, i) {
+      var x = (n > 1 ? i / (n - 1) * 34 : 17);
+      var y = 12 - (v / max) * 10;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    return '<svg class="spend-spark" viewBox="0 0 34 12" preserveAspectRatio="none" aria-hidden="true">' +
+      '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.3" ' +
+      'stroke-linecap="round" stroke-linejoin="round" opacity=".9"/></svg>';
+  }
+
   function renderDonut(p) {
     fillDonutYears();
     var data = catTotals(scopeRecords().filter(function (r) {
@@ -1799,21 +2074,60 @@
     var monthBudget = budN ? budSum / budN : 0;
     var yearFactor = state.donutYear === 'all' ? Math.max(1, YEARS.length) : 1;
     var budgetBase = monthBudget * 12 * yearFactor;
+    /* v1.0.108：真实月预算 → 这张卡的"年度可花额度"（预算 × 已过月数）。
+       这张卡列的是某一年（或全部）的合计，进度条要是拿本月去比就会
+       「金额是全年、进度是本月」，两个口径打架；换成年度额度之后就一致了。 */
+    var bYear = state.donutYear === 'all' ? null : Number(state.donutYear);
+    var bMonths = 12 * Math.max(1, YEARS.length);
+    if (bYear) bMonths = bYear < nowD.getFullYear() ? 12 : (bYear === nowD.getFullYear() ? nowD.getMonth() + 1 : 0);
+    var budMap = state.budgets || {};
+    /* 近 12 个月各分类的月度合计：给每行画一根迷你折线（第 8 条） */
+    var sparkSlots = [], sparkIndex = {};
+    for (var si = 11; si >= 0; si--) {
+      var sd = new Date(nowD.getFullYear(), nowD.getMonth() - si, 1);
+      sparkIndex[sd.getFullYear() + '-' + pad2(sd.getMonth() + 1)] = sparkSlots.length;
+      sparkSlots.push(0);
+    }
+    var sparkByCat = {};
+    scopeRecords().forEach(function (r) {
+      if (r.type === 'income') return;
+      var idx = sparkIndex[String(r.date || '').slice(0, 7)];
+      if (idx === undefined) return;
+      var cn = r.category || '其它';
+      if (!sparkByCat[cn]) sparkByCat[cn] = sparkSlots.slice();
+      sparkByCat[cn][idx] += r.amount;
+    });
     var colors = catColors(p);
     var nameIndex = {};
     EXPENSE_CATS.forEach(function (c, i) { nameIndex[c] = i; });
     el.innerHTML = data.map(function (d, i) {
       var pct = total ? d.value / total * 100 : 0;
+      var col = colors[nameIndex[d.name]] || p.primary;
+      var b = budMap[d.name] || 0;
+      var cap = (b && bMonths) ? b * bMonths : 0;
+      var budPct = cap ? d.value / cap * 100 : 0;
+      var over = cap > 0 && d.value > cap;
+      var trackW = cap ? Math.min(100, budPct) : pct;
+      var spark = sparkByCat[d.name] ? catSparkSVG(sparkByCat[d.name], col) : '';
+      var budChip = '';
+      if (cap) {
+        budChip = '<span class="spend-bud' + (over ? ' is-over' : '') + '" title="' +
+          esc(d.name + ' 月预算 ' + fmtYuan(b) + ' × ' + bMonths + ' 个月 = ' + fmtYuan(cap) + '，已花 ' + fmtYuan(d.value)) + '">' +
+          (over ? '超 ' + pctText(budPct - 100) : pctText(budPct)) + '</span>';
+      } else if (budgetBase > 0) {
+        budChip = '<span class="spend-bud" title="占近6月月均折算预算">' +
+          pctText(d.value / budgetBase * 100) + ' 预算</span>';
+      }
       return '<button type="button" class="spend-row" data-cat="' + esc(d.name) + '"' +
         ' title="' + esc(d.name + ' ' + fmtYuan(d.value) + ' · ' + pctText(pct) + '，点击看明细') + '">' +
-        '<span class="spend-rank" style="--dot:' + (colors[nameIndex[d.name]] || p.primary) + '">' + (i + 1) + '</span>' +
+        '<span class="spend-rank" style="--dot:' + col + '">' + (i + 1) + '</span>' +
         '<span class="spend-name">' + esc(d.name) + '</span>' +
-        '<span class="spend-track"><i style="width:' + pct.toFixed(1) + '%;background:' +
-        (colors[nameIndex[d.name]] || p.primary) + '"></i></span>' +
+        '<span class="spend-track"' + (cap ? ' data-bud="1"' : '') + '><i style="width:' + trackW.toFixed(1) + '%;background:' +
+        (over ? p.danger : col) + '"></i></span>' +
+        spark +
         '<span class="spend-amt">' + fmtYuan(d.value) + '</span>' +
         '<span class="spend-pct">' + pctText(pct) + '</span>' +
-        (budgetBase > 0 ? '<span class="spend-bud" title="占近6月月均折算预算">' +
-          pctText(d.value / budgetBase * 100) + ' 预算</span>' : '') + '</button>';
+        budChip + '</button>';
     }).join('');
     Array.prototype.forEach.call(el.querySelectorAll('.spend-row'), function (row) {
       row.onclick = function () { jumpToDetail({ reset: true, category: row.getAttribute('data-cat') }); };
@@ -2462,6 +2776,14 @@
     if (view === 'overview') {
       try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
     }
+    /* v1.0.108：消费节奏 / 月度预算这两张是纯 DOM 卡，不依赖 ECharts，
+       所以放在 hasEcharts 判断之前 —— 图表库没载入时它们照样该显示。 */
+    if (view === 'overview') {
+      var pd = palette();
+      try { renderBudget(pd); } catch (e) { warnChart(renderBudget, e); }
+      try { bindBudgetEdit(); } catch (e) { /* 绑定失败不影响出图 */ }
+      try { renderRhythm(pd); } catch (e) { warnChart(renderRhythm, e); }
+    }
     if (!hasEcharts) return;
     var prevMode = RENDER_MODE;
     if (mode) RENDER_MODE = mode;
@@ -2851,7 +3173,7 @@
         var amap = anomalyMap(allRecords());
         var rsig = recs.map(function (r) {
           return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type,
-            catColor(p, r.category), isAnomaly(r, amap) ? '!' : ''].join('|');
+            catColor(p, r.category), anomalyLevel(r, amap)].join('|');
         }).join('~');
         if (rlist.dataset.sig !== rsig) {
           rlist.dataset.sig = rsig;
@@ -2859,23 +3181,34 @@
             var inc = r.type === 'income';
             var newDay = ri > 0 && recs[ri - 1].date !== r.date;
             var note = String(r.note || r.sub || r.category || '').trim();
-            var bad = isAnomaly(r, amap);
+            var lv = anomalyLevel(r, amap);
+            var bad = lv > 0;
             /* 133×36 两行装：上行备注，下行「日期 · 金额」。备注因此不用被
                金额和日期挤成一团省略号，五颗并排也是齐的。 */
             var c = catColor(p, r.category);
             /* 分隔线是独立装饰元素，不是按钮的伪元素 —— 点在线上不会跳到后一天 */
             return (newDay ? '<i class="rs-sep" aria-hidden="true"></i>' : '') +
-              '<button type="button" class="rs-item' + (bad ? ' is-anomaly' : '') + '" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
+              '<button type="button" class="rs-item' + (bad ? ' is-anomaly' : '') + '" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" aria-label="' +
+              esc(r.date + ' ' + note + ' ' + (inc ? '收入 ' : '支出 ') + fmtYuan(r.amount) + (bad ? '，高于这类平时水平' : '')) + '" title="' +
               esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '') + (bad ? ' · 高于这类平时水平' : '')) + '">' +
               '<i class="rs-dot"></i>' +
               '<span class="rs-body">' +
-              '<span class="rs-note">' + (bad ? '<em class="ci-warn rs-warn" title="高于这类平时水平">!</em>' : '') + esc(note) + '</span>' +
+              '<span class="rs-note">' + warnHTML(lv) + esc(note) + '</span>' +
               '<span class="rs-meta">' +
               '<b class="rs-day">' + esc(String(r.date || '').slice(5)) + '</b>' +
               '<em class="rs-amt ' + (inc ? 'is-inc' : 'is-exp') + '">' + (inc ? '+' : '-') +
               esc(fmtYuan(r.amount).slice(1)) + '</em>' +
               '</span></span></button>';
           }).join('') : '<span class="rs-none">还没有记录</span>';
+        }
+        /* v1.0.108：「全部」把最近记录摊开成一块浮层。
+           一条横向滚动的条最多露 5~6 笔，想找前几天的记录只能去日历里翻。 */
+        var rmore = $('rsMore');
+        if (rmore) {
+          var totRecs = allRecords().length;
+          rmore.hidden = !showRecent || !totRecs;
+          rmore.innerHTML = '全部 <b>' + totRecs + '</b>';
+          rmore.setAttribute('aria-label', '查看全部 ' + totRecs + ' 条记录');
         }
       }
     }
@@ -3035,8 +3368,9 @@
     var ink = catInk(p, c);
     var sign = r.type === 'income' ? '+' : '−';
     var label = r.note || r.sub;
-    var bad = isAnomaly(r, anomalyMap(allRecords()));
-    var tip = label + ' · ' + r.sub + ' · ' + fmtYuan(r.amount) + (bad ? ' · 高于这类平时水平' : '');
+    var lv = anomalyLevel(r, anomalyMap(allRecords()));
+    var bad = lv > 0;
+    var tip = label + ' · ' + r.sub + ' · ' + fmtYuan(r.amount) + (bad ? ' · ' + (lv >= 2 ? '远高于这类平时水平' : '高于这类平时水平') : '');
     var isNew = r.id && r.id === state.newId && Date.now() < state.newUntil;
     return '<button type="button" class="cal-item' + (r.type === 'income' ? ' is-inc' : '') +
       (isNew ? ' is-new' : '') + (bad ? ' is-anomaly' : '') +
@@ -3045,11 +3379,77 @@
          原来塞在金额 <b> 里，而 noAmount 视图会整块省掉 <b>，徽标跟着消失；
          名称行永远在，放这里任何角度都显示。 */
       '<span class="ci-name"><i></i>' +
-      (bad ? '<em class="ci-warn rs-warn" title="高于这类平时水平">!</em>' : '') +
+      warnHTML(lv) +
       '<span>' + esc(label) + '</span></span>' +
       (opts && opts.noAmount ? '' : '<b>' + sign + fmtChip(r.amount) + '</b>') + '</button>';
   }
-  /* 右上角收支胶囊：净额 + 一颗呼吸点，代替原来的整块填色 */
+  /* ---------------- 最近记录浮层（「全部」） ----------------
+     v1.0.108：横向那条只能露 5~6 笔，点「全部」在这里列出最近 60 笔。
+     浮层挂在 body 上（不受筛选卡片的 overflow 限制），桌面落在按钮下方、
+     手机贴着屏幕底边展开成一块可滚动的面板；点任意一行跳到那天的天页。 */
+  function ensureRecentPop() {
+    var pop = $('recentPop');
+    if (pop) return pop;
+    pop = document.createElement('div');
+    pop.id = 'recentPop';
+    pop.className = 'recent-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', '最近记录');
+    pop.hidden = true;
+    document.body.appendChild(pop);
+    pop.addEventListener('click', function (e) {
+      var row = e.target.closest ? e.target.closest('.rp-row') : null;
+      if (row) { closeRecentPop(); jumpToDay(row.dataset.day); return; }
+      if (e.target.closest && e.target.closest('#rpClose')) closeRecentPop();
+    });
+    return pop;
+  }
+  function closeRecentPop() {
+    var pop = $('recentPop'); if (!pop || pop.hidden) return;
+    pop.hidden = true;
+    var b = $('rsMore'); if (b) b.setAttribute('aria-expanded', 'false');
+  }
+  function openRecentPop() {
+    var pop = ensureRecentPop(), btn = $('rsMore');
+    var p = palette();
+    var all = sortedDesc(allRecords());
+    var recs = all.slice(0, 60);
+    var amap = anomalyMap(allRecords());
+    pop.innerHTML = '<div class="rp-head"><b>最近记录</b><i>共 ' + all.length + ' 笔' +
+      (all.length > recs.length ? ' · 显示最近 ' + recs.length : '') + '</i>' +
+      '<button type="button" class="rp-close" id="rpClose" aria-label="关闭">×</button></div>' +
+      '<div class="rp-list">' + recs.map(function (r) {
+        var inc = r.type === 'income';
+        var lv = anomalyLevel(r, amap);
+        var c = catColor(p, r.category);
+        var note = String(r.note || r.sub || r.category || '').trim();
+        return '<button type="button" class="rp-row" data-day="' + esc(r.date) + '" style="--c:' + c + '"' +
+          ' aria-label="' + esc(r.date + ' ' + note + ' ' + (inc ? '收入 ' : '支出 ') + fmtYuan(r.amount)) + '">' +
+          '<i class="rp-dot"></i>' +
+          '<b class="rp-day">' + esc(String(r.date || '').slice(5)) + '</b>' +
+          '<span class="rp-note">' + warnHTML(lv) + esc(note) + '</span>' +
+          '<em class="rp-amt ' + (inc ? 'is-inc' : 'is-exp') + '">' + (inc ? '+' : '−') +
+          esc(fmtYuan(r.amount).slice(1)) + '</em></button>';
+      }).join('') + '</div>';
+    pop.hidden = false;
+    /* 定位：默认贴按钮左下；右边放不下就往左翻，手机改为贴底展开 */
+    var br = btn ? btn.getBoundingClientRect() : { left: 12, bottom: 96, width: 60 };
+    var pw = pop.offsetWidth, ph = pop.offsetHeight;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left = Math.min(Math.max(8, br.left), Math.max(8, vw - pw - 8));
+    var top = br.bottom + 8;
+    if (top + ph > vh - 8) top = Math.max(8, br.top - ph - 8);
+    if (pw >= vw - 16) { left = 8; top = Math.max(8, Math.min(top, vh - ph - 8)); }
+    pop.style.left = Math.round(left) + 'px';
+    pop.style.top = Math.round(top) + 'px';
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+
+  /* 右上角收支胶囊：净额 + 一颗呼吸点，代替原来的整块填色。
+     v1.0.108：同日 3 笔以上，在净额前挂一颗笔数小签（"3笔"）。
+     格子里的条目会被裁成「前 N 条 + N 笔」，光看条目数不准；这颗签是
+     唯一能一眼说明"这天很密"的信号，且在手机那档（合计胶囊整块隐藏）另有
+     左下角的 .cal-sum 兜底。 */
   function daySumHTML(p, items) {
     if (!items.length) return '<span class="cal-daysum is-off" aria-hidden="true"></span>';
     var de = 0, di = 0;
@@ -3059,8 +3459,11 @@
     var def = posNum >= 0;
     var col = def ? p.income : p.expense;
     var txt = (def ? '+' : '−') + fmtChip(Math.abs(posNum));
-    var tip = '支出 ' + fmtYuan(de) + ' · 收入 ' + fmtYuan(di) + ' · 净额 ' + fmtYuan(posNum);
-    return '<span class="cal-daysum" style="--ds:' + col + ';--ds-ink:' + catInk(p, col) + '" title="' + esc(tip) + '">' + txt + '</span>';
+    var tip = '支出 ' + fmtYuan(de) + ' · 收入 ' + fmtYuan(di) + ' · 净额 ' + fmtYuan(posNum) + ' · ' + items.length + ' 笔';
+    var busy = items.length >= 3;
+    return '<span class="cal-daysum' + (busy ? ' is-busy' : '') + '" style="--ds:' + col + ';--ds-ink:' + catInk(p, col) +
+      '" role="img" aria-label="' + esc(tip) + '" title="' + esc(tip) + '">' +
+      (busy ? '<i class="ds-n">' + items.length + '笔</i>' : '') + txt + '</span>';
   }
 
   /* 一条条目的最小/最大高度。15px 是 "色点 + 11px 字" 还看得清的底线；
@@ -3273,6 +3676,18 @@
       var key = dateKey(d);
       var other = d.getMonth() !== m - 1;
       var items = other ? [] : (byDate[key] || []);
+      /* v1.0.108：同日 3 笔以上，格子左下角压一颗「当日合计」。
+         手机那档隐藏了右上角的净额胶囊，一格只剩几条纯色条，
+         没有这行字就完全看不出这天花了多少。桌面不显示（右上角已有净额 + 笔数）。
+         只算支出合计：一条 5px 的色条说不了收支两件事。 */
+      var sumTag = '';
+      if (!other && items.length >= 3) {
+        var sumE = 0;
+        items.forEach(function (r) { if (r.type !== 'income') sumE += r.amount; });
+        if (sumE > 0) {
+          sumTag = '<span class="cal-sum" aria-hidden="true">¥' + fmtAxis(sumE) + '</span>';
+        }
+      }
       var cls = 'cal-cell';
       if (other) cls += ' is-other';
       if (d.getDay() === 0 || d.getDay() === 6) cls += ' is-weekend';
@@ -3289,6 +3704,7 @@
         (d.getDate() === 1 ? '<span class="cal-monthtag">' + (d.getMonth() + 1) + '月</span>' : '') + '</div>' +
         daySumHTML(p, items) + '</div>' +
         '<div class="cal-items">' + items.map(function (r) { return itemHTML(p, r); }).join('') + '</div>' +
+        sumTag +
         '</div>';
     }
     grid.innerHTML = html;
@@ -5571,7 +5987,26 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    /* v1.0.108：导出即成"备份过一次"，备份提醒的计时从这里重新起算 */
+    try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch (e) { /* noop */ }
     toast('已导出 ' + rows.length + ' 条记录', 'success');
+  }
+
+  /* v1.0.108：超过 30 天没导出过，就轻提示一次（同一条提醒 7 天内不重复）。
+     账本全在 localStorage 里，浏览器清一次缓存就没了 —— 这句提醒比任何
+     "稳健性"都实在。没有记录、门禁未过、或本来就不在记账页时不打扰。 */
+  function maybeBackupTip() {
+    if (LOCKED) return;
+    if (!allRecords().length) return;
+    var last = 0, tip = 0;
+    try { last = Number(localStorage.getItem(BACKUP_KEY)) || 0; tip = Number(localStorage.getItem(BACKUP_TIP_KEY)) || 0; } catch (e) { /* noop */ }
+    var now = Date.now(), DAY = 864e5;
+    if (last && now - last < 30 * DAY) return;
+    if (tip && now - tip < 7 * DAY) return;
+    try { localStorage.setItem(BACKUP_TIP_KEY, String(now)); } catch (e) { /* noop */ }
+    var days = last ? Math.floor((now - last) / DAY) : 0;
+    toast(last ? '账本已经 ' + days + ' 天没备份了，点「导出」存一份 CSV' : '账本还没备份过，点「导出」存一份 CSV 更稳当',
+      'info', { ms: 6500 });
   }
 
   /* ---------------- 事件绑定 ---------------- */
@@ -5596,6 +6031,11 @@
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
     var root = document.documentElement;
     root.setAttribute('data-theme', t);
+    /* v1.0.108：两颗主题按钮是「按下态」语义，读屏要知道现在是不是深色 */
+    ['themeBtn', 'themeBtnM'].forEach(function (id) {
+      var b = $(id);
+      if (b) b.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
+    });
     /* mode='theme' 走补间（图表颜色渐变），其余维持 instant / defer 原语义 */
     if (mode === 'theme') renderCharts(state.view, 'theme');
     else if (!mode) renderCharts(state.view, 'instant');
@@ -5626,7 +6066,7 @@
   /* 换肤：柔和补间，DOM 原地不重建。
      v1.0.99 的整页遮罩盖住→换色→揭开会「闪一下」刺眼；v1.0.98 的逐元素补间
      又因为 JS 重建 DOM 导致图表/筛选条瞬间跳色。这次两者取长：
-       1) 挂 .theme-morph 给全站统一 420ms 颜色补间；
+       1) 挂 .theme-morph 给全站统一 260ms 颜色补间；
        2) 只切 data-theme，不重建任何列表/卡片节点；
        3) 内联 --ink 就地改写；canvas 图表用 ECharts update 动画补间颜色。 */
   function setTheme(t) {
@@ -6128,6 +6568,14 @@
       }
       renderAll();
     });
+    /* 趋势小结右侧「较上月同期 ⇄」= 环比/同比开关（内容每次重绘都换，用委托） */
+    var tsBox = $('trendSum');
+    if (tsBox) tsBox.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.ts-cmp') : null;
+      if (!b) return;
+      state.trendCmp = b.getAttribute('data-cmp') === 'yoy' ? 'yoy' : 'mom';
+      renderTrend(palette());
+    });
     bindSeg($('trendScope'), 'data-scope', function (v) {
       state.trendScope = v;
       /* 副标题由 renderTrend 统一写：范围 + 粒度两件事都在那儿，这里不再单独改 */
@@ -6560,6 +7008,24 @@
     })();
     if ($('boardReset')) $('boardReset').addEventListener('click', resetBoardFilters);
     if ($('exportBtn')) $('exportBtn').addEventListener('click', exportCsv);
+
+    /* v1.0.108：最近记录「全部」浮层的开关。放这里而不是每次重绘都绑，
+       避免 renderSubBar 反复重绘时叠加监听。 */
+    var rsMoreBtn = $('rsMore');
+    if (rsMoreBtn) rsMoreBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var pop = $('recentPop');
+      if (pop && !pop.hidden) { closeRecentPop(); return; }
+      openRecentPop();
+    });
+    document.addEventListener('pointerdown', function (e) {
+      var pop = $('recentPop');
+      if (!pop || pop.hidden) return;
+      if (e.target.closest && (e.target.closest('#recentPop') || e.target.closest('#rsMore'))) return;
+      closeRecentPop();
+    }, true);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRecentPop(); });
+    window.addEventListener('resize', closeRecentPop);
 
     /* 棋盘：条目 / 空格 / 更多 / 年视图小格 —— 全部走一张委托表 */
     var boardEl = document.querySelector('.cal-board');
@@ -7254,12 +7720,14 @@
   var DEFAULT_LAYOUT = {
     v: 14,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
+      'rhythm', 'budget',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
       'salary', 'reimb'],
     spans: {
       kpi: [12, 3], calheat: [12, 7], trend: [4, 6], donut: [4, 6], balance: [4, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
+      rhythm: [6, 5], budget: [6, 5],
       cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
       cubebrand: [4, 5], cubeprice: [4, 5], compyear: [4, 5],
@@ -7784,6 +8252,7 @@
     document.documentElement.setAttribute('data-theme', state.theme);
 
     loadCatColors();
+    loadBudgets();
     state.anchorDate = todayStr();
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', state.theme === 'dark' ? '#0d121c' : '#f5f7fa');
@@ -7814,6 +8283,10 @@
        应用内切视图走 hashchange -> setView，不会经过这里，粒度不会被重置。 */
     if (initialRoute === 'calendar') gotoToday();
     setView(initialRoute);
+
+    /* v1.0.108：备份提醒放在首屏之后 —— 打开就要看得见图，
+       提示晚 3 秒再出来，不和启动动画抢注意力。 */
+    setTimeout(maybeBackupTip, 3000);
 
     /* 门禁没过：整块内容换成「未解锁」，不给看也不给记 */
     if (LOCKED) showLockGate(false);

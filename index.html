@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#f5f7fa" data-page-node-id="YNZhYru6j3RsrXDah5InT4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%234a6cf7'/%3E%3Crect x='8' y='21' width='6' height='12' rx='2.5' fill='white' opacity='.55'/%3E%3Crect x='17' y='13' width='6' height='20' rx='2.5' fill='white' opacity='.8'/%3E%3Crect x='26' y='7' width='6' height='26' rx='2.5' fill='white'/%3E%3C/svg%3E" data-page-node-id="ljD9H3EvTZuStNxnHHhOfD">
 <title>轻账 · 收支看板</title>
-<link rel="stylesheet" href="assets/ui-select.css?v=1.0.107">
-<link rel="stylesheet" href="assets/styles.css?v=1.0.107" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
+<link rel="stylesheet" href="assets/ui-select.css?v=1.0.108">
+<link rel="stylesheet" href="assets/styles.css?v=1.0.108" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
 </head>
 <body class="is-booting" data-page-node-id="tMyPJ5SSZhJcCq6bXrfJH7">
 <script>setTimeout(function(){document.body.classList.remove("is-booting")},3000)</script>
@@ -256,6 +256,18 @@
             <div class="chart chart-lg" id="chartTop" data-page-node-id="u7mkeTEDOkx5oLJHoQCa6N"></div>
           </article>
 
+          <!-- v1.0.108：消费节奏 + 分类月预算。两张都不走 ECharts：
+               柱条很细、行很密，DOM 反而更清楚，也不占图表实例。 -->
+          <article class="card rhythm-card" style="--i:7" data-oid="rhythm">
+            <div class="card-head"><div><h3>消费节奏</h3><p id="rhythmSub">近 12 个月 · 哪天最花钱</p></div></div>
+            <div class="rhythm-body" id="rhythmBody"></div>
+          </article>
+
+          <article class="card budget-card" style="--i:8" data-oid="budget">
+            <div class="card-head"><div><h3>月度预算</h3><p id="budgetSub">点一行设置分类预算</p></div></div>
+            <div class="bud-list" id="budgetList"></div>
+          </article>
+
           <article class="card cube-stat-grid" style="--i:7" data-oid="cubestats">
             <div class="card-head csg-head">
               <div><h3>魔方 / 比赛</h3><p>四格总数，点一格进对应列表</p></div>
@@ -477,7 +489,7 @@
             </div>
             <div class="fx-cell fx-sub-slot" data-page-node-id="5OO2ujQ5yZ3QsvIHJKiXx1">
               <div class="seg sub-seg" id="subRow" role="group" aria-label="子类筛选" hidden data-page-node-id="HuS3BNPVzGP9rBV9x2Um8A"><span class="seg-ind" aria-hidden="true" data-page-node-id="3X0xGJZ0sDfiCI2KUHpcro"></span></div>
-              <div class="recent-strip" id="recentStrip" hidden><span class="rs-lab">最近</span><div class="rs-list" id="recentList"></div></div><div class="sub-sum" id="subSum" aria-live="polite"><span>月统计</span><b>¥0</b></div>
+              <div class="recent-strip" id="recentStrip" hidden><span class="rs-lab">最近</span><div class="rs-list" id="recentList"></div><button type="button" class="rs-more" id="rsMore" hidden aria-haspopup="dialog" aria-expanded="false" title="查看全部最近记录">全部</button></div><div class="sub-sum" id="subSum" aria-live="polite"><span>月统计</span><b>¥0</b></div>
             </div>
           </div>
         </div>
@@ -754,7 +766,7 @@
     <svg viewBox="0 0 24 24" fill="none"><path d="M20 11a8 8 0 1 0-2.3 6.6M20 5v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </span>
   <span class="ub-text">
-    <b>有新版本可用<i class="ub-ver" id="ubVer">v1.0.107</i></b>
+    <b>有新版本可用<i class="ub-ver" id="ubVer">v1.0.108</i></b>
     <em>刷新即用，账目和设置都不会丢</em>
   </span>
   <button type="button" class="ub-btn" id="updateNow">立即刷新</button>
@@ -763,13 +775,13 @@
   </button>
 </div>
 
-<script src="assets/echarts.min.js?v=1.0.107" defer></script>
-<script src="assets/vault.js?v=1.0.107"></script>
-<script src="assets/boot.js?v=1.0.107"></script>
-<script src="assets/ui-select.js?v=1.0.107"></script>
-<script src="assets/app.js?v=1.0.107"></script>
+<script src="assets/echarts.min.js?v=1.0.108" defer></script>
+<script src="assets/vault.js?v=1.0.108"></script>
+<script src="assets/boot.js?v=1.0.108"></script>
+<script src="assets/ui-select.js?v=1.0.108"></script>
+<script src="assets/app.js?v=1.0.108"></script>
 <script>window.addEventListener("load",function(){try{UISelect.init()}catch(e){}});</script>
-<script src="assets/sync.js?v=1.0.107"></script>
+<script src="assets/sync.js?v=1.0.108"></script>
 <script>
 /* 离线加速：静态资源走本地缓存，页面本身始终取最新（详见 sw.js 顶部说明）。
    localhost 也算安全上下文，本地调试同样注册，省得两套行为。
