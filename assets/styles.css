@@ -886,10 +886,11 @@ html[data-theme="dark"] .cal-item:hover {
   display: grid; grid-template-columns: 4px 88px minmax(0, 1fr) auto;
   align-items: center; gap: 12px; padding: 11px 13px;
   border-radius: 12px;
-  /* v1.0.100：整行用该分类色的浅色填充，不再是一片纯白。
-     --c / --ink 由 JS 按分类写进行内样式；10% 平涂够认出色相又不抢文字。 */
-  background: color-mix(in srgb, var(--c, var(--primary)) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--c, var(--primary)) 24%, var(--border));
+  /* v1.0.101：整行只做极淡的分类色晕染（6%），胶囊保持 14% ——
+     v1.0.100 两者只差 4 个百分点，糊成一片分不出层次。现在行是底色、
+     胶囊明显浮起；色相还在，仍一眼分得清餐饮 / 日常 / 交通。 */
+  background: color-mix(in srgb, var(--c, var(--primary)) 6%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--c, var(--primary)) 18%, var(--border));
 }
 .dlc-bar { width: 4px; height: 34px; border-radius: 4px; background: var(--c); }
 .dlc-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -3867,8 +3868,8 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 /* 今日栏整体垫琥珀，但每一行仍保留自己的分类浅色 —— 只把描边往琥珀收一点，
    不再像 v1.0.98 那样强制刷成白卡把分类色吃掉 */
 .day-list.is-today .dl-cat {
-  background: color-mix(in srgb, var(--c, var(--primary)) 13%, var(--surface));
-  border-color: color-mix(in srgb, var(--today-ink) 20%, color-mix(in srgb, var(--c) 20%, var(--border)));
+  background: color-mix(in srgb, var(--c, var(--primary)) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--today-ink) 20%, color-mix(in srgb, var(--c) 18%, var(--border)));
 }
 .day-list.is-today .day-list-head { border-bottom-color: color-mix(in srgb, var(--today-ink) 26%, var(--border)); }
 html[data-theme="dark"] .day-list.is-today {
@@ -3876,8 +3877,8 @@ html[data-theme="dark"] .day-list.is-today {
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--today-ink) 45%, transparent);
 }
 html[data-theme="dark"] .day-list.is-today .dl-cat {
-  background: color-mix(in srgb, var(--c, var(--primary)) 18%, var(--surface));
-  border-color: color-mix(in srgb, var(--c, var(--primary)) 32%, var(--border));
+  background: color-mix(in srgb, var(--c, var(--primary)) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--c, var(--primary)) 26%, var(--border));
 }
 /* 标题旁的小徽章，和左栏日期卡的「今天」同一套视觉，只是缩一档 */
 .dl-today {
@@ -4702,6 +4703,10 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
 .boot-tips { position: relative; margin-top: 24px; width: min(304px, 76vw); height: 32px; }
 .boot-tips span {
   position: absolute; inset: 0; font-size: 10.5px; line-height: 1.55; color: var(--muted);
+  /* v1.0.101：三句提示绝对定位铺满 304px 容器，但没写 text-align 就默认
+     左对齐 —— 图标/名称/进度条都在 .boot-inner 里居中，只有这句偏左。
+     显式居中，和图标同一条中轴线。 */
+  text-align: center;
   opacity: 0; animation: bootTip 9s linear infinite;
 }
 .boot-tips span:nth-child(2) { animation-delay: 3s; }
