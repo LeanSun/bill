@@ -1042,8 +1042,11 @@ html[data-theme="dark"] .cal-item:hover {
 .ym-week span { text-align: center; font-size: 9.5px; color: var(--muted); padding: 0; line-height: 1.4; }
 /* 周六周日：表头文字走浅粉，一眼把周末那两列圈出来 */
 .ym-week span:nth-child(6), .ym-week span:nth-child(7) { color: var(--weekend-ink, #ff8ba7); font-weight: 700; }
-.ym-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 1px; flex: 1 1 auto; min-height: 0; }
-.ym-day, .ym-blank { position: relative; border-radius: 4px; display: grid; place-items: center; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; min-height: 0; }
+.ym-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 1px; flex: 1 1 auto; min-height: 0; }
+.ym-day, .ym-blank { position: relative; border-radius: 4px; display: grid; place-items: center;
+  /* padding:0：<button> 的默认 1px 6px 会顶大最小内容宽，手机 2 列时
+     七列加起来超过卡片宽度，右侧整列被裁（v1.9.0） */
+  padding: 0; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; min-height: 0; }
 .ym-blank { background: transparent; }
 .ym-day { color: var(--muted); background: color-mix(in srgb, var(--border) 45%, transparent); transition: transform .18s var(--ease), box-shadow .2s; }
 .ym-day:hover { transform: scale(1.24); box-shadow: 0 4px 10px -4px rgba(0, 0, 0, .3); z-index: 2; }
@@ -3154,7 +3157,7 @@ html.theme-morph *::before,
 html.theme-morph *::after {
   transition-property: background-color, color, border-color, box-shadow,
                        fill, stroke, outline-color, text-decoration-color !important;
-  transition-duration: .26s !important;
+  transition-duration: .15s !important;
   transition-timing-function: cubic-bezier(.4, 0, .2, 1) !important;
   transition-delay: 0s !important;
 }
@@ -3872,103 +3875,13 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 /* v1.0.67：支出构成每行追加「占预算 %」小标 */
 .spend-bud { flex: 0 0 auto; font-size: 9.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chart-donut.is-percent .spend-bud { display: none; }
-/* v1.8.5：设了真实月预算之后 —— 进度条改读「年度额度用了多少」，
-   超支那行整颗变红，金额榜末尾写「超 ¥x」。迷你折线只在宽屏出现。 */
-.spend-bud.is-over { color: var(--danger); font-weight: 800; }
-.spend-track[data-bud="1"] { background: color-mix(in srgb, var(--danger) 8%, var(--surface-3)); }
+/* 迷你折线：近 12 个月该分类的月度支出走势，只在宽屏出现 */
 .spend-spark {
   flex: 0 0 34px; width: 34px; height: 12px; display: block;
   overflow: visible;
 }
 @media (max-width: 720px) {
   .spend-spark { display: none; }
-}
-
-/* ---- 消费节奏 ---------------------------------------------------- */
-.rhythm-card { display: flex; flex-direction: column; }
-.rhythm-card .card-head { flex: 0 0 auto; }
-.rhythm-body {
-  flex: 1 1 auto; display: flex; flex-direction: column;
-  justify-content: flex-start; gap: 12px; padding: 6px 2px 2px; min-height: 0;
-}
-.rh-sec { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
-.rhythm-body > .rh-sec:first-child { flex: 1 1 auto; }
-.rh-lab { font-size: 10px; font-weight: 750; letter-spacing: .04em; color: var(--muted); }
-.rh-week { display: flex; align-items: flex-end; gap: 6px; flex: 1 1 auto; min-height: 46px; }
-.rh-col {
-  flex: 1 1 0; min-width: 0; height: 100%;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px;
-}
-.rh-col i {
-  display: block; width: 100%; max-width: 26px; height: var(--h, 0%); min-height: 3px;
-  border-radius: 4px 4px 2px 2px;
-  background: color-mix(in srgb, var(--primary) 32%, var(--surface));
-  transition: height .5s var(--ease), background-color .2s;
-}
-.rh-col b { font-size: 8.5px; font-weight: 650; color: var(--muted); line-height: 1; }
-.rh-col.is-peak i { background: var(--primary); }
-.rh-col.is-peak b { color: var(--primary); font-weight: 800; }
-.rh-bars { display: flex; align-items: flex-end; gap: 2px; }
-.rh-days {
-  height: 26px; padding-bottom: 1px;
-  background: linear-gradient(var(--border), var(--border)) bottom / 100% 1px no-repeat;
-}
-.rh-days i {
-  flex: 1 1 0; min-width: 0; height: var(--h, 0%); min-height: 0;
-  border-radius: 1.5px; background: color-mix(in srgb, var(--violet) 32%, var(--surface));
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--violet) 18%, transparent);
-}
-.rh-days i.is-peak { background: var(--violet); }
-.rh-x { display: flex; font-size: 8.5px; color: var(--muted); line-height: 1; font-variant-numeric: tabular-nums; }
-.rh-x31 { justify-content: space-between; }
-.rh-x31 i { font-style: normal; }
-.rh-note {
-  margin: 0; font-size: 10.5px; line-height: 1.5; color: var(--text-2);
-}
-.rh-note b { color: var(--primary); font-weight: 800; }
-
-/* ---- 月度预算 ---------------------------------------------------- */
-.bud-list { display: flex; flex-direction: column; gap: 2px; padding: 2px 0; }
-.bud-row {
-  display: flex; align-items: center; gap: 8px; min-height: 30px;
-  padding: 3px 7px; border-radius: 8px; cursor: pointer;
-  transition: background-color .14s;
-}
-.bud-row:hover { background: var(--surface-2); }
-.bud-row:focus-visible {
-  outline: 2px solid var(--primary); outline-offset: -2px;
-  background: var(--surface-2);
-}
-.bud-name { flex: 0 0 52px; display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: var(--text); }
-.bud-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--c, var(--primary)); }
-.bud-bar { flex: 1 1 auto; min-width: 24px; max-width: 260px; height: 7px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
-.bud-bar i { display: block; height: 100%; border-radius: 4px; transition: width .45s var(--ease); }
-.bud-row.is-unset .bud-bar { background: transparent; border: 1px dashed color-mix(in srgb, var(--border-strong) 85%, transparent); }
-.bud-num {
-  flex: 0 0 auto; margin-left: auto; display: inline-flex; align-items: baseline; gap: 1px;
-  font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-.bud-num b { font-size: 11.5px; color: var(--text); font-weight: 750; }
-.bud-num i { font-style: normal; }
-.bud-num .is-empty { font-size: 10px; color: var(--muted); opacity: .8; }
-.bud-pct { flex: 0 0 30px; text-align: right; font-size: 10px; font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
-.bud-over { flex: 0 0 auto; font-size: 9.5px; font-style: normal; font-weight: 800; color: var(--danger); white-space: nowrap; }
-.bud-row.is-over .bud-bar { background: color-mix(in srgb, var(--danger) 14%, var(--surface-3)); }
-.bud-total {
-  display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 7px 7px 2px;
-  border-top: 1px dashed var(--border);
-  font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums;
-}
-.bud-total span { flex: 0 0 52px; font-weight: 700; }
-.bud-total i { flex: 1 1 auto; font-style: normal; }
-.bud-total em { font-style: normal; font-weight: 750; color: var(--text-2); }
-.bud-total em.is-over { color: var(--danger); }
-.bud-input {
-  width: 74px; height: 22px; padding: 0 6px; border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--primary) 60%, var(--border));
-  background: var(--surface); color: var(--text);
-  font-family: var(--font); font-size: 11px; font-weight: 700; text-align: right;
-  outline: none;
 }
 
 /* v1.0.68：重置筛选按钮（⟳）加长 —— 从 36px 方钮改成带文字的长胶囊 */
@@ -4826,6 +4739,16 @@ html[data-theme="dark"] .cal-more {
 .de-week-top span { font-size: 10.5px; color: var(--muted); }
 .de-week-top b { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .de-bars { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; height: 42px; margin-top: 6px; }
+/* v1.9.0：本月记账节奏 —— 一天一格，记过的实心、今天描边 */
+.de-days { display: grid; grid-template-columns: repeat(31, minmax(0, 1fr)); gap: 2px; margin-top: 8px; }
+.de-day {
+  display: block; height: 15px; border-radius: 3px;
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-strong) 45%, transparent);
+}
+.de-day.is-on { background: color-mix(in srgb, var(--primary) 78%, var(--surface)); box-shadow: none; }
+.de-day.is-today { background: transparent; box-shadow: inset 0 0 0 1.6px var(--primary); }
+.de-day.is-today.is-on { background: var(--primary); box-shadow: inset 0 0 0 1.6px var(--text); }
 .de-bar {
   display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 3px;
   height: 100%; padding: 0; background: none; border: 0; min-width: 0;

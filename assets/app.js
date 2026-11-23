@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.8.5';
+  var ASSET_V = '1.9.0';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -44,7 +44,6 @@
      两个分开存：提醒过不代表备份过，30 天内不再重复提醒，但提醒记录只压 7 天。 */
   var BACKUP_KEY = 'qingzhang.backup.v1';
   var BACKUP_TIP_KEY = 'qingzhang.backupTip.v1';
-  var BUDGET_KEY = 'qingzhang.budget.v1';
   var EXPENSE_CATS = ['餐饮', '日常', '交通', '服饰', '娱乐'];
   var INCOME_CATS = ['收入'];
   var ALL_CATS = EXPENSE_CATS.concat(INCOME_CATS);
@@ -67,7 +66,7 @@
   var RENDER_MODE = 'animate';
   /* v1.8.5：420ms 的换肤偏慢，眼睛能跟住每一帧就显得拖；260ms 仍是补间，
      但像"按一下开关"而不是"等一次动画"。CSS .theme-morph 与图表补间同源。 */
-  var THEME_FADE_MS = 260;
+  var THEME_FADE_MS = 150;
   /* v1.0.106：需要在换肤时逐帧插值的主题色变量。
      CSS @property 的 transition 在根元素自定义属性上实测不生效（会瞬跳），
      所以由 JS 读新旧 computed 值、rAF 插值写到内联 style，到点后清除。 */
@@ -217,9 +216,6 @@
     weightYear: 'all',
     store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     catColors: {},
-    /* v1.8.5：分类月预算（元/月，按月循环用）。存在 BUDGET_KEY，
-       不写进 store —— 它是"设定"而不是账目，云端快照不该被它污染。 */
-    budgets: {},
     layout: null
   };
 
@@ -876,27 +872,57 @@
       if (r.type !== 'expense' || !r.date || r.date < cut) return;
       var c = r.category || '其它';
       if (!byCat[c]) byCat[c] = [];
-      byCat[c].push(r.amount);
+      byCat[c].push({ amount: r.amount, month: String(r.date).slice(0, 7) });
     });
     var out = {};
     Object.keys(byCat).forEach(function (c) {
       var a = byCat[c];
       if (a.length < 3) return;
-      var avg = a.reduce(function (x, y) { return x + y; }, 0) / a.length;
-      out[c] = avg * 2.5;
+      var sum = 0;
+      a.forEach(function (x) { sum += x.amount; });
+      out[c] = { th: (sum / a.length) * 2.5, fixed: fixedBands(a) };
     });
     return out;
+  }
+
+  /* v1.9.0：房租 / 水电费 / 宽带这种「每月一次、金额差不多」的周期账单，
+     拿单笔均值去比只会月月报高消费 —— 它本来就每月这么大。这里按金额聚簇：
+     一个簇同时满足「覆盖 ≥3 个月」「每月不超过 1.5 笔」「簇内极差 <40%」，
+     就当作固定支出，落在区间里的那一笔不参与异常判定；某个月明显涨了
+     （比如房租续租涨价），它自己会自成一簇、覆盖不到 3 个月，照样会报。 */
+  function fixedBands(list) {
+    var sorted = list.slice().sort(function (x, y) { return x.amount - y.amount; });
+    var bands = [], i = 0;
+    while (i < sorted.length) {
+      var base = sorted[i].amount, j = i, months = {};
+      while (j < sorted.length && sorted[j].amount <= base * 1.4) {
+        months[sorted[j].month] = (months[sorted[j].month] || 0) + 1;
+        j++;
+      }
+      var nM = Object.keys(months).length;
+      if (nM >= 3 && (j - i) / nM <= 1.5) {
+        bands.push({ lo: base * 0.98, hi: sorted[j - 1].amount * 1.02 });
+      }
+      i = j;
+    }
+    return bands;
   }
   /* v1.8.5：异常分两级。原来只有"超了/没超"，一笔 3 倍均值和一笔 12 倍均值
      长得一模一样，真出大额时反而看不出轻重。
        1 级（≥均值×2.5）：单感叹号，红底白字；
        2 级（≥均值×4）  ：双感叹号 + 更深的红 + 一圈微光。
-     amap 里存的是均值×2.5，所以 2 级阈值 = amap × 1.6（4 / 2.5）。 */
+     amap 里存的是 { th: 均值×2.5, fixed: 固定支出区间 }，所以 2 级阈值 = th × 1.6（4 / 2.5）。 */
   function anomalyLevel(r, amap) {
     if (r.type !== 'expense') return 0;
-    var th = amap[r.category || '其它'];
-    if (!th || !(r.amount >= th)) return 0;
-    return r.amount >= th * 1.6 ? 2 : 1;
+    var m = amap[r.category || '其它'];
+    if (!m) return 0;
+    /* 落在固定支出区间里的先放行，再看阈值 */
+    var f = m.fixed;
+    for (var i = 0; f && i < f.length; i++) {
+      if (r.amount >= f[i].lo && r.amount <= f[i].hi) return 0;
+    }
+    if (!(r.amount >= m.th)) return 0;
+    return r.amount >= m.th * 1.6 ? 2 : 1;
   }
   function isAnomaly(r, amap) {
     return anomalyLevel(r, amap) > 0;
@@ -1513,17 +1539,31 @@
     expVals.forEach(function (v) { if (v > 0) { expSum += v; expN++; } });
     var expAvg = expN ? expSum / expN : 0;
 
+    /* v1.9.0：支出和收入共用一个纵轴时，收入（两万级）把刻度撑到 2.5 万，
+       三千上下的支出柱全被压成一片等高的小方块，按月看不出差别。
+       改成双轴：支出走左轴、收入走右轴，各自按自己的最大值定刻度。
+       两条都显示时才分轴（只看支出 / 只看收入时单轴更干净）。 */
+    var showExp = state.trendScope !== 'income';
+    var showInc = state.trendScope !== 'expense';
+    var dual = showExp && showInc;
+    var expMax = 0, incMax = 0;
+    expVals.forEach(function (v) { if (v > expMax) expMax = v; });
+    rows.forEach(function (r) { if (r.income > incMax) incMax = r.income; });
     var series = [];
-    if (state.trendScope !== 'income') {
+    if (showExp) {
       series.push({
-        name: '支出', type: 'bar', barMaxWidth: 26, z: 2,
+        name: '支出', type: 'bar', barMaxWidth: 26, z: 3, yAxisIndex: 0,
         data: expVals,
         itemStyle: { borderRadius: [5, 5, 0, 0], color: gradV(withAlpha(p.expense, .88), withAlpha(p.expense, .14)) },
         emphasis: { itemStyle: { color: p.expense } },
         animationDelay: function (i) { return i * 20; },
         label: {
-          show: showBarLabel, position: 'top', distance: 3,
-          color: p.muted, fontSize: 9.5, fontFamily: p.font, fontWeight: 600,
+          /* 数字放柱底而不是柱顶：分轴后收入线正好从柱顶一带掠过，
+             挂在外面会被线穿成一串；柱底是淡色渐变，深色数字读得清。 */
+          show: showBarLabel, position: 'insideBottom', distance: 4,
+          /* 用正文色而不是支出色：柱底是 14% 透明度的渐变，深色主题下
+             深绿字压在上面几乎看不见，正文色两头都能读 */
+          color: p.text, fontSize: 9, fontFamily: p.font, fontWeight: 700,
           formatter: function (o2) { return shortYuan(o2.value); }
         },
         /* 一条虚线标出「这段时间的月均支出」：柱子高低一眼能比，但「这个月算不算
@@ -1537,12 +1577,15 @@
         } : undefined
       });
     }
-    if (state.trendScope !== 'expense') {
+    if (showInc) {
       series.push({
-        name: '收入', type: 'line', smooth: .34, symbol: 'circle', symbolSize: 6,
-        showSymbol: true, z: 3,
+        name: '收入', type: 'line', smooth: .34, symbol: 'circle', symbolSize: dual ? 5 : 6,
+        /* 分轴后支出柱顶的数字常和收入线的圆点撞在同一高度，读起来一串糊字：
+           双轴时只留线、不铺圆点，hover 时再亮出来。 */
+        /* z 压在柱子下面：线从柱背后穿过，只在柱间与柱顶之上露出来 */
+        showSymbol: !dual, z: dual ? 1 : 3, yAxisIndex: dual ? 1 : 0,
         data: rows.map(function (r) { return r.income; }),
-        lineStyle: { width: 2.4, color: p.income },
+        lineStyle: { width: dual ? 1.8 : 2.4, color: withAlpha(p.income, dual ? .58 : 1) },
         itemStyle: { color: p.income, borderColor: p.surface, borderWidth: 2 },
         /* 不再铺面积：工资这种每月几乎一样的收入会是一条贴在顶上的水平线，
            面积一直填到轴底，整张图变成一块红底，柱子全被盖住。
@@ -1608,7 +1651,24 @@
         }
       }
     });
-    o.yAxis = valAxis(p);
+    if (dual) {
+      o.yAxis = [
+        valAxis(p, {
+          position: 'left',
+          /* 柱顶要写数字，顶格会贴边；按支出的 1.3 倍收口，柱子高度差才拉得开 */
+          max: expMax > 0 ? Math.ceil(expMax * 1.3 / 100) * 100 : undefined,
+          axisLabel: { color: withAlpha(p.expense, .85), fontSize: 10, fontFamily: p.font, formatter: fmtAxis }
+        }),
+        valAxis(p, {
+          position: 'right',
+          max: incMax > 0 ? Math.ceil(incMax * 1.2 / 1000) * 1000 : undefined,
+          axisLabel: { color: withAlpha(p.income, .85), fontSize: 10, fontFamily: p.font, formatter: fmtAxis },
+          splitLine: { show: false }
+        })
+      ];
+    } else {
+      o.yAxis = valAxis(p);
+    }
     /* 不挂 inside dataZoom：它会拦截 wheel 并 preventDefault，
        鼠标停在趋势图上时整页滚不动。现在固定 12 格，本来也不需要缩放。 */
     o.dataZoom = [];
@@ -1851,185 +1911,6 @@
       series: series
     });
   }
-  /* ---------------- 分类月预算（v1.8.5） ----------------
-     预算按月循环：设一次，每个月都按这个数比。花钱口径取「本月自然月」的
-     真实支出（不受筛选影响）—— 预算说的是"这个月我花了多少"，不是"当前
-     筛选下花了多少"。存储独立于账本，改动不触发云同步。 */
-  function loadBudgets() {
-    var out = {};
-    try {
-      var raw = JSON.parse(localStorage.getItem(BUDGET_KEY) || '{}') || {};
-      ALL_CATS.forEach(function (c) {
-        var v = Number(raw[c]);
-        if (v > 0) out[c] = Math.round(v);
-      });
-    } catch (e) { /* 坏数据当没设过 */ }
-    state.budgets = out;
-  }
-  function writeBudgets() {
-    try { localStorage.setItem(BUDGET_KEY, JSON.stringify(state.budgets || {})); } catch (e) { /* noop */ }
-  }
-  /* 本月各分类的支出合计（含种子数据） */
-  function monthSpentByCat() {
-    var now = new Date();
-    var key = now.getFullYear() + '-' + pad2(now.getMonth() + 1);
-    var out = {};
-    allRecords().forEach(function (r) {
-      if (r.type === 'income') return;
-      if (String(r.date || '').slice(0, 7) !== key) return;
-      var c = r.category || '其它';
-      out[c] = (out[c] || 0) + r.amount;
-    });
-    return { ym: key, year: now.getFullYear(), month: now.getMonth() + 1, spent: out };
-  }
-
-  function renderBudget(p) {
-    var box = $('budgetList');
-    if (!box) return;
-    var info = monthSpentByCat();
-    var bud = state.budgets || {};
-    var sub = $('budgetSub');
-    if (sub) sub.textContent = info.month + ' 月 · 点一行设置预算';
-
-    var rows = EXPENSE_CATS.map(function (c) {
-      var b = bud[c] || 0, s = info.spent[c] || 0;
-      var pct = b ? s / b * 100 : 0;
-      var over = !!b && s > b;
-      var col = catColor(p, c);
-      var barW = b ? Math.min(100, pct) : 0;
-      var num = b
-        ? '<b>' + fmtYuan(s).replace('¥', '') + '</b><i>/' + fmtYuan(b).replace('¥', '') + '</i>'
-        : '<i class="is-empty">未设置</i>';
-      var tip = c + '：本月已花 ' + fmtYuan(s) +
-        (b ? '，预算 ' + fmtYuan(b) + (over ? '（超支）' : '') : '，还没设预算');
-      /* tabindex/role：预算行是靠点击进编辑的 div，不加这个键盘用户完全够不到（v1.8.5） */
-      return '<div class="bud-row' + (over ? ' is-over' : '') + (b ? '' : ' is-unset') + '" data-bud="' + esc(c) + '"' +
-        ' role="button" tabindex="0" aria-label="' + esc(tip + '，按回车设置预算') + '"' +
-        ' style="--c:' + col + '" title="' + esc(tip) + '">' +
-        '<span class="bud-name"><i class="bud-dot"></i>' + esc(c) + '</span>' +
-        '<span class="bud-bar"><i style="width:' + barW.toFixed(1) + '%;background:' + (over ? 'var(--danger)' : col) + '"></i></span>' +
-        '<span class="bud-num">' + num + '</span>' +
-        (over ? '<em class="bud-over">超 ' + fmtYuan(s - b).replace('¥', '') + '</em>' : (b ? '<em class="bud-pct">' + Math.round(pct) + '%</em>' : '')) +
-        '</div>';
-    }).join('');
-    var totalB = 0, totalS = 0;
-    EXPENSE_CATS.forEach(function (c) { totalB += bud[c] || 0; totalS += info.spent[c] || 0; });
-    /* 合计行一直在：没设预算时写「未设置」，占住卡片底部，也顺带说明这张卡在算什么 */
-    var totalRow = '<div class="bud-total"><span>合计</span>' +
-      (totalB > 0
-        ? '<i>' + fmtYuan(totalS).replace('¥', '') + ' / ' + fmtYuan(totalB).replace('¥', '') + '</i>' +
-          '<em class="' + (totalS > totalB ? 'is-over' : '') + '">' + Math.round(totalS / totalB * 100) + '%</em>'
-        : '<i class="is-empty">还没有设置任何预算</i>') + '</div>';
-    box.innerHTML = rows + totalRow;
-    box.dataset.sig = JSON.stringify(bud) + '|' + Math.round(totalS * 100);
-  }
-
-  /* 行内改预算：点一行 → 原位换成输入框，Enter 存、Esc 撤、失焦也算存。
-     不用 prompt()：手机上那个系统框丑，而且会被某些浏览器拦。 */
-  function bindBudgetEdit() {
-    var box = $('budgetList');
-    if (!box || box.__bound) return;
-    box.__bound = true;
-    function openRow(row) {
-      if (!row || row.classList.contains('is-editing')) return;
-      var cat = row.dataset.bud;
-      row.classList.add('is-editing');
-      var cur = (state.budgets || {})[cat] || '';
-      var slot = row.querySelector('.bud-num');
-      slot.innerHTML = '<input class="bud-input" type="number" min="0" step="10" inputmode="decimal" value="' +
-        (cur || '') + '" aria-label="' + esc(cat) + '月预算，单位元">';
-      var inp = row.querySelector('.bud-input');
-      inp.focus();
-      if (inp.select) inp.select();
-      var done = false;
-      function commit(ok) {
-        if (done) return;
-        done = true;
-        var v = Number(inp.value);
-        if (ok) {
-          if (v > 0) state.budgets[cat] = Math.round(v);
-          else delete state.budgets[cat];
-          writeBudgets();
-          toast(v > 0 ? cat + ' 月预算 ' + fmtYuan(v) : '已清除 ' + cat + ' 的预算', v > 0 ? 'success' : 'info');
-        }
-        var p = palette();
-        renderBudget(p);
-        renderDonut(p);
-      }
-      inp.addEventListener('keydown', function (ev) {
-        if (ev.key === 'Enter') { ev.preventDefault(); commit(true); }
-        else if (ev.key === 'Escape') { ev.preventDefault(); commit(false); }
-      });
-      inp.addEventListener('blur', function () { commit(true); });
-    }
-    box.addEventListener('click', function (e) {
-      openRow(e.target.closest ? e.target.closest('.bud-row') : null);
-    });
-    box.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      var row = e.target.closest ? e.target.closest('.bud-row') : null;
-      if (!row || e.target !== row) return;
-      e.preventDefault();
-      openRow(row);
-    });
-  }
-
-  /* ---------------- 消费节奏（v1.8.5） ----------------
-     「哪天最花钱」两个角度：一周里的星期几、每月里的几号。用纯 DOM 的
-     小柱条画（不占 ECharts 实例）—— 31 根 4px 的柱子用 canvas 反而糊。 */
-  function renderRhythm(p) {
-    var box = $('rhythmBody');
-    if (!box) return;
-    var now = new Date();
-    var from = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    var cut = dateKey(from);
-    var wSum = [0, 0, 0, 0, 0, 0, 0], wCnt = [0, 0, 0, 0, 0, 0, 0];
-    var dSum = [], dCnt = [];
-    for (var i = 0; i < 31; i++) { dSum.push(0); dCnt.push(0); }
-    allRecords().forEach(function (r) {
-      if (r.type === 'income' || !r.date || r.date < cut) return;
-      var d = new Date(r.date + 'T00:00:00');
-      if (isNaN(d.getTime())) return;
-      /* getDay(): 0=周日。这里按「周一开头」排，和 WEEKDAYS 一致 */
-      var wi = (d.getDay() + 6) % 7;
-      wSum[wi] += r.amount; wCnt[wi]++;
-      var di = d.getDate() - 1;
-      dSum[di] += r.amount; dCnt[di]++;
-    });
-    var wMax = Math.max.apply(null, wSum) || 1;
-    var dMax = Math.max.apply(null, dSum) || 1;
-    var wPeak = wSum.indexOf(Math.max.apply(null, wSum));
-    var dPeak = dSum.indexOf(Math.max.apply(null, dSum));
-    var hasData = wCnt.some(function (n) { return n > 0; });
-
-    /* 一列 = 柱子 + 标签。整组撑满卡片宽度，而不是挤在左边一小块 */
-    var bars = WEEKDAYS.map(function (name, i) {
-      var h = Math.round(wSum[i] / wMax * 100);
-      return '<span class="rh-col' + (i === wPeak && hasData ? ' is-peak' : '') + '">' +
-        '<i style="--h:' + Math.max(hasData ? 6 : 0, h) + '%" title="' +
-        esc(name + ' 合计 ' + fmtYuan(wSum[i]) + ' · ' + wCnt[i] + ' 笔') + '"></i>' +
-        '<b>' + name.slice(1) + '</b></span>';
-    }).join('');
-    var days = '';
-    for (var k = 0; k < 31; k++) {
-      var h2 = Math.round(dSum[k] / dMax * 100);
-      /* 0 的那天不留 2px 的碎点：31 个碎点连起来像一条虚线，反而看不出高峰 */
-      var vis = dSum[k] > 0 ? Math.max(6, h2) : 0;
-      days += '<i class="' + (k === dPeak && hasData ? 'is-peak' : '') + '" style="--h:' + vis + '%"' +
-        ' title="' + esc('每月 ' + (k + 1) + ' 号 合计 ' + fmtYuan(dSum[k]) + ' · ' + dCnt[k] + ' 笔') + '"></i>';
-    }
-    box.innerHTML =
-      '<div class="rh-sec"><span class="rh-lab">一周里</span>' +
-      '<div class="rh-week">' + bars + '</div></div>' +
-      '<div class="rh-sec"><span class="rh-lab">每月几号</span>' +
-      '<div class="rh-bars rh-days">' + days + '</div>' +
-      '<div class="rh-x rh-x31"><i>1</i><i>10</i><i>20</i><i>31</i></div></div>' +
-      (hasData
-        ? '<p class="rh-note">近 12 个月：<b>' + WEEKDAYS[wPeak] + '</b>花得最多，每月 <b>' + (dPeak + 1) + ' 号</b>是高峰</p>'
-        : '<p class="rh-note">还没有支出记录</p>');
-  }
-
-  /* 12 个月的分类迷你折线：一根 34×12 的 polyline，够看出"在涨还是在落" */
   function catSparkSVG(vals, color) {
     var max = Math.max.apply(null, vals) || 1;
     var n = vals.length;
@@ -2074,13 +1955,6 @@
     var monthBudget = budN ? budSum / budN : 0;
     var yearFactor = state.donutYear === 'all' ? Math.max(1, YEARS.length) : 1;
     var budgetBase = monthBudget * 12 * yearFactor;
-    /* v1.8.5：真实月预算 → 这张卡的"年度可花额度"（预算 × 已过月数）。
-       这张卡列的是某一年（或全部）的合计，进度条要是拿本月去比就会
-       「金额是全年、进度是本月」，两个口径打架；换成年度额度之后就一致了。 */
-    var bYear = state.donutYear === 'all' ? null : Number(state.donutYear);
-    var bMonths = 12 * Math.max(1, YEARS.length);
-    if (bYear) bMonths = bYear < nowD.getFullYear() ? 12 : (bYear === nowD.getFullYear() ? nowD.getMonth() + 1 : 0);
-    var budMap = state.budgets || {};
     /* 近 12 个月各分类的月度合计：给每行画一根迷你折线（第 8 条） */
     var sparkSlots = [], sparkIndex = {};
     for (var si = 11; si >= 0; si--) {
@@ -2103,18 +1977,10 @@
     el.innerHTML = data.map(function (d, i) {
       var pct = total ? d.value / total * 100 : 0;
       var col = colors[nameIndex[d.name]] || p.primary;
-      var b = budMap[d.name] || 0;
-      var cap = (b && bMonths) ? b * bMonths : 0;
-      var budPct = cap ? d.value / cap * 100 : 0;
-      var over = cap > 0 && d.value > cap;
-      var trackW = cap ? Math.min(100, budPct) : pct;
+      var trackW = pct;
       var spark = sparkByCat[d.name] ? catSparkSVG(sparkByCat[d.name], col) : '';
       var budChip = '';
-      if (cap) {
-        budChip = '<span class="spend-bud' + (over ? ' is-over' : '') + '" title="' +
-          esc(d.name + ' 月预算 ' + fmtYuan(b) + ' × ' + bMonths + ' 个月 = ' + fmtYuan(cap) + '，已花 ' + fmtYuan(d.value)) + '">' +
-          (over ? '超 ' + pctText(budPct - 100) : pctText(budPct)) + '</span>';
-      } else if (budgetBase > 0) {
+      if (budgetBase > 0) {
         budChip = '<span class="spend-bud" title="占近6月月均折算预算">' +
           pctText(d.value / budgetBase * 100) + ' 预算</span>';
       }
@@ -2122,8 +1988,7 @@
         ' title="' + esc(d.name + ' ' + fmtYuan(d.value) + ' · ' + pctText(pct) + '，点击看明细') + '">' +
         '<span class="spend-rank" style="--dot:' + col + '">' + (i + 1) + '</span>' +
         '<span class="spend-name">' + esc(d.name) + '</span>' +
-        '<span class="spend-track"' + (cap ? ' data-bud="1"' : '') + '><i style="width:' + trackW.toFixed(1) + '%;background:' +
-        (over ? p.danger : col) + '"></i></span>' +
+        '<span class="spend-track"><i style="width:' + trackW.toFixed(1) + '%;background:' + col + '"></i></span>' +
         spark +
         '<span class="spend-amt">' + fmtYuan(d.value) + '</span>' +
         '<span class="spend-pct">' + pctText(pct) + '</span>' +
@@ -2203,6 +2068,37 @@
   /* 消费日历 = 日历热力图（calendar 坐标系 + heatmap 系列）。
      优化点：按分位数定色阶（大额不冲淡整图）、空白日给淡底让格网成形、
      四档渐变、提示气泡带笔数、点击直达当日。 */
+  /* 年历格子的底色是「分类色 × 透明度」拼出来的 rgba，写在内联 style 上，
+     CSS 变量换肤管不到 —— 深色主题下这些格子会留着浅色底（空白日最扎眼，
+     一整片白块浮在深色卡片上）。配色算法抽出来，首次渲染和换肤重绘共用。 */
+  function yearCellPaint(p, catHue, e, inc, ae, ai) {
+    if (e && inc) {
+      return { bg: 'linear-gradient(155deg,' + withAlpha(catHue, ae) + ' 0 47%,' +
+        withAlpha(p.income, ai) + ' 53% 100%)',
+        ink: Math.max(ae, ai) > .42 ? '#ffffff' : p.text2 };
+    }
+    if (e) return { bg: withAlpha(catHue, ae), ink: ae > .42 ? '#ffffff' : catInk(p, catHue) };
+    if (inc) return { bg: withAlpha(p.income, ai), ink: ai > .42 ? '#ffffff' : catInk(p, p.income) };
+    return { bg: mixColor(p.surface3, p.surface, .45), ink: p.muted };
+  }
+  /* 换肤后就地重刷年历格子的内联色：DOM 不重建，滚动位置和点选状态都不丢 */
+  function repaintYearBoard() {
+    var box = $('calYearBoard');
+    if (!box || box.hidden) return;
+    var p = palette();
+    var catKey = state.filters.category || 'all';
+    var catHue = catKey === 'all' ? p.expense : (catKey === '收入' ? p.income : catColor(p, catKey));
+    var cells = box.querySelectorAll('.ym-day');
+    for (var i = 0; i < cells.length; i++) {
+      var c = cells[i];
+      var pc = yearCellPaint(p, catHue,
+        Number(c.dataset.e) || 0, Number(c.dataset.i) || 0,
+        Number(c.dataset.ae) || 0, Number(c.dataset.ai) || 0);
+      c.style.background = pc.bg;
+      c.style.color = pc.ink;
+    }
+  }
+
   function renderCalendar(p) {
     var y = state.calendarYear;
     var data = calendarData(y);
@@ -2775,14 +2671,6 @@
   function renderCharts(view, mode) {
     if (view === 'overview') {
       try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
-    }
-    /* v1.8.5：消费节奏 / 月度预算这两张是纯 DOM 卡，不依赖 ECharts，
-       所以放在 hasEcharts 判断之前 —— 图表库没载入时它们照样该显示。 */
-    if (view === 'overview') {
-      var pd = palette();
-      try { renderBudget(pd); } catch (e) { warnChart(renderBudget, e); }
-      try { bindBudgetEdit(); } catch (e) { /* 绑定失败不影响出图 */ }
-      try { renderRhythm(pd); } catch (e) { warnChart(renderRhythm, e); }
     }
     if (!hasEcharts) return;
     var prevMode = RENDER_MODE;
@@ -4155,38 +4043,35 @@
         if (gd >= 0 && (lastGap < 0 || gd < lastGap)) lastGap = gd;
       });
       var gapText = lastGap < 0 ? '还没有记过账' : (lastGap === 0 ? '今天刚记过' : lastGap + ' 天前记过');
-      /* v1.0.97：空状态从「图标 + 一句灰字」改成一块有内容的卡。
-         空日子原来只有三格数字和一句「用左侧的表单记下第一笔」，右半边一片灰；
-         补上近 7 日的小柱（今天那根高亮、可点着跳）和一句能立刻行动的结论，
-         这块就不再是「这儿什么都没有」的占位，而是一天的上下文。 */
-      var week7 = [], wSum7 = 0, wMax7 = 1;
-      var daySum = {};
+      /* v1.9.0：这块原来是「近 7 日支出」七根柱 + 一句「距月底还有 X 天 ·
+         日均可花」。今天那根永远是空的，右侧三格又在说「本月累计 / 上次记账」，
+         合起来只是把「最近没花钱」重复了一遍。换成「本月记账节奏」：
+         1 号到月底一天一格，记过的实心、今天描边 —— 说的是「这个月我记了
+         哪些天、有没有断」，和右边三个数字不重叠。 */
+      var dim = new Date(dRef.getFullYear(), dRef.getMonth() + 1, 0).getDate();
+      var dom = dRef.getDate();
+      var dayHit = {}, hitDays = 0, bestRun = 0, run = 0;
       allRecords().forEach(function (r) {
-        if (r.type !== 'income' && r.date) daySum[r.date] = (daySum[r.date] || 0) + r.amount;
+        if (r.type === 'income' || !r.date) return;
+        if (String(r.date).slice(0, 7) !== ym) return;
+        var dd = Number(String(r.date).slice(8, 10));
+        if (dd >= 1 && dd <= dim) dayHit[dd] = true;
       });
-      for (var sw = 6; sw >= 0; sw--) {
-        var sd = new Date(dRef.getFullYear(), dRef.getMonth(), dRef.getDate() - sw);
-        var sk = dateKey(sd), sv = round(daySum[sk] || 0);
-        week7.push({ k: sk, v: sv, d: sd, today: sw === 0 });
-        wSum7 += sv;
-        if (sv > wMax7) wMax7 = sv;
+      var days31 = '';
+      for (var dn = 1; dn <= dim; dn++) {
+        var on = !!dayHit[dn];
+        if (on) { hitDays++; run++; if (run > bestRun) bestRun = run; } else run = 0;
+        days31 += '<i class="de-day' + (on ? ' is-on' : '') + (dn === dom ? ' is-today' : '') +
+          '" title="' + (dRef.getMonth() + 1) + ' 月 ' + dn + ' 日' + (on ? '：记过' : '：没记') + '"></i>';
       }
-      var bars7 = week7.map(function (x) {
-        var hgt = Math.max(6, x.v / wMax7 * 100);
-        var lbl = x.k + ' 支出 ' + fmtYuan(x.v) + (x.today ? '（今天）' : '');
-        return '<button type="button" class="de-bar' + (x.today ? ' is-today' : '') + '"' +
-          ' data-jump-day="' + x.k + '" data-tip="' + esc(lbl) + '" aria-label="' + esc(lbl) + '">' +
-          '<i style="height:' + hgt.toFixed(1) + '%"></i>' +
-          '<span>' + (x.today ? '今天' : WEEK_CN[x.d.getDay()].slice(1)) + '</span></button>';
-      }).join('');
-      /* 距月底 / 日均可花：把「还剩多少预算」换算成「每天还能花多少」，
-         这是空日子里唯一能立刻用来做决定的一个数。 */
-      var dimE = new Date(dRef.getFullYear(), dRef.getMonth() + 1, 0).getDate();
+      /* 距月底 / 日均可花：把「还剩多少预算」换算成「每天还能花多少」 */
+      var dimE = dim;
       var leftDays = Math.max(1, dimE - dRef.getDate() + 1);
       var perDay = remain > 0 ? Math.round(remain / leftDays) : 0;
-      var actionHint = remain > 0
-        ? '距月底还有 ' + leftDays + ' 天 · 日均可花 ' + fmtYuan(perDay)
-        : (bud > 0 ? '本月已超出月均 ' + fmtYuan(-remain) + ' · 下面几笔悠着点' : '记下第一笔，这里就会长出趋势');
+      var actionHint = hitDays > 0
+        ? '本月记了 ' + hitDays + ' 天 · 最长连着 ' + bestRun + ' 天' +
+          (perDay > 0 ? ' · 日均可花 ' + fmtYuan(perDay) : '')
+        : (bud > 0 ? '这个月还没记过一笔 · 日均可花 ' + fmtYuan(perDay) : '这个月还没记过一笔，从今天开始');
       catRowsHTML =
         '<div class="day-empty">' +
         '<div class="de-head">' +
@@ -4201,8 +4086,8 @@
         '<span><b>' + gapText + '</b><i>上次记账</i></span>' +
         '</div>' +
         '<div class="de-week">' +
-        '<div class="de-week-top"><span>近 7 日支出</span><b>' + fmtYuan(wSum7) + '</b></div>' +
-        '<div class="de-bars">' + bars7 + '</div>' +
+        '<div class="de-week-top"><span>本月记账节奏</span><b>' + hitDays + ' / ' + dim + ' 天</b></div>' +
+        '<div class="de-days">' + days31 + '</div>' +
         '</div>' +
         '<p class="de-hint">' + actionHint + '</p>' +
         '</div>';
@@ -4397,24 +4282,16 @@
         var key = dateKey(d);
         var e = de[key] || 0, inc = di[key] || 0;
         var ae = alphaOf(e, peakE), ai = alphaOf(inc, peakI);
-        var bg = mixColor(p.surface3, p.surface, .45), ink = p.muted, tip = key + ' · 无记录';
-        if (e && inc) {
-            bg = 'linear-gradient(155deg,' + withAlpha(catHue, ae) + ' 0 47%,' +
-            withAlpha(p.income, ai) + ' 53% 100%)';
-          ink = Math.max(ae, ai) > .42 ? '#ffffff' : p.text2;
-        } else if (e) {
-          bg = withAlpha(catHue, ae);
-          ink = ae > .42 ? '#ffffff' : catInk(p, catHue);
-        } else if (inc) {
-          bg = withAlpha(p.income, ai);
-          ink = ai > .42 ? '#ffffff' : catInk(p, p.income);
-        }
+        var pc = yearCellPaint(p, catHue, e, inc, ae, ai);
+        var tip = key + ' · 无记录';
         if (e || inc) tip = key + ' · ' + (e ? '支 ' + fmtBig(e) : '') + (e && inc ? ' · ' : '') + (inc ? '收 ' + fmtBig(inc) : '');
         tip += ' · 点开看月历';
         var cls = 'ym-day' + ((e || inc) ? ' has' : '') + (key === today ? ' is-today' : '') +
           (inc ? ' is-in' : '') + (e ? ' is-out' : '');
         grid += '<button type="button" class="' + cls + '" data-date="' + key +
-          '" style="background:' + bg + ';color:' + ink +
+          '" data-e="' + e + '" data-i="' + inc +
+          '" data-ae="' + ae.toFixed(3) + '" data-ai="' + ai.toFixed(3) + '"' +
+          ' style="background:' + pc.bg + ';color:' + pc.ink +
           '" title="' + esc(tip) + '">' + d.getDate() + '</button>';
       }
       var mde = monthDe[m] || 0, mid = monthDi[m] || 0;
@@ -5333,6 +5210,13 @@
     sel.style.color = catInk(p, c);
     sel.style.backgroundColor = mixColor(c, p.surface, .9);
     sel.style.borderColor = mixColor(c, p.border, .55);
+    /* v1.9.0：option 的底色也是渲染时算好的内联值，切主题后要一起重刷，
+       否则展开列表仍是浅色（原生下拉不跟 CSS 变量走）。 */
+    for (var oi = 0; oi < sel.options.length; oi++) {
+      var o = sel.options[oi], oc = o.getAttribute('data-c');
+      if (!oc) continue;
+      o.setAttribute('style', 'color:' + catInk(p, oc) + ';background-color:' + mixColor(oc, p.surface, .86) + ';');
+    }
     /* 原生 select 已经隐身了，颜色只有同步到自绘 trigger 上才看得见 */
     if (window.UISelect) { try { UISelect.syncAll(); } catch (e) {} }
   }
@@ -6036,9 +5920,10 @@
       var b = $(id);
       if (b) b.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
     });
-    /* mode='theme' 走补间（图表颜色渐变），其余维持 instant / defer 原语义 */
-    if (mode === 'theme') renderCharts(state.view, 'theme');
-    else if (!mode) renderCharts(state.view, 'instant');
+    /* v1.9.0：mode='theme' 时不再在这里重绘图表 —— 8 张图同步 setOption 要
+       七八十毫秒，点击后先卡一下才开始变色，体感就是「慢」。改成交给补间
+       结束再统一 update（颜色仍是渐变，只是晚 150ms 跟上）。 */
+    if (!mode) renderCharts(state.view, 'instant');
     /* 让 iframe 同一帧换色；子页自己会 repaint 行底色与图表 */
     var f = $('cubeFrame');
     if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __ledgerTheme: t }, '*'); } catch (e) {} }
@@ -6063,6 +5948,17 @@
     }
   }
 
+  /* 分类下拉的底色 / 字色是 paintSelect 写死的内联值（在当时的主题下算好的），
+     换肤时没人重算 —— 深色下这几枚仍顶着浅色底，要等用户点一次下拉才「恢复正常」。
+     v1.9.0：换完主题就地重刷一遍，trigger 上的颜色由 UISelect.syncAll 同步。 */
+  function repaintPaintedSelects() {
+    var sels = document.querySelectorAll('select');
+    for (var i = 0; i < sels.length; i++) {
+      if (!sels[i].querySelector('option[data-c]')) continue;
+      paintSelect(sels[i]);
+    }
+  }
+
   /* 换肤：柔和补间，DOM 原地不重建。
      v1.0.99 的整页遮罩盖住→换色→揭开会「闪一下」刺眼；v1.0.98 的逐元素补间
      又因为 JS 重建 DOM 导致图表/筛选条瞬间跳色。这次两者取长：
@@ -6074,7 +5970,13 @@
     var root = document.documentElement;
     var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduce) { commitTheme(t); return; }
-    if (root.__themeTimer) { cancelAnimationFrame(root.__themeTimer); root.__themeTimer = 0; }
+    /* 连点两下时要把上一轮的内联覆盖收干净：留着的话下面读 to 会读回
+       自己写的中间色，两次颜色一样，页面就「卡」在中间态不动了 */
+    if (root.__themeTimer) {
+      cancelAnimationFrame(root.__themeTimer); root.__themeTimer = 0;
+      root.classList.remove('theme-morph');
+      THEME_VARS.forEach(function (n) { root.style.removeProperty(n); });
+    }
     /* 1) 记录旧主题下每个色变量的计算值 */
     var from = {}, to = {}, skip = {}, cs = getComputedStyle(root);
     THEME_VARS.forEach(function (n) {
@@ -6086,6 +5988,8 @@
     /* 2) 切到新主题（同时启动图表 ECharts 补间、iframe 换色） */
     applyTheme(t, 'theme');
     repaintThemeInk();
+    repaintPaintedSelects();
+    repaintYearBoard();
     cubePing();
     /* 3) 读新值，先把内联覆盖回旧值 —— 元素此刻仍显示旧主题色 */
     cs = getComputedStyle(root);
@@ -6113,6 +6017,8 @@
         THEME_VARS.forEach(function (n) { root.style.removeProperty(n); });
         root.classList.remove('theme-morph');
         root.__themeTimer = 0;
+        /* 变量已交还给 [data-theme]，此刻 palette() 读到的才是正式新值 */
+        renderCharts(state.view, 'theme');
       }
     }
     root.__themeTimer = requestAnimationFrame(frame);
@@ -6122,6 +6028,8 @@
     applyTheme(t, false);
     renderCatBar(palette());
     refreshAfterColor();
+    repaintPaintedSelects();
+    repaintYearBoard();
     cubePing();
   }
 
@@ -7720,14 +7628,12 @@
   var DEFAULT_LAYOUT = {
     v: 14,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
-      'rhythm', 'budget',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
       'salary', 'reimb'],
     spans: {
       kpi: [12, 3], calheat: [12, 7], trend: [4, 6], donut: [4, 6], balance: [4, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
-      rhythm: [6, 5], budget: [6, 5],
       cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
       cubebrand: [4, 5], cubeprice: [4, 5], compyear: [4, 5],
@@ -8252,7 +8158,6 @@
     document.documentElement.setAttribute('data-theme', state.theme);
 
     loadCatColors();
-    loadBudgets();
     state.anchorDate = todayStr();
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', state.theme === 'dark' ? '#0d121c' : '#f5f7fa');
