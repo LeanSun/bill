@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.101';
+  var ASSET_V = '1.0.102';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -7478,9 +7478,31 @@
         relTo = act.last * unit;
         relT0 = performance.now();
         releasing = true;
+        var landed = act.last;
         act = null;
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(tick);
+        /* v1.0.102：分类/子类/金额/星期这几条筛选滑块没有 bindSeg，
+           切换只靠外层 .ct-filters 的 click 委托。拖拽时 suppress 吞掉了 click，
+           原来没人改选中态 —— 于是松手回弹到原段、根本切不了。
+           这里补一次"提交"：先把选中态按落点改好（和 bindSeg 的 apply 等价），
+           再向落点按钮派发一次 click 走原有业务委托。派发的 click 要在下面的
+           捕获守卫里放行（用 data-seg-commit 标记），否则又被 suppress 吞掉。 */
+        var all = btns();
+        if (all.length && landed >= 0 && landed < all.length) {
+          var target = all[landed];
+          var before = el.style.getPropertyValue('--seg-i');
+          all.forEach(function (x, i) { x.classList.toggle('is-active', i === landed); });
+          el.style.setProperty('--seg-n', String(all.length));
+          el.style.setProperty('--seg-i', String(landed));
+          el.dataset.active = String(landed);
+          /* 只对真正换了段的情况提交；同一段拖一下不该触发重绘 */
+          if (String(landed) !== before) {
+            target.dataset.segCommit = '1';
+            target.click();
+            delete target.dataset.segCommit;
+          }
+        }
         return;
       }
       /* 只是点了一下没拖动：把内联样式彻底交还 CSS，
@@ -7500,6 +7522,13 @@
     });
     el.addEventListener('click', function (e) {
       if (!suppress) return;
+      /* v1.0.102：拖拽结束时本函数自己派发的"提交 click"要放行到业务委托，
+         只吞浏览器在拖拽后自动补发的那个 click —— 用一次性标记区分。 */
+      var b = e.target.closest ? e.target.closest('button') : null;
+      if (b && b.dataset.segCommit === '1') {
+        suppress = false;
+        return;
+      }
       suppress = false;
       e.stopPropagation();
       e.preventDefault();
