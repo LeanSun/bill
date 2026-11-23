@@ -885,7 +885,11 @@ html[data-theme="dark"] .cal-item:hover {
 .dl-cat {
   display: grid; grid-template-columns: 4px 88px minmax(0, 1fr) auto;
   align-items: center; gap: 12px; padding: 11px 13px;
-  border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px;
+  /* v1.0.100：整行用该分类色的浅色填充，不再是一片纯白。
+     --c / --ink 由 JS 按分类写进行内样式；10% 平涂够认出色相又不抢文字。 */
+  background: color-mix(in srgb, var(--c, var(--primary)) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--c, var(--primary)) 24%, var(--border));
 }
 .dlc-bar { width: 4px; height: 34px; border-radius: 4px; background: var(--c); }
 .dlc-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -3860,10 +3864,11 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
   background: color-mix(in srgb, var(--today-ink) 15%, var(--surface));
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--today-ink) 55%, transparent);
 }
-/* 浅色纸面 + 白卡片：让每一行从底色上真正「浮」起来 */
+/* 今日栏整体垫琥珀，但每一行仍保留自己的分类浅色 —— 只把描边往琥珀收一点，
+   不再像 v1.0.98 那样强制刷成白卡把分类色吃掉 */
 .day-list.is-today .dl-cat {
-  background: var(--surface);
-  border-color: color-mix(in srgb, var(--today-ink) 16%, var(--border));
+  background: color-mix(in srgb, var(--c, var(--primary)) 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--today-ink) 20%, color-mix(in srgb, var(--c) 20%, var(--border)));
 }
 .day-list.is-today .day-list-head { border-bottom-color: color-mix(in srgb, var(--today-ink) 26%, var(--border)); }
 html[data-theme="dark"] .day-list.is-today {
@@ -3871,8 +3876,8 @@ html[data-theme="dark"] .day-list.is-today {
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--today-ink) 45%, transparent);
 }
 html[data-theme="dark"] .day-list.is-today .dl-cat {
-  background: color-mix(in srgb, var(--surface) 92%, var(--today-ink));
-  border-color: color-mix(in srgb, var(--today-ink) 22%, var(--border));
+  background: color-mix(in srgb, var(--c, var(--primary)) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--c, var(--primary)) 32%, var(--border));
 }
 /* 标题旁的小徽章，和左栏日期卡的「今天」同一套视觉，只是缩一档 */
 .dl-today {
@@ -4211,9 +4216,9 @@ html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2
   .ts-cell b { grid-column: 2; grid-row: 1; }
   .ts-cell em { grid-column: 2; grid-row: 2; }
   .ts-cell b, .ts-cell em { overflow: hidden; text-overflow: ellipsis; }
-  /* 让出标题的位置：原来这颗分段控件锁 210px，卡片一窄就把「月度收支趋势」
-     挤成两行、副标题再折一行，卡片头上半截全是换行 */
-  #trendScope { min-width: 146px; }
+  /* 让出标题的位置：卡片头改成标题独占一行、控件整组落到第二行后，
+     范围条不再需要撑 146px —— 与支出构成滑块同宽 132px 即可。 */
+  #trendScope { min-width: 132px; }
   #trendScope button { font-size: 12px; }
 }
 @media (max-width: 1240px) {
@@ -4547,15 +4552,15 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
    v1.0.97 · 月度收支趋势：年份条 + 柱顶数字
    ----------------------------------------------------------------
    两张 segmented 并排放在卡片头右侧：年份（近 12 月 / 各年）+ 范围
-   （全部 / 支出 / 收入）。年份按钮的段数由 JS 写进 --seg-n，这里只
-   保证不换行、不互相挤压；窄屏时整组落到标题下方一行。
+   （全部 / 支出 / 收入）。年份按钮的段数由 JS 写进 --seg-n。
 
-   v1.0.99 修「文字不居中 / 部分段过窄」：
-   旧的 .seg 用 repeat(n, 1fr)，而外层 .tr-controls 一挤，1fr 就被压到
-   比文字还窄（实测 6 段时每段只有 30px，而「近12月」要 68px）。按钮被
-   挤出格子，但 .seg-ind 仍按均分宽度算位置和宽度 —— 滑块和文字错位，
-   看着就是「没居中」。改成每段的 minmax(最小宽, 1fr)：段多时整条自动变宽，
-   外层 flex-wrap 让它整组换行，而不是把每段压扁。按钮再做真居中。
+   v1.0.100 · 按用户要求整条仿「支出构成」那两枚滑块：
+   字号 10.5px 粗体、按钮 padding 5px 8px、内容撑开的紧凑胶囊。
+   v1.0.99 那版用 12px + 52px 等宽，技术上居中了但明显比支出构成的
+   滑块松垮一圈 —— 用户要的是同款观感，不只是对齐。这里连字号、字重、
+   padding、条高一起对齐。段宽仍用 minmax 兜底：年份条第一段是
+   「近12月」(4 字含中文) 比四位年份宽，纯 1fr 会把它撑成不等宽，
+   而 .seg-ind 按均分宽度定位 —— 那样滑块会错位，正是 v1.0.98 的病根。
    ================================================================== */
 .tr-controls {
   display: flex; align-items: center; gap: 7px;
@@ -4563,25 +4568,30 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
 }
 .tr-controls .seg-sm { min-width: 0; }
 #trendYear.seg {
-  --seg-min: 52px;
+  --seg-min: 50px;              /* 10.5px 粗体「近12月」≈33px + padding 16px */
+  padding: 3px;
   flex: 0 0 auto;
   flex-wrap: nowrap; white-space: nowrap; grid-auto-flow: column;
   grid-template-columns: repeat(var(--seg-n), minmax(var(--seg-min), 1fr));
-  min-width: calc(var(--seg-n) * var(--seg-min) + 8px);
+  min-width: calc(var(--seg-n) * var(--seg-min) + 6px);
 }
-#trendYear button,
-#trendScope button {
-  display: flex; align-items: center; justify-content: center;
-  text-align: center; padding-left: 3px; padding-right: 3px;
+#trendYear button {
+  /* 与 .donut-years.seg button 完全同款 */
+  padding: 5px 8px; border: 0; background: transparent;
+  font-size: 10.5px; font-weight: 700; white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-#trendYear button { font-size: 12px; }
+#trendScope.seg {
+  /* 与 .donut-mode.seg 完全同款 */
+  width: 132px; min-width: 0; flex: 0 0 auto; padding: 3px;
+}
+#trendScope button {
+  padding: 5px 2px; border: 0; background: transparent;
+  font-size: 12px; white-space: nowrap;
+}
 @media (max-width: 620px) {
   .tr-controls { flex: 1 1 100%; justify-content: flex-start; gap: 6px; margin-top: 8px; }
   .tr-controls .seg-sm { min-width: 0; flex: 0 0 auto; }
-  #trendYear.seg { --seg-min: 48px; }
-  #trendScope.seg { min-width: 126px; }
-  #trendYear button, #trendScope button { padding-left: 2px; padding-right: 2px; font-size: 11.5px; }
 }
 
 /* 手机上天页是整页滚动的，底部要留出呼吸位：".main.is-calendar" 的
@@ -4596,11 +4606,9 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
 .chart-card:has(.tr-controls) .card-head { flex-wrap: wrap; align-items: flex-start; gap: 5px; }
 .chart-card:has(.tr-controls) .card-head > div:first-child { flex: 1 1 100%; min-width: 0; }
 .chart-card:has(.tr-controls) .tr-controls { flex: 1 1 100%; justify-content: flex-start; }
-/* 范围条三段「全部 / 支出 / 收入」至少要 132px：原来被压到 89px、
-   每段 27px 刚好卡住两个字，边缘贴着滑块的圆角。给足宽度让它透气。 */
-.tr-controls #trendScope { min-width: 132px; flex: 0 0 auto; }
-.tr-controls .seg-sm { height: 32px; }
-.tr-controls .seg-sm button { font-size: 11.5px; }
+/* 年份条 / 范围条的字号与按钮 padding 已各自按支出构成滑块写死在上面；
+   这里只统一条高，不再用 .seg-sm button 通用规则回头盖掉字号。 */
+.tr-controls .seg-sm { height: 30px; }
 
 /* ==================================================================
    v1.0.97 · 启动过场
