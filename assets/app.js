@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.104';
+  var ASSET_V = '1.0.105';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3977,6 +3977,7 @@
           ink = ai > .42 ? '#ffffff' : catInk(p, p.income);
         }
         if (e || inc) tip = key + ' · ' + (e ? '支 ' + fmtBig(e) : '') + (e && inc ? ' · ' : '') + (inc ? '收 ' + fmtBig(inc) : '');
+        tip += ' · 点开看月历';
         var cls = 'ym-day' + ((e || inc) ? ' has' : '') + (key === today ? ' is-today' : '') +
           (inc ? ' is-in' : '') + (e ? ' is-out' : '');
         grid += '<button type="button" class="' + cls + '" data-date="' + key +
@@ -4255,6 +4256,30 @@
   function toggleNavMore() {
     var sheet = $('navMoreSheet');
     if (sheet && !sheet.hidden) closeNavMore(); else openNavMore();
+  }
+
+  /* 快捷键帮助面板：? 键唤起，Esc / 点空白 / 关闭按钮收起。
+     打开时把焦点交给关闭按钮，Tab 能走完清单，关闭后归还焦点。 */
+  var helpLastFocus = null;
+  function toggleHelp(open) {
+    var hb = $('helpBackdrop');
+    if (!hb) return;
+    if (open) {
+      helpLastFocus = document.activeElement;
+      hb.hidden = false;
+      var close = $('helpClose');
+      if (close) close.focus();
+    } else {
+      hb.hidden = true;
+      if (helpLastFocus && typeof helpLastFocus.focus === 'function') helpLastFocus.focus();
+      helpLastFocus = null;
+    }
+  }
+  function bindHelp() {
+    var hb = $('helpBackdrop'), close = $('helpClose');
+    if (!hb) return;
+    if (close) close.addEventListener('click', function () { toggleHelp(false); });
+    hb.addEventListener('click', function (e) { if (e.target === hb) toggleHelp(false); });
   }
   function setView(view, cubeTab) {
     if (!VIEW_META[view]) return;
@@ -5578,7 +5603,7 @@
     if (root.__themeTimer) clearTimeout(root.__themeTimer);
     var prevBg = getComputedStyle(root).getPropertyValue('--bg').trim() || '#f4f6fa';
     veil.classList.remove('is-out');
-    veil.style.background = prevBg;
+    veil.style.setProperty('--veil-bg', prevBg);
     /* 先把遮罩淡入，盖住当前这一屏 */
     void veil.offsetWidth;
     veil.classList.add('is-in');
@@ -5586,7 +5611,7 @@
       commitTheme(t);
       var nextBg = getComputedStyle(root).getPropertyValue('--bg').trim() || prevBg;
       veil.classList.remove('is-in');
-      veil.style.background = nextBg;
+      veil.style.setProperty('--veil-bg', nextBg);
       veil.classList.add('is-out');
       root.__themeTimer = setTimeout(function () {
         veil.classList.remove('is-out');
@@ -6096,6 +6121,7 @@
       });
     });
     bindColorPanel();
+    bindHelp();
 
     /* 概览条格子 → 跳转（本身就是 button，回车/空格天然可用） */
     var kpis = document.querySelectorAll('.stat-cell[data-jump]');
@@ -6245,6 +6271,9 @@
         return;
       }
       if (e.key === 'Escape') {
+        /* 快捷键帮助是浮在最上层的面板，先收它 */
+        var hb = $('helpBackdrop');
+        if (hb && !hb.hidden) { toggleHelp(false); return; }
         /* 「更多」是浮在最上层的面板，先收它 */
         if ($('navMoreSheet') && !$('navMoreSheet').hidden) { closeNavMore(); return; }
         if (dp.open) { closeDp(); return; }
@@ -6276,6 +6305,11 @@
           var si = $('searchInput');
           if (si) { setView('calendar'); si.focus(); }
           return;
+        }
+        /* v1.0.105：? 键唤起快捷键帮助。Shift+/ 在很多键盘上就是 ?，
+           两种都认；输入框里打字时不抢键，所以放在 typing 守卫之后。 */
+        if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+          e.preventDefault(); toggleHelp(true); return;
         }
       }
       /* ← → 翻页：年 / 月 / 周 / 天 四种粒度都走 softStep，
@@ -6503,7 +6537,13 @@
       if (ymHead) { gotoMonth(state.calMonth.year, Number(ymHead.dataset.month)); return; }
 
       var ym = e.target.closest('.ym-day[data-date]');
-      if (ym) { jumpToDay(ym.dataset.date); return; }
+      if (ym) {
+        /* v1.0.105：点年历格子直接下钻到对应月份的月历，和点月份标题一致，
+           少一次「先跳到那天、再切月」的翻页。想看某天，进月历后再点格子。 */
+        var mk = /^(\d{4})-(\d{2})/.exec(ym.dataset.date);
+        if (mk) gotoMonth(Number(mk[1]), Number(mk[2]));
+        return;
+      }
 
       var add = e.target.closest('[data-add]');
       if (add) { openModal(null, add.dataset.add, 'cell'); return; }
@@ -6558,8 +6598,93 @@
 
     /* 判定窗内第二下按下去 = 一次双击正在进行：立刻撤掉挂起的弹框，
        不用等 dblclick 事件到（这样快双击全程都不会闪出浮层）。 */
-    if (boardEl) boardEl.addEventListener('pointerdown', function () {
+    if (boardEl) boardEl.addEventListener('pointerdown', function (e) {
       if (cellTapTimer) cancelCellAdd();
+      startCellLongPress(e);
+    }, true);
+
+    /* v1.0.105：长按日期格子 = 快捷菜单（记一笔 / 看明细 / 复制该日到今天）。
+       用 pointer 事件统一鼠标与触摸：按下起 520ms 计时，中途移动超阈值就取消
+       （那是翻页手势），真触发时撤掉挂起的单击弹框并压住随后的 click。 */
+    var LP_MS = 520, LP_MOVE = 12;
+    var lpTimer = 0, lpStart = null, lpSwallowClick = false;
+    function hideCellMenu() {
+      var m = $('cellMenu'); if (m) m.hidden = true;
+      lpStart = null;
+    }
+    function startCellLongPress(e) {
+      var cell = e.target.closest ? e.target.closest('.cal-cell[data-date], .wk-col[data-date]') : null;
+      if (!cell || cell.dataset.other === '1') return;
+      if (!$('modalBackdrop').hidden || !$('confirmBackdrop').hidden) return;
+      cancelLongPress();
+      lpStart = { key: cell.dataset.date, x: e.clientX, y: e.clientY, id: e.pointerId };
+      lpTimer = setTimeout(function () {
+        lpTimer = 0;
+        if (!lpStart) return;
+        lpSwallowClick = true;   /* 吞掉长按松手后的那一下格子 click，一次性 */
+        cancelCellAdd();
+        showCellMenu(lpStart.key, lpStart.x, lpStart.y);
+        lpStart = null;
+      }, LP_MS);
+    }
+    function cancelLongPress() {
+      if (lpTimer) { clearTimeout(lpTimer); lpTimer = 0; }
+      lpStart = null;
+    }
+    function showCellMenu(date, x, y) {
+      var m = $('cellMenu'); if (!m) return;
+      m.dataset.date = date;
+      var dayRecs = allRecords().filter(function (r) { return r.date === date; });
+      var copyBtn = m.querySelector('[data-act="copy"]');
+      if (copyBtn) copyBtn.disabled = dayRecs.length === 0;
+      m.hidden = false;
+      /* 优先落在指针右下方，贴边时翻到另一侧 */
+      var r = m.getBoundingClientRect();
+      var left = x + 10, top = y + 10;
+      if (left + r.width > window.innerWidth - 8) left = x - r.width - 10;
+      if (top + r.height > window.innerHeight - 8) top = y - r.height - 10;
+      m.style.left = Math.max(8, left) + 'px';
+      m.style.top = Math.max(8, top) + 'px';
+    }
+    if (boardEl) {
+      boardEl.addEventListener('pointermove', function (e) {
+        if (!lpStart || (lpStart.id !== undefined && e.pointerId !== lpStart.id)) return;
+        if (Math.abs(e.clientX - lpStart.x) > LP_MOVE || Math.abs(e.clientY - lpStart.y) > LP_MOVE) cancelLongPress();
+      }, true);
+      boardEl.addEventListener('pointerup', cancelLongPress, true);
+      boardEl.addEventListener('pointercancel', cancelLongPress, true);
+    }
+    document.addEventListener('pointerdown', function (e) {
+      var m = $('cellMenu');
+      if (m && !m.hidden && !(e.target.closest && e.target.closest('#cellMenu'))) hideCellMenu();
+    }, true);
+    var cellMenu = $('cellMenu');
+    if (cellMenu) cellMenu.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-act]') : null;
+      if (!b) return;
+      var date = cellMenu.dataset.date;
+      hideCellMenu();
+      lpSwallowClick = false;
+      if (b.dataset.act === 'add') { openModal(null, date, 'cell'); return; }
+      if (b.dataset.act === 'detail') { jumpToDay(date); return; }
+      if (b.dataset.act === 'copy') {
+        var today = todayStr();
+        var recs = allRecords().filter(function (r) { return r.date === date && r.type !== 'income'; });
+        var copied = 0;
+        recs.forEach(function (r) {
+          var msg = commitEntry({ date: today, type: r.type, category: r.category, sub: r.sub || '', note: r.note, amount: r.amount, dupAck: true });
+          if (!msg) copied++;
+        });
+        toast(copied ? '已把 ' + date + ' 的 ' + copied + ' 笔支出复制到今天' : '那天没有可复制的支出', copied ? 'success' : 'info');
+        renderAll();
+      }
+    });
+    /* 长按触发后的那一下 click 要吞掉，否则会再走单击记一笔 / 双击看明细。
+       一次性标记：只吞紧接着的那一下，之后用户的真实点击照常响应。 */
+    document.addEventListener('click', function (e) {
+      if (!lpSwallowClick) return;
+      lpSwallowClick = false;
+      e.stopPropagation(); e.preventDefault();
     }, true);
 
     /* 天页内嵌表单是每次重绘都重建的，事件只能委托在稳定的 .cal-board 上 */

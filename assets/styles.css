@@ -3022,7 +3022,13 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 .theme-veil {
   position: fixed; inset: 0; z-index: 9997;
   pointer-events: none; opacity: 0;
-  background: var(--bg);
+  /* v1.0.105：底色掺一抹主色柔光。两组 radial 都压得很淡（12% / 7%），
+     只在遮罩最浓的那一瞬透出品牌色，不会盖住「底色统一换肤」的观感。
+     --veil-bg 由脚本在切换前后写入旧 / 新主题的 --bg。 */
+  background:
+    radial-gradient(62% 48% at 22% 18%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 72%),
+    radial-gradient(58% 44% at 82% 88%, color-mix(in srgb, var(--violet) 7%, transparent), transparent 74%),
+    var(--veil-bg, var(--bg));
   will-change: opacity;
 }
 .theme-veil.is-in {
@@ -3036,6 +3042,86 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 @media (prefers-reduced-motion: reduce) {
   .theme-veil { display: none; }
 }
+
+/* ---- 长按日期格子的快捷菜单 -------------------------------------- */
+.cell-menu {
+  position: fixed; z-index: 120; min-width: 156px; padding: 5px;
+  border-radius: 12px; background: var(--surface);
+  border: 1px solid var(--border); box-shadow: var(--shadow-pop);
+  animation: cellMenuIn .16s var(--ease) both;
+}
+.cell-menu[hidden] { display: none; }
+@keyframes cellMenuIn {
+  from { opacity: 0; transform: translateY(-4px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+.cell-menu button {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 9px 11px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text);
+  font-family: var(--font); font-size: 12.5px; font-weight: 600;
+  text-align: left; cursor: pointer;
+  transition: background-color .14s;
+}
+.cell-menu button:hover, .cell-menu button:focus-visible {
+  background: var(--surface-3); outline: none;
+}
+.cell-menu button:disabled { opacity: .42; cursor: not-allowed; }
+.cell-menu .cm-ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 19px; height: 19px; flex: 0 0 19px; border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  color: var(--primary); font-size: 13px; font-style: normal; font-weight: 700;
+}
+.cell-menu button[data-act="detail"] .cm-ico {
+  background: color-mix(in srgb, var(--expense) 14%, var(--surface)); color: var(--expense);
+}
+.cell-menu button[data-act="copy"] .cm-ico {
+  background: color-mix(in srgb, var(--violet) 14%, var(--surface)); color: var(--violet);
+}
+
+/* ---- 快捷键帮助面板（? 键唤起） ---------------------------------- */
+.help-backdrop {
+  position: fixed; inset: 0; z-index: 105;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(17, 26, 45, .38); backdrop-filter: blur(5px);
+  animation: fadeIn .22s var(--ease-soft) both;
+}
+.help-backdrop[hidden] { display: none; }
+html[data-theme="dark"] .help-backdrop { background: rgba(3, 7, 14, .56); }
+.help-card {
+  width: min(420px, 100%); padding: 22px 24px 16px;
+  border-radius: 18px; background: var(--surface);
+  border: 1px solid var(--border); box-shadow: var(--shadow-pop);
+  animation: modalIn .24s var(--ease) both;
+}
+.help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.help-head h3 { margin: 0 0 3px; font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+.help-head p { margin: 0; font-size: 11.5px; color: var(--muted); }
+.help-close {
+  flex: 0 0 28px; width: 28px; height: 28px; border: 0; border-radius: 8px;
+  background: var(--surface-3); color: var(--text-2); font-size: 19px; line-height: 1;
+  cursor: pointer; transition: background-color .16s, color .16s;
+}
+.help-close:hover { background: var(--danger-soft); color: var(--danger); }
+.help-list { display: flex; flex-direction: column; gap: 1px; }
+.help-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border);
+  font-size: 12.5px; color: var(--text-2);
+}
+.help-row:last-child { border-bottom: 0; }
+.help-row small { grid-column: 1 / -1; margin-top: -3px; font-size: 10px; color: var(--muted); }
+.help-keys { display: inline-flex; gap: 4px; }
+.help-backdrop kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 23px; padding: 0 6px; border-radius: 6px;
+  background: var(--surface-3); border: 1px solid var(--border-strong, var(--border));
+  border-bottom-width: 2px; font-family: var(--font); font-size: 11px; font-weight: 700;
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
+.help-foot { margin-top: 14px; font-size: 10.5px; color: var(--muted); text-align: center; }
+.help-foot kbd { min-width: 20px; height: 18px; font-size: 9.5px; padding: 0 4px; }
 
 /* ---- 4. 魔方蒙层：整屏一张，中间给 iframe 挖个洞 ------------------
    子页 iframe 是透明的（html.is-embed），整屏蒙层会从底下透过去，
