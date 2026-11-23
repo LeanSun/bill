@@ -3,6 +3,41 @@
    色彩 / 排版 / 动效 / 组件 / 响应式
    ============================================================ */
 
+/* v1.0.106 · 把主题色变量注册为 <color>，让 var(--x) 本身可补间。
+   这样 195 处 background: var(--surface) 简写、color-mix 派生的颜色都能
+   跟着一起平滑过渡，无需逐处改成 background-color。 */
+@property --bg { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --bg-glow-1 { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --bg-glow-2 { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --surface { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --surface-2 { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --surface-3 { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --border { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --border-strong { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --text { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --text-2 { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --muted { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --primary { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --primary-2 { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --primary-soft { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --income { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --income-soft { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --expense { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --expense-soft { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --danger { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --danger-soft { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --amber { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --violet { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --sky { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --weekend-ink { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --today-ink { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --today-solid { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --today-on { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --cat-food { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --cat-daily { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --cat-travel { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --cat-wear { syntax: "<color>"; inherits: true; initial-value: #000000; }
+@property --cat-fun { syntax: "<color>"; inherits: true; initial-value: #000000; }
 :root {
   --bg: #f4f6fa;
   --bg-glow-1: rgba(74, 108, 247, .075);
@@ -3011,36 +3046,21 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 
 /* ---- 2. 今年结余：浅一档的红，压在卡片里不刺眼 ------------------ */
 
-/* ---- 3. 换肤：整页统一过场（v1.0.99） -----------------------------
-   v1.0.98 让全站所有元素各自做 420ms 颜色补间，看着柔和，但 canvas 图表
-   和 JS 重建的节点（筛选条、日历格子）没有补间起点 —— 它们一帧就跳到终色，
-   于是「卡片还在渐变、图表已经变完」，各板块各自换色，整体是散的。
-
-   改成整页一块遮罩：淡入盖住 → 遮罩最浓时一次性把所有主题色与重绘做完 →
-   淡出揭开。用户看到的是整页一起柔和过渡，中间那一下换色被遮罩盖住，
-   不存在任何板块单独变色。遮罩底色取旧/新主题的 --bg，由脚本写内联值。 */
-.theme-veil {
-  position: fixed; inset: 0; z-index: 9997;
-  pointer-events: none; opacity: 0;
-  /* v1.0.105：底色掺一抹主色柔光。两组 radial 都压得很淡（12% / 7%），
-     只在遮罩最浓的那一瞬透出品牌色，不会盖住「底色统一换肤」的观感。
-     --veil-bg 由脚本在切换前后写入旧 / 新主题的 --bg。 */
-  background:
-    radial-gradient(62% 48% at 22% 18%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 72%),
-    radial-gradient(58% 44% at 82% 88%, color-mix(in srgb, var(--violet) 7%, transparent), transparent 74%),
-    var(--veil-bg, var(--bg));
-  will-change: opacity;
-}
-.theme-veil.is-in {
-  animation: themeVeilIn .16s cubic-bezier(.4, 0, 1, 1) forwards;
-}
-.theme-veil.is-out {
-  animation: themeVeilOut .3s cubic-bezier(0, 0, .2, 1) forwards;
-}
-@keyframes themeVeilIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes themeVeilOut { from { opacity: 1; } to { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .theme-veil { display: none; }
+/* ---- 3. 换肤：整页柔和补间（v1.0.106） -----------------------------
+   v1.0.99 的整页遮罩盖住→换色→揭开会「闪一下」刺眼。根因是那层不透明遮罩。
+   v1.0.98 的逐元素补间又败在 JS 重建 DOM：重建节点没有过渡起点，图表和
+   筛选条一帧跳到终色。现在两者取长 —— 换肤时 DOM 原地不重建（内联 --ink
+   就地改写、canvas 走 ECharts update 动画），只给全站挂一条统一的颜色补间。
+   只列颜色类属性，位移/缩放（翻页、滑块）完全不受影响。 */
+html.theme-morph,
+html.theme-morph *,
+html.theme-morph *::before,
+html.theme-morph *::after {
+  transition-property: background-color, color, border-color, box-shadow,
+                       fill, stroke, outline-color, text-decoration-color !important;
+  transition-duration: .42s !important;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1) !important;
+  transition-delay: 0s !important;
 }
 
 /* ---- 长按日期格子的快捷菜单 -------------------------------------- */

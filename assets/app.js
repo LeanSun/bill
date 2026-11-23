@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.105';
+  var ASSET_V = '1.0.106';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -54,8 +54,25 @@
   var MONTH_CN = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
   /* echarts 用 defer 延后解析，真实可用性在 init() 里再判定 */
   var hasEcharts = false;
-  /* 图表重绘模式：'animate' 首次入场有生长动画，'instant' 主题切换时原地换色不重放动画 */
+  /* 图表重绘模式：
+     'animate' 首次入场有生长动画；
+     'instant' 原地换色不重放动画（用于配色自定义等需要立刻到位的场合）；
+     'theme'   v1.0.106 换肤专用：不重放入场，但颜色走 420ms 补间，
+               配合 CSS 补间让 canvas 图表和板块同步柔和过渡。 */
   var RENDER_MODE = 'animate';
+  var THEME_FADE_MS = 420;
+  /* v1.0.106：需要在换肤时逐帧插值的主题色变量。
+     CSS @property 的 transition 在根元素自定义属性上实测不生效（会瞬跳），
+     所以由 JS 读新旧 computed 值、rAF 插值写到内联 style，420ms 后清除。 */
+  var THEME_VARS = ('--bg --bg-glow-1 --bg-glow-2 --surface --surface-2 --surface-3 ' +
+    '--border --border-strong --text --text-2 --muted --primary --primary-2 --primary-soft ' +
+    '--income --income-soft --expense --expense-soft --danger --danger-soft --amber --violet --sky ' +
+    '--weekend-ink --today-ink --today-solid --today-on --cat-food --cat-daily --cat-travel --cat-wear --cat-fun').split(' ');
+  /* 换肤时 ECharts 用 update 动画渐变到新配色，不重放生长入场；
+     其余模式维持原样。三处 helper 集中管理，避免每个图表各写一套。 */
+  function chartAnimOn()    { return RENDER_MODE !== 'instant'; }
+  function chartAnimDur()   { return RENDER_MODE === 'theme' ? 0 : (RENDER_MODE === 'instant' ? 0 : 900); }
+  function chartAnimUpdate()    { return RENDER_MODE === 'theme' ? THEME_FADE_MS : (RENDER_MODE === 'instant' ? 0 : 560); }
 
   /* 名称归并：同一件事的多种写法收敛到一个词条，
      日历、排行、搜索、聚合全部按归并后的名字走 */
@@ -1018,12 +1035,12 @@
     /* instant 模式下把动画时长压到 0：主题切换时原地换色，
        不会重放"虚线生长 / 柱子从零长起"那套入场动画，
        也就不会配合圆形转场出现闪烁 */
-    var anim = RENDER_MODE !== 'instant';
+    var anim = chartAnimOn();
     return {
       backgroundColor: 'transparent',
       animation: anim,
-      animationDuration: anim ? 900 : 0,
-      animationDurationUpdate: anim ? 560 : 0,
+      animationDuration: chartAnimDur(),
+      animationDurationUpdate: chartAnimUpdate(),
       animationEasing: 'cubicOut',
       animationEasingUpdate: 'cubicOut',
       textStyle: { fontFamily: p.font }
@@ -1047,9 +1064,11 @@
     if (!hasEcharts) return;
     var c = getChart(id);
     if (!c) return;
-    c.setOption(option, true);
-    /* instant 重绘后同步刷新画布：View Transition 截「新快照」时
-       canvas 位图必须已经是新配色，否则转场末尾会整片跳色 */
+    /* v1.0.106：换肤用 merge 更新（notMerge=false），ECharts 才会在旧系列上
+       把颜色补间到新配色；其它模式仍全量替换，保证数据结构干净。 */
+    var isTheme = RENDER_MODE === 'theme';
+    c.setOption(option, !isTheme);
+    /* instant 重绘后同步刷新画布（配色自定义需要立刻到位） */
     if (RENDER_MODE === 'instant') {
       var zr = c.getZr && c.getZr();
       if (zr && typeof zr.refreshImmediately === 'function') zr.refreshImmediately();
@@ -1735,7 +1754,8 @@
     setOpt('chartDonut', {
       backgroundColor: 'transparent',
       color: cats.map(function (c) { return colors[idx[c]]; }),
-      animationDuration: RENDER_MODE === 'instant' ? 0 : 620,
+      animationDuration: chartAnimDur(),
+      animationDurationUpdate: chartAnimUpdate(),
       textStyle: { fontFamily: p.font },
       tooltip: tooltipCommon(p, {
         trigger: 'axis',
@@ -1991,14 +2011,13 @@
     var accent = opt.accent || p.primary;
     var accent2 = opt.accent2 || p.primary2;
     var fmt = opt.fmt || function (v) { return v; };
-    var inst = RENDER_MODE === 'instant';
     var maxV = Math.max.apply(null, rows.map(function (r) { return Number(r.value) || 0; }).concat([1]));
     var total = rows.reduce(function (s, r) { return s + (Number(r.value) || 0); }, 0) || 1;
     return {
       backgroundColor: 'transparent',
-      animation: !inst,
-      animationDuration: inst ? 0 : 640,
-      animationDurationUpdate: inst ? 0 : 420,
+      animation: chartAnimOn(),
+      animationDuration: chartAnimDur(),
+      animationDurationUpdate: chartAnimUpdate(),
       animationEasing: 'cubicOut',
       textStyle: { fontFamily: p.font },
       grid: { left: 2, right: opt.right || 66, top: 6, bottom: 6, containLabel: true },
@@ -2049,13 +2068,12 @@
     var accent = opt.accent || p.primary;
     var fmt = opt.fmt || function (v) { return v; };
     var axisFmt = opt.axisFmt || fmtAxis;
-    var inst = RENDER_MODE === 'instant';
     var dense = rows.length > 9;
     return {
       backgroundColor: 'transparent',
-      animation: !inst,
-      animationDuration: inst ? 0 : 700,
-      animationDurationUpdate: inst ? 0 : 420,
+      animation: chartAnimOn(),
+      animationDuration: chartAnimDur(),
+      animationDurationUpdate: chartAnimUpdate(),
       animationEasing: 'cubicOut',
       textStyle: { fontFamily: p.font },
       grid: { left: 2, right: 10, top: 28, bottom: 2, containLabel: true },
@@ -2110,15 +2128,14 @@
     var accent = opt.accent || p.primary;
     var fmt = opt.fmt || function (v) { return v; };
     var axisFmt = opt.axisFmt || fmtAxis;
-    var inst = RENDER_MODE === 'instant';
     var dense = rows.length > 9;
     var vals = rows.map(function (r) { return Number(r.value) || 0; });
     var maxV = Math.max.apply(null, vals.concat([1]));
     return {
       backgroundColor: 'transparent',
-      animation: !inst,
-      animationDuration: inst ? 0 : 760,
-      animationDurationUpdate: inst ? 0 : 420,
+      animation: chartAnimOn(),
+      animationDuration: chartAnimDur(),
+      animationDurationUpdate: chartAnimUpdate(),
       animationEasing: 'cubicOut',
       textStyle: { fontFamily: p.font },
       grid: { left: 2, right: 16, top: 30, bottom: 2, containLabel: true },
@@ -5572,60 +5589,97 @@
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('is-active', bs[i].dataset.cat === state.filters.category);
   }
 
-  function applyTheme(t, deferCharts) {
+  function applyTheme(t, mode) {
     state.theme = t;
     try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* noop */ }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
     var root = document.documentElement;
-    /* 换色本身做一帧硬切：柔和感由 setTheme 的整页遮罩统一提供（v1.0.99）。
-       这里不再给全站挂逐元素补间 —— canvas 图表和 JS 重建的节点没有补间起点，
-       逐元素补间只会让它们「先跳到终色」，造成各板块单独换色。 */
     root.setAttribute('data-theme', t);
-    if (!deferCharts) renderCharts(state.view, 'instant');
+    /* mode='theme' 走补间（图表颜色渐变），其余维持 instant / defer 原语义 */
+    if (mode === 'theme') renderCharts(state.view, 'theme');
+    else if (!mode) renderCharts(state.view, 'instant');
     /* 让 iframe 同一帧换色；子页自己会 repaint 行底色与图表 */
     var f = $('cubeFrame');
     if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __ledgerTheme: t }, '*'); } catch (e) {} }
   }
 
-  /* 换肤：整页遮罩过场。淡入盖住 → 在遮罩最浓的那一帧同步换掉所有主题色
-     和重绘（图表 canvas、筛选条、日历格子一并到位）→ 淡出揭开。
-     从旧主题底色淡入、换到新主题底色再淡出，全程整页一起走，
-     不会再出现「卡片还在渐变、图表已经变完」的分块感。 */
+  /* 就地更新内联分类色里的 --ink（文字墨色随主题深浅变化）。
+     v1.0.106：以前靠 renderCatBar / renderBoard 整段重建 DOM 来刷新这些值 ——
+     重建的节点没有过渡起点，正是「各板块单独跳色」的根因。现在只改内联变量，
+     DOM 节点原地不动，CSS transition 让文字色和底色一起平滑过渡。 */
+  function repaintThemeInk() {
+    var p = palette();
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var nodes = document.querySelectorAll('[style*="--c:"]');
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var c = (n.style.getPropertyValue('--c') || '').trim();
+      if (!c) continue;
+      /* 与 palette().adapt 同一口径：深色底上很暗的分类色提亮半档，色相不变 */
+      var cc = (dark && lum(c) < .26) ? mixColor(c, '#ffffff', .48) : c;
+      n.style.setProperty('--c', cc);
+      n.style.setProperty('--ink', catInk(p, cc));
+    }
+  }
+
+  /* 换肤：柔和补间，DOM 原地不重建。
+     v1.0.99 的整页遮罩盖住→换色→揭开会「闪一下」刺眼；v1.0.98 的逐元素补间
+     又因为 JS 重建 DOM 导致图表/筛选条瞬间跳色。这次两者取长：
+       1) 挂 .theme-morph 给全站统一 420ms 颜色补间；
+       2) 只切 data-theme，不重建任何列表/卡片节点；
+       3) 内联 --ink 就地改写；canvas 图表用 ECharts update 动画补间颜色。 */
   function setTheme(t) {
     if (t === state.theme) return;
-    var veil = $('themeVeil');
-    if (!veil || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
-      commitTheme(t);
-      return;
-    }
     var root = document.documentElement;
-    if (root.__themeTimer) clearTimeout(root.__themeTimer);
-    var prevBg = getComputedStyle(root).getPropertyValue('--bg').trim() || '#f4f6fa';
-    veil.classList.remove('is-out');
-    veil.style.setProperty('--veil-bg', prevBg);
-    /* 先把遮罩淡入，盖住当前这一屏 */
-    void veil.offsetWidth;
-    veil.classList.add('is-in');
-    root.__themeTimer = setTimeout(function () {
-      commitTheme(t);
-      var nextBg = getComputedStyle(root).getPropertyValue('--bg').trim() || prevBg;
-      veil.classList.remove('is-in');
-      veil.style.setProperty('--veil-bg', nextBg);
-      veil.classList.add('is-out');
-      root.__themeTimer = setTimeout(function () {
-        veil.classList.remove('is-out');
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { commitTheme(t); return; }
+    if (root.__themeTimer) { cancelAnimationFrame(root.__themeTimer); root.__themeTimer = 0; }
+    /* 1) 记录旧主题下每个色变量的计算值 */
+    var from = {}, to = {}, skip = {}, cs = getComputedStyle(root);
+    THEME_VARS.forEach(function (n) {
+      var raw = cs.getPropertyValue(n).trim();
+      /* rgba 变量丢失 alpha 会插值成实色，这些soft色面积小，留给CSS瞬时切换 */
+      skip[n] = /^rgba\(/.test(raw) || /rgba\(/.test(raw);
+      from[n] = parseColor(raw) || [0, 0, 0];
+    });
+    /* 2) 切到新主题（同时启动图表 ECharts 补间、iframe 换色） */
+    applyTheme(t, 'theme');
+    repaintThemeInk();
+    cubePing();
+    /* 3) 读新值，先把内联覆盖回旧值 —— 元素此刻仍显示旧主题色 */
+    cs = getComputedStyle(root);
+    THEME_VARS.forEach(function (n) {
+      to[n] = parseColor(cs.getPropertyValue(n).trim()) || from[n];
+      if (skip[n]) return;
+      root.style.setProperty(n, 'rgb(' + from[n][0] + ',' + from[n][1] + ',' + from[n][2] + ')');
+    });
+    root.classList.add('theme-morph');
+    /* 4) rAF 逐帧插值：所有变量同一条曲线同步推进，整页一起柔和换色 */
+    var t0 = 0;
+    function frame(now) {
+      if (!t0) t0 = now;
+      var k = Math.min(1, (now - t0) / THEME_FADE_MS);
+      var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; /* easeInOutQuad */
+      THEME_VARS.forEach(function (n) {
+        if (skip[n]) return;
+        var a = from[n], b = to[n];
+        root.style.setProperty(n, 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * e) + ',' +
+          Math.round(a[1] + (b[1] - a[1]) * e) + ',' + Math.round(a[2] + (b[2] - a[2]) * e) + ')');
+      });
+      if (k < 1) root.__themeTimer = requestAnimationFrame(frame);
+      else {
+        /* 5) 到点清掉内联覆盖，交还给[data-theme]的正式定义 */
+        THEME_VARS.forEach(function (n) { root.style.removeProperty(n); });
+        root.classList.remove('theme-morph');
         root.__themeTimer = 0;
-      }, 300);
-    }, 160);
+      }
+    }
+    root.__themeTimer = requestAnimationFrame(frame);
   }
-  /* 一次性把所有跟主题有关的东西换到位：token、图表、筛选条、日历格子。
-     调用点都在遮罩最浓的那一帧，用户看不到中间态。 */
+  /* 无动画路径：初始化、reduced-motion、配色面板关闭时仍走一次性到位 */
   function commitTheme(t) {
     applyTheme(t, false);
-    /* 筛选胶囊的 --c / --ink 是渲染时按主题算好写死在内联样式里的，
-       只重绘图表不会动它们 —— 必须连同筛选区一起重画，否则文字要等下一次点击才跟上。
-       筛选区在日历页，切主题时人可能正停在总览，所以这里直接无条件重排一遍。 */
     renderCatBar(palette());
     refreshAfterColor();
     cubePing();
