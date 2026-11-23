@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.108';
+  var ASSET_V = '1.8.5';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -40,7 +40,7 @@
   var STORE_KEY = 'qingzhang.ledger.v1';
   var THEME_KEY = 'qingzhang.theme.v1';
   var CATCOLOR_KEY = 'qingzhang.catcolors.v1';
-  /* v1.0.108：备份节奏。BACKUP = 上次导出 CSV 的时间，TIP = 上次提醒的时间。
+  /* v1.8.5：备份节奏。BACKUP = 上次导出 CSV 的时间，TIP = 上次提醒的时间。
      两个分开存：提醒过不代表备份过，30 天内不再重复提醒，但提醒记录只压 7 天。 */
   var BACKUP_KEY = 'qingzhang.backup.v1';
   var BACKUP_TIP_KEY = 'qingzhang.backupTip.v1';
@@ -65,7 +65,7 @@
      'theme'   v1.0.106 换肤专用：不重放入场，但颜色走 260ms 补间，
                配合 CSS 补间让 canvas 图表和板块同步柔和过渡。 */
   var RENDER_MODE = 'animate';
-  /* v1.0.108：420ms 的换肤偏慢，眼睛能跟住每一帧就显得拖；260ms 仍是补间，
+  /* v1.8.5：420ms 的换肤偏慢，眼睛能跟住每一帧就显得拖；260ms 仍是补间，
      但像"按一下开关"而不是"等一次动画"。CSS .theme-morph 与图表补间同源。 */
   var THEME_FADE_MS = 260;
   /* v1.0.106：需要在换肤时逐帧插值的主题色变量。
@@ -200,7 +200,7 @@
        近 12 个月固定只有 12 根柱，柱顶才放得下具体数字 —— 之前一次铺
        23 个自然月，横轴挤得只剩几个刻度，柱子上更放不下数，只能靠悬浮读。 */
     trendRange: '12m',
-    /* v1.0.108：对比口径。mom = 环比（上月同期），yoy = 同比（去年同月同期）。
+    /* v1.8.5：对比口径。mom = 环比（上月同期），yoy = 同比（去年同月同期）。
        仅近 12 个月那档有效，年份范围本身就是跟去年同年比。 */
     trendCmp: 'mom',
     calendarYear: Y_LAST,
@@ -217,7 +217,7 @@
     weightYear: 'all',
     store: { added: [], edited: {}, deleted: [], weights: {}, weightCleared: [] },
     catColors: {},
-    /* v1.0.108：分类月预算（元/月，按月循环用）。存在 BUDGET_KEY，
+    /* v1.8.5：分类月预算（元/月，按月循环用）。存在 BUDGET_KEY，
        不写进 store —— 它是"设定"而不是账目，云端快照不该被它污染。 */
     budgets: {},
     layout: null
@@ -887,7 +887,7 @@
     });
     return out;
   }
-  /* v1.0.108：异常分两级。原来只有"超了/没超"，一笔 3 倍均值和一笔 12 倍均值
+  /* v1.8.5：异常分两级。原来只有"超了/没超"，一笔 3 倍均值和一笔 12 倍均值
      长得一模一样，真出大额时反而看不出轻重。
        1 级（≥均值×2.5）：单感叹号，红底白字；
        2 级（≥均值×4）  ：双感叹号 + 更深的红 + 一圈微光。
@@ -1360,7 +1360,7 @@
     } else {
       curE = last.expense; curI = last.income; curB = last.balance;
       if (state.trendCmp === 'yoy') {
-        /* v1.0.108：同比 —— 拿去年同一个自然月、同一个日号之前的部分来比。
+        /* v1.8.5：同比 —— 拿去年同一个自然月、同一个日号之前的部分来比。
            近 12 个月这份数据里通常没有去年同月（正好 12 格滚动），
            所以直接翻原始记录，而不是从 rows 里找。 */
         var ly = last.year - 1, le = 0, li = 0, anyY = false;
@@ -1394,7 +1394,7 @@
     var avgNote = (state.trendScope !== 'income' && avgExp > 0)
       ? ' · 月均 ' + moneyText(avgExp) : '';
 
-    /* v1.0.108：这一行右边那半句"较上月同期"，本身就是环比/同比的开关。
+    /* v1.8.5：这一行右边那半句"较上月同期"，本身就是环比/同比的开关。
        做成按钮而不是再加一个 seg：卡片头部已经排了年份和范围两排控件，
        再塞一枚分段控件会把标题挤到第三行去；而"跟谁比"恰好就是这句话在说的事。 */
     var cmpHTML = (isYear || !cmpText)
@@ -1495,7 +1495,7 @@
     var rows = trendRows(scopeRecords());
     var labels = rows.map(function (r) { return r.label; });
     var isYear = String(state.trendRange) !== '12m';
-    /* v1.0.108：同比时把去年同月的数据也算一份，挂在提示气泡里对照 */
+    /* v1.8.5：同比时把去年同月的数据也算一份，挂在提示气泡里对照 */
     var yoyMap = null;
     if (!isYear && state.trendCmp === 'yoy') {
       yoyMap = {};
@@ -1851,7 +1851,7 @@
       series: series
     });
   }
-  /* ---------------- 分类月预算（v1.0.108） ----------------
+  /* ---------------- 分类月预算（v1.8.5） ----------------
      预算按月循环：设一次，每个月都按这个数比。花钱口径取「本月自然月」的
      真实支出（不受筛选影响）—— 预算说的是"这个月我花了多少"，不是"当前
      筛选下花了多少"。存储独立于账本，改动不触发云同步。 */
@@ -1902,7 +1902,7 @@
         : '<i class="is-empty">未设置</i>';
       var tip = c + '：本月已花 ' + fmtYuan(s) +
         (b ? '，预算 ' + fmtYuan(b) + (over ? '（超支）' : '') : '，还没设预算');
-      /* tabindex/role：预算行是靠点击进编辑的 div，不加这个键盘用户完全够不到（v1.0.108） */
+      /* tabindex/role：预算行是靠点击进编辑的 div，不加这个键盘用户完全够不到（v1.8.5） */
       return '<div class="bud-row' + (over ? ' is-over' : '') + (b ? '' : ' is-unset') + '" data-bud="' + esc(c) + '"' +
         ' role="button" tabindex="0" aria-label="' + esc(tip + '，按回车设置预算') + '"' +
         ' style="--c:' + col + '" title="' + esc(tip) + '">' +
@@ -1974,7 +1974,7 @@
     });
   }
 
-  /* ---------------- 消费节奏（v1.0.108） ----------------
+  /* ---------------- 消费节奏（v1.8.5） ----------------
      「哪天最花钱」两个角度：一周里的星期几、每月里的几号。用纯 DOM 的
      小柱条画（不占 ECharts 实例）—— 31 根 4px 的柱子用 canvas 反而糊。 */
   function renderRhythm(p) {
@@ -2074,7 +2074,7 @@
     var monthBudget = budN ? budSum / budN : 0;
     var yearFactor = state.donutYear === 'all' ? Math.max(1, YEARS.length) : 1;
     var budgetBase = monthBudget * 12 * yearFactor;
-    /* v1.0.108：真实月预算 → 这张卡的"年度可花额度"（预算 × 已过月数）。
+    /* v1.8.5：真实月预算 → 这张卡的"年度可花额度"（预算 × 已过月数）。
        这张卡列的是某一年（或全部）的合计，进度条要是拿本月去比就会
        「金额是全年、进度是本月」，两个口径打架；换成年度额度之后就一致了。 */
     var bYear = state.donutYear === 'all' ? null : Number(state.donutYear);
@@ -2776,7 +2776,7 @@
     if (view === 'overview') {
       try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
     }
-    /* v1.0.108：消费节奏 / 月度预算这两张是纯 DOM 卡，不依赖 ECharts，
+    /* v1.8.5：消费节奏 / 月度预算这两张是纯 DOM 卡，不依赖 ECharts，
        所以放在 hasEcharts 判断之前 —— 图表库没载入时它们照样该显示。 */
     if (view === 'overview') {
       var pd = palette();
@@ -3201,7 +3201,7 @@
               '</span></span></button>';
           }).join('') : '<span class="rs-none">还没有记录</span>';
         }
-        /* v1.0.108：「全部」把最近记录摊开成一块浮层。
+        /* v1.8.5：「全部」把最近记录摊开成一块浮层。
            一条横向滚动的条最多露 5~6 笔，想找前几天的记录只能去日历里翻。 */
         var rmore = $('rsMore');
         if (rmore) {
@@ -3384,7 +3384,7 @@
       (opts && opts.noAmount ? '' : '<b>' + sign + fmtChip(r.amount) + '</b>') + '</button>';
   }
   /* ---------------- 最近记录浮层（「全部」） ----------------
-     v1.0.108：横向那条只能露 5~6 笔，点「全部」在这里列出最近 60 笔。
+     v1.8.5：横向那条只能露 5~6 笔，点「全部」在这里列出最近 60 笔。
      浮层挂在 body 上（不受筛选卡片的 overflow 限制），桌面落在按钮下方、
      手机贴着屏幕底边展开成一块可滚动的面板；点任意一行跳到那天的天页。 */
   function ensureRecentPop() {
@@ -3446,7 +3446,7 @@
   }
 
   /* 右上角收支胶囊：净额 + 一颗呼吸点，代替原来的整块填色。
-     v1.0.108：同日 3 笔以上，在净额前挂一颗笔数小签（"3笔"）。
+     v1.8.5：同日 3 笔以上，在净额前挂一颗笔数小签（"3笔"）。
      格子里的条目会被裁成「前 N 条 + N 笔」，光看条目数不准；这颗签是
      唯一能一眼说明"这天很密"的信号，且在手机那档（合计胶囊整块隐藏）另有
      左下角的 .cal-sum 兜底。 */
@@ -3676,7 +3676,7 @@
       var key = dateKey(d);
       var other = d.getMonth() !== m - 1;
       var items = other ? [] : (byDate[key] || []);
-      /* v1.0.108：同日 3 笔以上，格子左下角压一颗「当日合计」。
+      /* v1.8.5：同日 3 笔以上，格子左下角压一颗「当日合计」。
          手机那档隐藏了右上角的净额胶囊，一格只剩几条纯色条，
          没有这行字就完全看不出这天花了多少。桌面不显示（右上角已有净额 + 笔数）。
          只算支出合计：一条 5px 的色条说不了收支两件事。 */
@@ -5987,12 +5987,12 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    /* v1.0.108：导出即成"备份过一次"，备份提醒的计时从这里重新起算 */
+    /* v1.8.5：导出即成"备份过一次"，备份提醒的计时从这里重新起算 */
     try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch (e) { /* noop */ }
     toast('已导出 ' + rows.length + ' 条记录', 'success');
   }
 
-  /* v1.0.108：超过 30 天没导出过，就轻提示一次（同一条提醒 7 天内不重复）。
+  /* v1.8.5：超过 30 天没导出过，就轻提示一次（同一条提醒 7 天内不重复）。
      账本全在 localStorage 里，浏览器清一次缓存就没了 —— 这句提醒比任何
      "稳健性"都实在。没有记录、门禁未过、或本来就不在记账页时不打扰。 */
   function maybeBackupTip() {
@@ -6031,7 +6031,7 @@
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
     var root = document.documentElement;
     root.setAttribute('data-theme', t);
-    /* v1.0.108：两颗主题按钮是「按下态」语义，读屏要知道现在是不是深色 */
+    /* v1.8.5：两颗主题按钮是「按下态」语义，读屏要知道现在是不是深色 */
     ['themeBtn', 'themeBtnM'].forEach(function (id) {
       var b = $(id);
       if (b) b.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
@@ -7009,7 +7009,7 @@
     if ($('boardReset')) $('boardReset').addEventListener('click', resetBoardFilters);
     if ($('exportBtn')) $('exportBtn').addEventListener('click', exportCsv);
 
-    /* v1.0.108：最近记录「全部」浮层的开关。放这里而不是每次重绘都绑，
+    /* v1.8.5：最近记录「全部」浮层的开关。放这里而不是每次重绘都绑，
        避免 renderSubBar 反复重绘时叠加监听。 */
     var rsMoreBtn = $('rsMore');
     if (rsMoreBtn) rsMoreBtn.addEventListener('click', function (e) {
@@ -8284,7 +8284,7 @@
     if (initialRoute === 'calendar') gotoToday();
     setView(initialRoute);
 
-    /* v1.0.108：备份提醒放在首屏之后 —— 打开就要看得见图，
+    /* v1.8.5：备份提醒放在首屏之后 —— 打开就要看得见图，
        提示晚 3 秒再出来，不和启动动画抢注意力。 */
     setTimeout(maybeBackupTip, 3000);
 

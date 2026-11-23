@@ -665,7 +665,7 @@ html[data-theme="dark"] .cal-cell.is-today:hover { background: color-mix(in srgb
 }
 .cal-daysum.is-off { border-color: transparent; background: none; }
 .cal-daysum.is-off::before { display: none; }
-/* v1.0.108：同日 3 笔以上，净额前挂一颗笔数小签 */
+/* v1.8.5：同日 3 笔以上，净额前挂一颗笔数小签 */
 .cal-daysum.is-busy { padding-left: 5px; gap: 4px; }
 .ds-n {
   display: inline-flex; align-items: center; height: 13px; padding: 0 4px;
@@ -2533,7 +2533,7 @@ html[data-theme="dark"] .ym-day.is-today{
   transform: none;
 }
 .rs-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--c, var(--primary)); }
-/* v1.0.108：最近记录条末尾的「全部」入口 + 点开后的浮层 */
+/* v1.8.5：最近记录条末尾的「全部」入口 + 点开后的浮层 */
 .rs-more {
   flex: 0 0 auto; height: 26px; padding: 0 9px; border-radius: 8px;
   border: 1px solid var(--border); background: var(--surface);
@@ -2602,7 +2602,7 @@ html[data-theme="dark"] .ym-day.is-today{
 }
 /* 日历胶囊是 flex 行：间距交给 .ci-name 的 gap，徽标自身不再加 margin */
 .ci-name .ci-warn { margin-right: 0; }
-/* v1.0.108：二级异常（≥均值 4 倍）。同一条"感叹号"语言里加码：
+/* v1.8.5：二级异常（≥均值 4 倍）。同一条"感叹号"语言里加码：
    尺寸大一号、双感叹号、底色更深并带一圈微光，扫一眼就知道这笔跟普通的
    "超了一点"不是一个量级。深色下底色换成亮红，避免暗红糊在深背景上。 */
 .ci-warn.is-severe {
@@ -3872,7 +3872,7 @@ html[data-theme="dark"] .card:hover { border-color: color-mix(in srgb, var(--pri
 /* v1.0.67：支出构成每行追加「占预算 %」小标 */
 .spend-bud { flex: 0 0 auto; font-size: 9.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chart-donut.is-percent .spend-bud { display: none; }
-/* v1.0.108：设了真实月预算之后 —— 进度条改读「年度额度用了多少」，
+/* v1.8.5：设了真实月预算之后 —— 进度条改读「年度额度用了多少」，
    超支那行整颗变红，金额榜末尾写「超 ¥x」。迷你折线只在宽屏出现。 */
 .spend-bud.is-over { color: var(--danger); font-weight: 800; }
 .spend-track[data-bud="1"] { background: color-mix(in srgb, var(--danger) 8%, var(--surface-3)); }
@@ -4524,7 +4524,7 @@ html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2
 }
 .ts-cap span { font-weight: 700; color: var(--text-2); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .ts-cap em { font-style: normal; font-size: 10px; white-space: nowrap; }
-/* v1.0.108：这句话就是环比/同比的开关，给它一条虚线提示"可以点" */
+/* v1.8.5：这句话就是环比/同比的开关，给它一条虚线提示"可以点" */
 .ts-cmp {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 0 0 1px; border: 0; background: none; cursor: pointer;
@@ -4535,7 +4535,7 @@ html[data-theme="dark"] .tr-sum { background: color-mix(in srgb, var(--surface-2
 .ts-cmp i { font-style: normal; font-size: 10.5px; opacity: .8; }
 .ts-cmp:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: 2px; border-radius: 3px; }
 .ts-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-/* v1.0.108：涨跌幅偶尔会有三位数（基数很小时），格子只有 100px 宽，
+/* v1.8.5：涨跌幅偶尔会有三位数（基数很小时），格子只有 100px 宽，
    放不下就让它折到第二行，而不是把百分号硬裁掉。 */
 .ts-cell { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px; min-width: 0; overflow: hidden; }
 .ts-cell i { font-style: normal; font-size: 10.5px; color: var(--muted); flex: 0 0 auto; }
