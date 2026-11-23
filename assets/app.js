@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.102';
+  var ASSET_V = '1.0.103';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2829,8 +2829,12 @@
       strip.hidden = !showRecent;
       if (showRecent) {
         var recs = sortedDesc(allRecords()).slice(0, 8);
+        /* v1.0.103：最近记录也接上异常高消费预警，和日历格子同一套口径
+           （同分类近 6 月单笔均值 ×2.5、样本 <3 不判）。整段只算一次 amap。 */
+        var amap = anomalyMap(allRecords());
         var rsig = recs.map(function (r) {
-          return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type, catColor(p, r.category)].join('|');
+          return [r.id, r.date, r.amount, r.category, r.sub, r.note, r.type,
+            catColor(p, r.category), isAnomaly(r, amap) ? '!' : ''].join('|');
         }).join('~');
         if (rlist.dataset.sig !== rsig) {
           rlist.dataset.sig = rsig;
@@ -2838,16 +2842,17 @@
             var inc = r.type === 'income';
             var newDay = ri > 0 && recs[ri - 1].date !== r.date;
             var note = String(r.note || r.sub || r.category || '').trim();
+            var bad = isAnomaly(r, amap);
             /* 133×36 两行装：上行备注，下行「日期 · 金额」。备注因此不用被
                金额和日期挤成一团省略号，五颗并排也是齐的。 */
             var c = catColor(p, r.category);
             /* 分隔线是独立装饰元素，不是按钮的伪元素 —— 点在线上不会跳到后一天 */
             return (newDay ? '<i class="rs-sep" aria-hidden="true"></i>' : '') +
-              '<button type="button" class="rs-item" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
-              esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '')) + '">' +
+              '<button type="button" class="rs-item' + (bad ? ' is-anomaly' : '') + '" data-day="' + esc(r.date) + '" style="--c:' + c + ';--ink:' + catInk(p, c) + '" title="' +
+              esc(r.date + ' · ' + (r.category || '') + (r.sub ? ' / ' + r.sub : '') + (r.note ? ' · ' + r.note : '') + (bad ? ' · 高于这类平时水平' : '')) + '">' +
               '<i class="rs-dot"></i>' +
               '<span class="rs-body">' +
-              '<span class="rs-note">' + esc(note) + '</span>' +
+              '<span class="rs-note">' + (bad ? '<em class="ci-warn rs-warn" title="高于这类平时水平">!</em>' : '') + esc(note) + '</span>' +
               '<span class="rs-meta">' +
               '<b class="rs-day">' + esc(String(r.date || '').slice(5)) + '</b>' +
               '<em class="rs-amt ' + (inc ? 'is-inc' : 'is-exp') + '">' + (inc ? '+' : '-') +
