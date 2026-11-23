@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.98';
+  var ASSET_V = '1.0.99';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -360,7 +360,7 @@
      所以覆盖值只要写回 :root，图表、筛选滑块、明细条会一起换色。
      读写都走 localStorage，刷新/换设备（同浏览器）都记得。 */
   var CAT_COLOR_DEFS = [
-    { key: '餐饮', name: '餐饮', css: '--cat-food', def: '#ffc000' },
+    { key: '餐饮', name: '餐饮', css: '--cat-food', def: '#6f8b1f' },
     { key: '日常', name: '日常', css: '--cat-daily', def: '#490033' },
     { key: '交通', name: '交通', css: '--cat-travel', def: '#264465' },
     { key: '服饰', name: '服饰', css: '--cat-wear', def: '#8b5cf6' },
@@ -5159,7 +5159,9 @@
     var back = $('modalBackdrop');
     if (back) { clearTimeout(modalCloseTimer); back.classList.remove('is-closing'); back.hidden = false; }
     setTimeout(function () {
-      var first = (mode === 'cell' && $('fNote')) ? $('fNote') : $('fAmount');
+      /* v1.0.99：默认落内容框。写「午餐 35」失焦/回车会自动把数字抽到金额栏，
+         所以从内容起手更顺；金额框仍是想直接填数时点一下的事。 */
+      var first = $('fNote') || $('fAmount');
       if (first) first.focus();
     }, 120);
   }
@@ -5542,31 +5544,51 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#0d121c' : '#f5f7fa');
     var root = document.documentElement;
-    /* v1.0.43 起不走 startViewTransition：那条管线会把旧帧拍成快照交叉淡入，
-       浅切深的那一下整屏先亮起来，刺眼。当时改成了「换色这两帧按住全站过渡」
-       —— 一帧硬切，干净但生硬。
-       v1.0.98 改成柔和化过去：.theme-snap 现在不是禁用过渡，而是给全站一个
-       统一时长、统一缓动的颜色补间（见 styles.css 末尾）。类必须留到补间跑完
-       才能撤，中途撤掉 transition 会把动画截断在半路。 */
-    root.classList.add('theme-snap');
+    /* 换色本身做一帧硬切：柔和感由 setTheme 的整页遮罩统一提供（v1.0.99）。
+       这里不再给全站挂逐元素补间 —— canvas 图表和 JS 重建的节点没有补间起点，
+       逐元素补间只会让它们「先跳到终色」，造成各板块单独换色。 */
     root.setAttribute('data-theme', t);
     if (!deferCharts) renderCharts(state.view, 'instant');
     /* 让 iframe 同一帧换色；子页自己会 repaint 行底色与图表 */
     var f = $('cubeFrame');
     if (f && f.contentWindow) { try { f.contentWindow.postMessage({ __ledgerTheme: t }, '*'); } catch (e) {} }
-    if (root.__themeTimer) clearTimeout(root.__themeTimer);
-    root.__themeTimer = setTimeout(function () {
-      root.classList.remove('theme-snap');
-      root.__themeTimer = 0;
-    }, 520);
   }
 
-  /* 换肤：光晕已取消。只做一次 token + 图表配色的同步替换，
-     不生成覆盖层、不读写布局、不设切换锁，连点也能立刻响应。
-     底色与卡面本来就没有 background-color 过渡，所以是干净的一帧切换。 */
+  /* 换肤：整页遮罩过场。淡入盖住 → 在遮罩最浓的那一帧同步换掉所有主题色
+     和重绘（图表 canvas、筛选条、日历格子一并到位）→ 淡出揭开。
+     从旧主题底色淡入、换到新主题底色再淡出，全程整页一起走，
+     不会再出现「卡片还在渐变、图表已经变完」的分块感。 */
   function setTheme(t) {
     if (t === state.theme) return;
-    applyTheme(t, true);
+    var veil = $('themeVeil');
+    if (!veil || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      commitTheme(t);
+      return;
+    }
+    var root = document.documentElement;
+    if (root.__themeTimer) clearTimeout(root.__themeTimer);
+    var prevBg = getComputedStyle(root).getPropertyValue('--bg').trim() || '#f4f6fa';
+    veil.classList.remove('is-out');
+    veil.style.background = prevBg;
+    /* 先把遮罩淡入，盖住当前这一屏 */
+    void veil.offsetWidth;
+    veil.classList.add('is-in');
+    root.__themeTimer = setTimeout(function () {
+      commitTheme(t);
+      var nextBg = getComputedStyle(root).getPropertyValue('--bg').trim() || prevBg;
+      veil.classList.remove('is-in');
+      veil.style.background = nextBg;
+      veil.classList.add('is-out');
+      root.__themeTimer = setTimeout(function () {
+        veil.classList.remove('is-out');
+        root.__themeTimer = 0;
+      }, 300);
+    }, 160);
+  }
+  /* 一次性把所有跟主题有关的东西换到位：token、图表、筛选条、日历格子。
+     调用点都在遮罩最浓的那一帧，用户看不到中间态。 */
+  function commitTheme(t) {
+    applyTheme(t, false);
     /* 筛选胶囊的 --c / --ink 是渲染时按主题算好写死在内联样式里的，
        只重绘图表不会动它们 —— 必须连同筛选区一起重画，否则文字要等下一次点击才跟上。
        筛选区在日历页，切主题时人可能正停在总览，所以这里直接无条件重排一遍。 */

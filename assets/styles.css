@@ -43,8 +43,13 @@
   --today-solid: #e8a83c;
   --today-on: #3b2605;
   /* 分类色板：这套值就是「恢复默认」回到的颜色，改这里等于改出厂配色。
-     深浅两套同值 —— 配色自定义写的是同一个 :root 变量，两套主题本来就同色 */
-  --cat-food: #ba7517;
+     深浅两套同值 —— 配色自定义写的是同一个 :root 变量，两套主题本来就同色
+
+     v1.0.99 餐饮改用橄榄黄绿：原来的琥珀 #ba7517 和「今天」的琥珀
+     #e0992a 几乎一个色，日历上今日底色和餐饮胶囊糊成一片。现有色板
+     红(收入)/橙(今日)/蓝(交通)/紫(日常)/玫红(服饰)/青绿(娱乐) 已经占满，
+     黄绿是唯一的空档色相 —— 和谁都不撞，深浅两档各给适配的明度。 */
+  --cat-food: #6f8b1f;
   --cat-daily: #7f77dd;
   --cat-travel: #378add;
   --cat-wear: #d4537e;
@@ -103,7 +108,7 @@ html[data-theme="dark"] {
   --today-solid: #e0a33c;
   --today-on: #2c1c02;
   /* 深色底沿用同一套分类色：自定义配色本来就两端共用一份值 */
-  --cat-food: #ef9f27;
+  --cat-food: #a9c94a;
   --cat-daily: #afa9ec;
   --cat-travel: #85b7eb;
   --cat-wear: #ed93b1;
@@ -2987,29 +2992,30 @@ html[data-theme="dark"] .cal-item.is-new { --ring-c: color-mix(in srgb, var(--c,
 
 /* ---- 2. 今年结余：浅一档的红，压在卡片里不刺眼 ------------------ */
 
-/* ---- 3. 换肤：柔和化过去（v1.0.98） -------------------------------
-   v1.0.43 用 startViewTransition 时，旧帧快照和新帧交叉淡入，切到深色
-   那一下整屏先发白 —— 刺眼；改成「两帧内按住所有过渡」后变成一帧硬切，
-   干净但生硬。现在 .theme-snap 只做一件事：换色的这 520ms 里给全站一个
-   统一时长、统一缓动的颜色补间（applyTheme 到点才撤掉这个类，中途撤会
-   把补间截断）。所有元素同一条曲线同步起步，不会出现「几十个控件各自
-   补间」的抖动；只列颜色类属性 + transform，滑块与翻页的位移不被打断。
-   尊重 prefers-reduced-motion：那一档退回瞬时切换。 */
-html.theme-snap,
-html.theme-snap *,
-html.theme-snap *::before,
-html.theme-snap *::after {
-  transition-property: background-color, color, border-color, box-shadow,
-                       fill, stroke, outline-color, transform !important;
-  transition-duration: .42s !important;
-  transition-timing-function: cubic-bezier(.4, 0, .2, 1) !important;
-  transition-delay: 0s !important;
+/* ---- 3. 换肤：整页统一过场（v1.0.99） -----------------------------
+   v1.0.98 让全站所有元素各自做 420ms 颜色补间，看着柔和，但 canvas 图表
+   和 JS 重建的节点（筛选条、日历格子）没有补间起点 —— 它们一帧就跳到终色，
+   于是「卡片还在渐变、图表已经变完」，各板块各自换色，整体是散的。
+
+   改成整页一块遮罩：淡入盖住 → 遮罩最浓时一次性把所有主题色与重绘做完 →
+   淡出揭开。用户看到的是整页一起柔和过渡，中间那一下换色被遮罩盖住，
+   不存在任何板块单独变色。遮罩底色取旧/新主题的 --bg，由脚本写内联值。 */
+.theme-veil {
+  position: fixed; inset: 0; z-index: 9997;
+  pointer-events: none; opacity: 0;
+  background: var(--bg);
+  will-change: opacity;
 }
+.theme-veil.is-in {
+  animation: themeVeilIn .16s cubic-bezier(.4, 0, 1, 1) forwards;
+}
+.theme-veil.is-out {
+  animation: themeVeilOut .3s cubic-bezier(0, 0, .2, 1) forwards;
+}
+@keyframes themeVeilIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes themeVeilOut { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  html.theme-snap,
-  html.theme-snap *,
-  html.theme-snap *::before,
-  html.theme-snap *::after { transition-duration: 0s !important; }
+  .theme-veil { display: none; }
 }
 
 /* ---- 4. 魔方蒙层：整屏一张，中间给 iframe 挖个洞 ------------------
@@ -4543,6 +4549,13 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
    两张 segmented 并排放在卡片头右侧：年份（近 12 月 / 各年）+ 范围
    （全部 / 支出 / 收入）。年份按钮的段数由 JS 写进 --seg-n，这里只
    保证不换行、不互相挤压；窄屏时整组落到标题下方一行。
+
+   v1.0.99 修「文字不居中 / 部分段过窄」：
+   旧的 .seg 用 repeat(n, 1fr)，而外层 .tr-controls 一挤，1fr 就被压到
+   比文字还窄（实测 6 段时每段只有 30px，而「近12月」要 68px）。按钮被
+   挤出格子，但 .seg-ind 仍按均分宽度算位置和宽度 —— 滑块和文字错位，
+   看着就是「没居中」。改成每段的 minmax(最小宽, 1fr)：段多时整条自动变宽，
+   外层 flex-wrap 让它整组换行，而不是把每段压扁。按钮再做真居中。
    ================================================================== */
 .tr-controls {
   display: flex; align-items: center; gap: 7px;
@@ -4550,14 +4563,25 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
 }
 .tr-controls .seg-sm { min-width: 0; }
 #trendYear.seg {
+  --seg-min: 52px;
+  flex: 0 0 auto;
   flex-wrap: nowrap; white-space: nowrap; grid-auto-flow: column;
-  min-width: 0;
+  grid-template-columns: repeat(var(--seg-n), minmax(var(--seg-min), 1fr));
+  min-width: calc(var(--seg-n) * var(--seg-min) + 8px);
 }
-#trendYear button { padding-left: 10px; padding-right: 10px; font-size: 12px; }
+#trendYear button,
+#trendScope button {
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding-left: 3px; padding-right: 3px;
+  font-variant-numeric: tabular-nums;
+}
+#trendYear button { font-size: 12px; }
 @media (max-width: 620px) {
   .tr-controls { flex: 1 1 100%; justify-content: flex-start; gap: 6px; margin-top: 8px; }
-  .tr-controls .seg-sm { min-width: 0; flex: 1 1 auto; }
-  #trendYear button, #trendScope button { padding-left: 7px; padding-right: 7px; font-size: 11.5px; }
+  .tr-controls .seg-sm { min-width: 0; flex: 0 0 auto; }
+  #trendYear.seg { --seg-min: 48px; }
+  #trendScope.seg { min-width: 126px; }
+  #trendYear button, #trendScope button { padding-left: 2px; padding-right: 2px; font-size: 11.5px; }
 }
 
 /* 手机上天页是整页滚动的，底部要留出呼吸位：".main.is-calendar" 的
@@ -4572,7 +4596,9 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
 .chart-card:has(.tr-controls) .card-head { flex-wrap: wrap; align-items: flex-start; gap: 5px; }
 .chart-card:has(.tr-controls) .card-head > div:first-child { flex: 1 1 100%; min-width: 0; }
 .chart-card:has(.tr-controls) .tr-controls { flex: 1 1 100%; justify-content: flex-start; }
-.tr-controls #trendScope { min-width: 0; }
+/* 范围条三段「全部 / 支出 / 收入」至少要 132px：原来被压到 89px、
+   每段 27px 刚好卡住两个字，边缘贴着滑块的圆角。给足宽度让它透气。 */
+.tr-controls #trendScope { min-width: 132px; flex: 0 0 auto; }
 .tr-controls .seg-sm { height: 32px; }
 .tr-controls .seg-sm button { font-size: 11.5px; }
 
