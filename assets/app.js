@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.103';
+  var ASSET_V = '1.0.104';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -3024,9 +3024,13 @@
     return '<button type="button" class="cal-item' + (r.type === 'income' ? ' is-inc' : '') +
       (isNew ? ' is-new' : '') + (bad ? ' is-anomaly' : '') +
       '" data-id="' + esc(r.id) + '" style="--c:' + c + ';--ink:' + ink + '" title="' + esc(tip) + '">' +
-      '<span class="ci-name"><i></i><span>' + esc(label) + '</span></span>' +
-      (opts && opts.noAmount ? '' : '<b>' + (bad ? '<em class="ci-warn" title="高于这类平时水平">!</em>' : '') +
-        sign + fmtChip(r.amount) + '</b>') + '</button>';
+      /* v1.0.104：徽标统一放名称行文字前，和最近记录同一位置。
+         原来塞在金额 <b> 里，而 noAmount 视图会整块省掉 <b>，徽标跟着消失；
+         名称行永远在，放这里任何角度都显示。 */
+      '<span class="ci-name"><i></i>' +
+      (bad ? '<em class="ci-warn rs-warn" title="高于这类平时水平">!</em>' : '') +
+      '<span>' + esc(label) + '</span></span>' +
+      (opts && opts.noAmount ? '' : '<b>' + sign + fmtChip(r.amount) + '</b>') + '</button>';
   }
   /* 右上角收支胶囊：净额 + 一颗呼吸点，代替原来的整块填色 */
   function daySumHTML(p, items) {

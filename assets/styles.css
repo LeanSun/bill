@@ -2476,16 +2476,20 @@ html[data-theme="dark"] .ym-day.is-today{
   display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 11px; font-weight: 750; line-height: 1.1; color: var(--text);
 }
-/* v1.0.103：异常高消费感叹号。日历格子那颗 .ci-warn 的选择器限定在
-   .cal-item 下，最近记录是 .rs-item 命中不到 —— 这里把红底白字连同尺寸
-   一起按同款写进 .rs-warn（JS 输出 ci-warn rs-warn 两个类，靠这条独立生效）。
-   保持 inline-flex 参与行内排版，.rs-note 的 ellipsis 才能对备注生效。 */
-.rs-note .rs-warn {
+/* v1.0.104：异常感叹号——日历胶囊与最近记录共用一套基础样式。
+   位置统一在「名称行文字前」：.ci-name（flex）与 .rs-note（inline）都放这里。
+   JS 两处都输出 ci-warn + rs-warn，基础样式挂全局类，不再按父容器限定。 */
+.ci-warn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px;
+  flex: 0 0 12px; width: 12px; height: 12px;
   border-radius: 50%; background: var(--danger); color: #fff;
   font-size: 9px; font-weight: 800; font-style: normal; line-height: 1;
+  vertical-align: -1px;
 }
+/* 日历胶囊是 flex 行：间距交给 .ci-name 的 gap，徽标自身不再加 margin */
+.ci-name .ci-warn { margin-right: 0; }
+/* 最近记录是 inline 行：没有 gap，用 margin 拉开与备注文字的距离 */
+.rs-note .ci-warn { margin-right: 2px; }
 .rs-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 5px; line-height: 1; }
 .rs-day { font-size: 10px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rs-amt { font-style: normal; font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -3919,13 +3923,8 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
 /* ==================================================================
    v1.0.78 · C 组：异常标记 / 周几热力 / 占比趋势
    ================================================================== */
-/* #7 异常消费：金额前的感叹号徽标，不压住项目名 */
-.cal-item .ci-warn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 13px; height: 13px; margin-right: 4px; vertical-align: -1px;
-  border-radius: 50%; background: var(--danger); color: #fff;
-  font-size: 10px; font-weight: 800; font-style: normal; line-height: 1;
-}
+/* #7 异常消费：徽标基础样式已上移到 .ci-warn（全局），
+   这里不再重复定义 —— 两处胶囊共用同一颗 12px 红底白字感叹号。 */
 
 /* #12 趋势模式下，金额榜的 is-percent 样式不干扰画布 */
 #chartDonut.is-percent { color-scheme: normal; }
