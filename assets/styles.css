@@ -3064,16 +3064,41 @@ html.theme-morph *::after {
 }
 
 /* ---- 长按日期格子的快捷菜单 -------------------------------------- */
+/* 长按格子时浏览器会顺手把格子里那行文字选中：手机上还会跟着弹放大镜、
+   系统"拷贝/查询"菜单，把我们的浮层顶掉。格子里的文字没有复制的价值，
+   这里直接关掉文字选中与系统长按呼出，让 520ms 只兑现成我们的菜单。 */
+.cal-cell, .wk-col, .ym-day {
+  -webkit-user-select: none; -moz-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
 .cell-menu {
   position: fixed; z-index: 120; min-width: 156px; padding: 5px;
   border-radius: 12px; background: var(--surface);
   border: 1px solid var(--border); box-shadow: var(--shadow-pop);
-  animation: cellMenuIn .16s var(--ease) both;
+  /* 缩放原点由 JS 按指针位置写进来：菜单从手指那一角"长"出来 */
+  transform-origin: var(--cm-ox, 14px) var(--cm-oy, 12px);
+  animation: cellMenuIn .28s cubic-bezier(.16, 1.24, .38, 1) both;
 }
 .cell-menu[hidden] { display: none; }
 @keyframes cellMenuIn {
-  from { opacity: 0; transform: translateY(-4px) scale(.96); }
-  to   { opacity: 1; transform: none; }
+  /* 只写 from，to 交给元素自身的样式：这样「复制该日到今天」禁用时
+     的 opacity:.42 不会被动画的结束帧改回 1。 */
+  from { opacity: 0; transform: scale(.76) translateY(5px); }
+}
+/* 三条动作稍微错开落位，弹出来是一串而不是一整块 */
+.cell-menu button { animation: cellMenuItemIn .24s var(--ease) both; }
+.cell-menu button:nth-child(1) { animation-delay: .03s; }
+.cell-menu button:nth-child(2) { animation-delay: .06s; }
+.cell-menu button:nth-child(3) { animation-delay: .09s; }
+@keyframes cellMenuItemIn {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cell-menu { animation: cellMenuFade .14s linear both; }
+  .cell-menu button { animation: none; }
+}
+@keyframes cellMenuFade {
+  from { opacity: 0; }
 }
 .cell-menu button {
   display: flex; align-items: center; gap: 9px; width: 100%;

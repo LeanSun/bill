@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.0.106';
+  var ASSET_V = '1.0.107';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -6662,6 +6662,14 @@
        （那是翻页手势），真触发时撤掉挂起的单击弹框并压住随后的 click。 */
     var LP_MS = 520, LP_MOVE = 12;
     var lpTimer = 0, lpStart = null, lpSwallowClick = false;
+    /* 有些浏览器在 touchstart 那一刻就已经起了一段文字选区（样式还没来得及挡住），
+       菜单弹出来时再清一次，避免格子里留着一条蓝底高亮。 */
+    function clearTextSelection() {
+      try {
+        var sel = window.getSelection && window.getSelection();
+        if (sel && sel.rangeCount) sel.removeAllRanges();
+      } catch (err) { /* 取不到选区就算了，不影响菜单 */ }
+    }
     function hideCellMenu() {
       var m = $('cellMenu'); if (m) m.hidden = true;
       lpStart = null;
@@ -6677,6 +6685,7 @@
         if (!lpStart) return;
         lpSwallowClick = true;   /* 吞掉长按松手后的那一下格子 click，一次性 */
         cancelCellAdd();
+        clearTextSelection();
         showCellMenu(lpStart.key, lpStart.x, lpStart.y);
         lpStart = null;
       }, LP_MS);
@@ -6692,13 +6701,21 @@
       var copyBtn = m.querySelector('[data-act="copy"]');
       if (copyBtn) copyBtn.disabled = dayRecs.length === 0;
       m.hidden = false;
-      /* 优先落在指针右下方，贴边时翻到另一侧 */
-      var r = m.getBoundingClientRect();
+      /* 优先落在指针右下方，贴边时翻到另一侧。
+         尺寸用 offsetWidth/Height 取：此刻弹入动画正跑着 scale，
+         getBoundingClientRect 会量到缩小后的框，翻转就会差出几十像素。 */
+      var mw = m.offsetWidth, mh = m.offsetHeight;
       var left = x + 10, top = y + 10;
-      if (left + r.width > window.innerWidth - 8) left = x - r.width - 10;
-      if (top + r.height > window.innerHeight - 8) top = y - r.height - 10;
-      m.style.left = Math.max(8, left) + 'px';
-      m.style.top = Math.max(8, top) + 'px';
+      if (left + mw > window.innerWidth - 8) left = x - mw - 10;
+      if (top + mh > window.innerHeight - 8) top = y - mh - 10;
+      left = Math.max(8, left);
+      top = Math.max(8, top);
+      m.style.left = left + 'px';
+      m.style.top = top + 'px';
+      /* 弹出动效的缩放原点：取离指针最近的那个角，视觉上像从手指尖长出来。
+         菜单默认落在指针右下 10px，所以通常是左上角；贴边翻到另一侧时自动换角。 */
+      m.style.setProperty('--cm-ox', Math.min(Math.max(x - left, 10), Math.max(10, mw - 10)) + 'px');
+      m.style.setProperty('--cm-oy', Math.min(Math.max(y - top, 10), Math.max(10, mh - 10)) + 'px');
     }
     if (boardEl) {
       boardEl.addEventListener('pointermove', function (e) {
@@ -6712,6 +6729,12 @@
       var m = $('cellMenu');
       if (m && !m.hidden && !(e.target.closest && e.target.closest('#cellMenu'))) hideCellMenu();
     }, true);
+    /* Android 长按文字会直接弹系统菜单（选中 + 复制/搜索），走的是 contextmenu。
+       样式已经关了选中，这里再兜一层，保证长按只出我们自己的浮层。 */
+    document.addEventListener('contextmenu', function (e) {
+      var cell = e.target.closest ? e.target.closest('.cal-cell[data-date], .wk-col[data-date]') : null;
+      if (cell) e.preventDefault();
+    });
     var cellMenu = $('cellMenu');
     if (cellMenu) cellMenu.addEventListener('click', function (e) {
       var b = e.target.closest ? e.target.closest('button[data-act]') : null;
