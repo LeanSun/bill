@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.9.2';
+  var ASSET_V = '1.9.3';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2110,6 +2110,10 @@
         Number(c.dataset.ae) || 0, Number(c.dataset.ai) || 0);
       c.style.background = pc.bg;
       c.style.color = pc.ink;
+    }
+    var heavies = box.querySelectorAll('.ym.is-heavy');
+    for (var j = 0; j < heavies.length; j++) {
+      heavies[j].style.setProperty('--heavy-ink', catHue);
     }
   }
 
@@ -4289,14 +4293,17 @@
     /* 重月：支出比「有支出月份的均值」高出 15% 以上才标。
        少于 3 个月有数据时样本太薄，一律不标 —— 一年只记了两个月，
        怎么算都有一半是重月，那这个标记就没有信息量了。 */
+    /* v1.9.3：基准跟着筛选方向走 —— 筛「收入」时支出账是空的，
+       继续拿 monthDe 算会一个重月都标不出来。 */
+    var heavyMonths = catKey === '收入' ? monthDi : monthDe;
     var mList = [], mSum = 0;
     for (var mi = 1; mi <= 12; mi++) {
-      if (monthDe[mi] > 0) { mList.push(monthDe[mi]); mSum += monthDe[mi]; }
+      if (heavyMonths[mi] > 0) { mList.push(heavyMonths[mi]); mSum += heavyMonths[mi]; }
     }
     var mAvg = mList.length >= 3 ? mSum / mList.length : 0;
     function heavyOf(m) {
       if (!mAvg) return 0;
-      var v = monthDe[m] || 0;
+      var v = heavyMonths[m] || 0;
       return v > mAvg * 1.15 ? v / mAvg : 0;
     }
     var today = todayStr();
@@ -4331,9 +4338,14 @@
       var msum = (mde ? '<i class="c-expense">−' + fmtBig(mde).slice(1) + '</i>' : '') +
         (mid ? '<i class="c-income">+' + fmtBig(mid).slice(1) + '</i>' : '');
       var hv = heavyOf(m);
-      html += '<article class="ym' + (hv ? ' is-heavy' : '') + '">' +
+      /* v1.9.3：重月色跟随筛选分类（格子底色早就是 catHue，标记却写死绿，
+         筛「交通」时一整片绿底压在蓝格子上面，两套颜色语言打架）。
+         「全部」时 catHue 就是 p.expense，视觉与从前完全一致。 */
+      var heavyStyle = hv ? ' style="--heavy-ink:' + catHue + '"' : '';
+      html += '<article class="ym' + (hv ? ' is-heavy' : '') + '"' + heavyStyle + '>' +
         '<button type="button" class="ym-head" data-month="' + m + '"' +
-        (hv ? ' title="' + m + ' 月支出比全年月均高 ' + Math.round((hv - 1) * 100) + '%"' : '') + '><b>' + m + '月</b>' +
+        (hv ? ' title="' + m + ' 月' + (catKey === '收入' ? '收入' : '支出') +
+          '比全年月均高 ' + Math.round((hv - 1) * 100) + '%"' : '') + '><b>' + m + '月</b>' +
         '<span class="ym-msum">' + (msum || '<i>—</i>') + '</span></button>' +
         '<div class="ym-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
         '<div class="ym-grid">' + grid + '</div></article>';

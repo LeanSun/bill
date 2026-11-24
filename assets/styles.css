@@ -4223,12 +4223,13 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
    3. 重复记账提示的语气（#3）
    ================================================================== */
 
-/* #8 重月：支出高于全年月均 15% 的月份，整格淡染 + 标题数字转支出色。
+/* #8 重月：高于全年月均 15% 的月份，整格淡染 + 标题数字转该分类色。
    只在至少 3 个月有数据时启用（JS 里判断），避免样本太少时满屏都是「重」。
    v1.0.89：原来只跟一个小圆点，渲染出来是「7月·」，看着像打字打错了一个符号，
-   谁也不知道整格淡绿是什么意思；换成两字标签，不用悬停也能读懂。 */
-.ym.is-heavy { background: color-mix(in srgb, var(--expense) 9%, var(--surface)); }
-.ym.is-heavy .ym-head b { color: var(--expense); }
+   谁也不知道整格淡色是什么意思；换成两字标签，不用悬停也能读懂。
+   v1.9.3：色源交给 JS 写的 --heavy-ink（跟随筛选分类），「全部」才落回 --expense 绿。 */
+.ym.is-heavy { background: color-mix(in srgb, var(--heavy-ink, var(--expense)) 9%, var(--surface)); }
+.ym.is-heavy .ym-head b { color: var(--heavy-ink, var(--expense)); }
 .ym.is-heavy .ym-head b::after {
   content: '偏高';
   display: inline-block; margin-left: 4px;
@@ -4236,10 +4237,10 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
   letter-spacing: 0; white-space: nowrap;
   padding: 2px 4px; border-radius: 4px;
   vertical-align: 1px;
-  color: var(--expense);
-  background: color-mix(in srgb, var(--expense) 15%, var(--surface));
+  color: var(--heavy-ink, var(--expense));
+  background: color-mix(in srgb, var(--heavy-ink, var(--expense)) 15%, var(--surface));
 }
-.ym.is-heavy .ym-msum i.c-expense { color: var(--expense); }
+.ym.is-heavy .ym-msum i.c-expense { color: var(--heavy-ink, var(--expense)); }
 
 /* #18 气泡统一：原先是一块深色底、白字、11.5px 的小黑条，
    和图表里的 tooltip（surface 底 + 1px 边框 + 12px 字）完全是两套语言。
