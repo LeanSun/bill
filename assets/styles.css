@@ -2292,8 +2292,12 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 /* 金额统计固定贴在筛选行最右侧：不论有没有子类按钮，都靠右站 */
 .fx-sub-slot { justify-content: space-between; }
 .sub-sum {
-  flex: 0 0 auto; margin-left: auto; min-width: 132px; height: 100%;
-  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  /* v1.9.2：固定宽度。v1.9.1 为填满收窄子类条后的空档让它 flex:1，
+     1920 宽下被拉到 824px，成了一条空荡荡的长条。280px 刚好装得下
+     最坏情况（月统计 + 支 + 收 + 日均，金额 ¥34,750 一级），两种模式同宽不跳。 */
+  flex: 0 0 280px; width: 280px; margin-left: auto;
+  height: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 0 12px; border-radius: 10px;
   background: var(--surface-2); border: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
@@ -2317,7 +2321,7 @@ html[data-theme="dark"] .wk-col.is-weekend .wk-head {
 }
 @media (max-width: 760px) {
   .fx-sub-slot { flex-wrap: wrap; }
-  .sub-sum { min-width: 0; flex: 1 1 100%; height: 30px; justify-content: space-between; }
+  .sub-sum { width: auto; min-width: 0; flex: 1 1 100%; height: 30px; justify-content: space-between; }
 }
 
 .cube-loading{
@@ -5292,19 +5296,15 @@ html[data-theme="dark"] .cal-beam {
 
 /* ---- 2. 子类条收窄：按内容定宽、每颗最多 112px ----------------------
    原来七颗把整行等分，1920 宽时一颗近 230px，两字加个角标空得像七个槽。
-   收窄后右边会空一截 —— 那块交给统计框接管（只在子类条出现时生效），
-   统计框拉长、内容两端对齐，整行仍是一块实心面板，不是两个孤岛夹一个洞。 */
+   v1.9.2 更正：一度让统计框拉伸去填余下的空，结果 1920 下它被拉成
+   824px 的空条。现在两者都按内容定宽、统计框固定 280px 靠右。 */
 .fx-sub-slot .sub-seg {
   flex: 0 1 auto;
   grid-template-columns: repeat(var(--seg-n), minmax(0, 112px));
   justify-content: start;
 }
-.fx-sub-slot:has(.sub-seg:not([hidden])) .sub-sum {
-  flex: 1 1 auto;
-  margin-left: 0;
-  min-width: 168px;
-  justify-content: space-between;
-}
+/* v1.9.2：统计框不再接管余宽 —— 有子类的行右边会空一截，
+   但比一条 824px 的空条好读；统计框固定 280px 并始终右对齐。 */
 @media (max-width: 760px) {
   /* 手机上七颗仍要挤在一行：回到等分，左右不留空。
      另外这一行会换行（统计框掉到第二行），而 .sub-seg 的 height:100%
@@ -5315,7 +5315,7 @@ html[data-theme="dark"] .cal-beam {
     flex: 1 1 100%; height: 46px;
     grid-template-columns: repeat(var(--seg-n), minmax(0, 1fr));
   }
-  .fx-sub-slot:has(.sub-seg:not([hidden])) .sub-sum { flex: 1 1 100%; min-width: 0; }
+  .fx-sub-slot:has(.sub-seg:not([hidden])) .sub-sum { width: auto; flex: 1 1 100%; min-width: 0; }
 }
 
 /* ---- 3. 年历 / 周历的今日流光（月历 .cal-cell 上那圈，直接复用 .cal-beam） ----
