@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.9.0';
+  var ASSET_V = '1.9.1';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -66,7 +66,7 @@
   var RENDER_MODE = 'animate';
   /* v1.8.5：420ms 的换肤偏慢，眼睛能跟住每一帧就显得拖；260ms 仍是补间，
      但像"按一下开关"而不是"等一次动画"。CSS .theme-morph 与图表补间同源。 */
-  var THEME_FADE_MS = 150;
+  var THEME_FADE_MS = 100;
   /* v1.0.106：需要在换肤时逐帧插值的主题色变量。
      CSS @property 的 transition 在根元素自定义属性上实测不生效（会瞬跳），
      所以由 JS 读新旧 computed 值、rAF 插值写到内联 style，到点后清除。 */
@@ -997,6 +997,20 @@
     var b = rangeBounds(), f = dateKey(b.from), t = dateKey(b.to);
     return allRecords().filter(function (r) { return r.date >= f && r.date <= t; });
   }
+  /* v1.9.1：当前粒度的「单位数」，给筛选栏那个平均值做分母。
+     年 → 已经过去的月数（当年看到 11 月就是 11），月 / 周 → 已经过去的天数。
+     分母按日历走、不跟筛选走：筛成「餐饮」时分子只剩餐饮，摊的仍是同一段时间；
+     若分母也跟着缩水，平均值反而会被抬高。整段都在未来时返回 0（不显示）。 */
+  function periodSpan() {
+    var b = rangeBounds(), now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var end = b.to < today ? b.to : today;
+    if (end < b.from) return 0;
+    if (state.scale === 'year') {
+      return (end.getFullYear() - b.from.getFullYear()) * 12 + (end.getMonth() - b.from.getMonth()) + 1;
+    }
+    return Math.round((end - b.from) / 86400000) + 1;
+  }
   /* 整月全量：月份条统计与子类笔数用 */
   function monthRecords() {
     var y = state.calMonth.year, m = state.calMonth.month;
@@ -1506,13 +1520,13 @@
     });
   }
 
-  /* 柱顶数字：12 根柱的空间里只放得下「几位数 + 可能一个万」，
-     完整金额交给悬浮提示。千位不加千分位逗号 —— 「1,552」比「1552」宽一截。 */
+  /* 柱底数字：12 根柱的空间里只放得下「几位数 + 可能一个万」，完整金额交给悬浮提示。
+     千位不加千分位逗号（「1,552」比「1552」宽一截）；v1.9.1 起四位改用与纵轴
+     同套的 2.8k / 1.2万 —— 380px 宽里「2754 2322 2438」会连成一串，看着像一个大数。 */
   function shortYuan(v) {
     var n = Math.round(Number(v) || 0);
     if (!n) return '';
-    var a = Math.abs(n);
-    if (a >= 10000) return (n / 10000).toFixed(a >= 100000 ? 0 : 1) + '万';
+    if (Math.abs(n) >= 1000) return fmtAxis(n);
     return String(n);
   }
 
@@ -3034,15 +3048,31 @@
       var label = ({ year: '年统计', month: '月统计', week: '周统计', day: '日统计' })[state.scale] || '统计';
       var expOn = expSum > 0 || !incSum;
       var incOn = incSum > 0;
-      var body = '<span class="ss-lab">' + label + '</span>';
+      /* 数字整组包一层：子类条收窄后统计框会被拉长，标签贴左、数字贴右，
+         中间那段留白才不会把三个数扯成三列（v1.9.1） */
+      var body = '<span class="ss-lab">' + label + '</span><span class="ss-vals">';
       if (expOn) {
         body += '<b class="ss-num is-exp"><i>支</i>' + fmtBig(expSum) + '</b>';
       }
       if (incOn) {
         body += '<b class="ss-num is-inc"><i>收</i>' + fmtBig(incSum) + '</b>';
       }
+      /* v1.9.1：统计数旁边再给一个平均值 —— 年看月均、月 / 周看日均，日不摊
+         （一天的平均没有意义）。选了具体分类时，摊的就是这个分类。 */
+      var avgN = (state.scale === 'day') ? 0 : periodSpan();
+      var avgTxt = '';
+      if (avgN > 0) {
+        var avgLab = state.scale === 'year' ? '月均' : '日均';
+        var avgUnit = state.scale === 'year' ? ' 个月' : ' 天';
+        var avgVal = (expOn ? expSum : incSum) / avgN;
+        avgTxt = fmtBig(avgVal);
+        body += '<b class="ss-avg" title="' + (expOn ? '支出' : '收入') + avgLab +
+          '（合计摊到 ' + avgN + avgUnit + '）"><i>' + avgLab + '</i>' + avgTxt + '</b>';
+      }
+      body += '</span>';
       sumBox.innerHTML = body;
-      sumBox.setAttribute('aria-label', label + '：支出 ' + fmtBig(expSum) + '，收入 ' + fmtBig(incSum));
+      sumBox.setAttribute('aria-label', label + '：支出 ' + fmtBig(expSum) + '，收入 ' + fmtBig(incSum) +
+        (avgTxt ? '，' + (expOn ? '支出' : '收入') + (state.scale === 'year' ? '月均 ' : '日均 ') + avgTxt : ''));
     }
     /* 「全部」时子类那一行本来是空的：这段空白改成最近 5 笔，
        随手就能看见刚刚记下的账；选了具体分类就让位给子类按钮。 */
@@ -3619,6 +3649,7 @@
       if (key === today) cls += ' is-today';
       if (i >= 5) cls += ' is-weekend';
       html += '<div class="' + cls + '" data-date="' + key + '">' +
+        (key === today ? '<i class="cal-beam cal-beam-strong" aria-hidden="true"></i>' : '') +
         '<div class="wk-head">' +
         '<div class="wk-head-top"><span class="wk-dow">' + WEEKDAYS[i] + '</span>' +
         '<b class="wk-day">' + d.getDate() + '</b></div>' +
@@ -4292,7 +4323,9 @@
           '" data-e="' + e + '" data-i="' + inc +
           '" data-ae="' + ae.toFixed(3) + '" data-ai="' + ai.toFixed(3) + '"' +
           ' style="background:' + pc.bg + ';color:' + pc.ink +
-          '" title="' + esc(tip) + '">' + d.getDate() + '</button>';
+          '" title="' + esc(tip) + '">' +
+          (key === today ? '<i class="cal-beam cal-beam-strong" aria-hidden="true"></i>' : '') +
+          d.getDate() + '</button>';
       }
       var mde = monthDe[m] || 0, mid = monthDi[m] || 0;
       var msum = (mde ? '<i class="c-expense">−' + fmtBig(mde).slice(1) + '</i>' : '') +
@@ -7626,13 +7659,15 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 14,
+    v: 15,
     order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
       'salary', 'reimb'],
     spans: {
-      kpi: [12, 3], calheat: [12, 7], trend: [4, 6], donut: [4, 6], balance: [4, 6],
+      /* v1.9.1：趋势卡 4x6 时表头占 78、小结占 73，画布只剩 136px —— 12 根柱子
+         挤在里面读不出高低。加高到 8 行，画布回到 250 上下。 */
+      kpi: [12, 3], calheat: [12, 7], trend: [4, 8], donut: [4, 6], balance: [4, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
       cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
@@ -7661,7 +7696,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 14 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 15 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -7677,7 +7712,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 14, order: [], spans: {} };
+    var L = { v: 15, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;

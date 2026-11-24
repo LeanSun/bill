@@ -3157,7 +3157,7 @@ html.theme-morph *::before,
 html.theme-morph *::after {
   transition-property: background-color, color, border-color, box-shadow,
                        fill, stroke, outline-color, text-decoration-color !important;
-  transition-duration: .15s !important;
+  transition-duration: .1s !important;
   transition-timing-function: cubic-bezier(.4, 0, .2, 1) !important;
   transition-delay: 0s !important;
 }
@@ -4832,11 +4832,25 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
    「近12月」(4 字含中文) 比四位年份宽，纯 1fr 会把它撑成不等宽，
    而 .seg-ind 按均分宽度定位 —— 那样滑块会错位，正是 v1.0.98 的病根。
    ================================================================== */
-.tr-controls {
-  display: flex; align-items: center; gap: 7px;
-  flex-wrap: wrap; justify-content: flex-end; min-width: 0;
+/* v1.9.1：与支出构成同款表头 —— 两行栅格，标题与年份同行、副标题与范围同行。
+   原来控件整组落在第二行，窄卡里年份条和范围条又会互相挤到换行，表头吃掉 78px。 */
+.chart-card:has(.trend-head) .card-head.trend-head {
+  display: grid;
+  grid-template-columns: minmax(84px, 1fr) minmax(0, max-content);
+  align-items: center;
+  column-gap: 12px; row-gap: 7px;
+  flex-wrap: nowrap; overflow: hidden;
 }
-.tr-controls .seg-sm { min-width: 0; }
+.trend-head > h3 { grid-column: 1; grid-row: 1; margin: 0; white-space: nowrap; }
+.trend-head > .trend-years {
+  grid-column: 2; grid-row: 1; justify-self: end; margin: 0;
+  min-width: 0; max-width: 100%;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
+}
+.trend-head > .trend-years::-webkit-scrollbar { display: none; }
+.trend-head > p { grid-column: 1; grid-row: 2; margin: 0; min-width: 0; line-height: 1.35; }
+.trend-head > #trendScope { grid-column: 2; grid-row: 2; justify-self: end; margin: 0; }
 #trendYear.seg {
   --seg-min: 50px;              /* 10.5px 粗体「近12月」≈33px + padding 16px */
   padding: 3px;
@@ -4860,8 +4874,14 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
   font-size: 12px; white-space: nowrap;
 }
 @media (max-width: 620px) {
-  .tr-controls { flex: 1 1 100%; justify-content: flex-start; gap: 6px; margin-top: 8px; }
-  .tr-controls .seg-sm { min-width: 0; flex: 0 0 auto; }
+  /* 手机：标题与范围条同一行，年份条整条下移、可横向滑 */
+  .trend-head > h3 { grid-column: 1; grid-row: 1; }
+  .trend-head > #trendScope { grid-column: 2; grid-row: 1; }
+  .trend-head > p { display: none; }
+  .trend-head > .trend-years {
+    grid-column: 1 / -1; grid-row: 2;
+    justify-self: stretch; justify-content: flex-start;
+  }
 }
 
 /* 手机上天页是整页滚动的，底部要留出呼吸位：".main.is-calendar" 的
@@ -4871,14 +4891,9 @@ html[data-theme="dark"] .de-week { background: var(--surface); }
   .main.is-calendar { padding-bottom: calc(26px + env(safe-area-inset-bottom)); }
 }
 
-/* 趋势卡在 12 栅格里只占 4 格（约 380px）：标题 + 两枚分段控件挤在一行，
-   结果标题折两行、控件也折两行。标题独占一行，控件整组落到第二行并排。 */
-.chart-card:has(.tr-controls) .card-head { flex-wrap: wrap; align-items: flex-start; gap: 5px; }
-.chart-card:has(.tr-controls) .card-head > div:first-child { flex: 1 1 100%; min-width: 0; }
-.chart-card:has(.tr-controls) .tr-controls { flex: 1 1 100%; justify-content: flex-start; }
 /* 年份条 / 范围条的字号与按钮 padding 已各自按支出构成滑块写死在上面；
    这里只统一条高，不再用 .seg-sm button 通用规则回头盖掉字号。 */
-.tr-controls .seg-sm { height: 30px; }
+.trend-head .seg-sm { height: 30px; }
 
 /* ==================================================================
    v1.0.97 · 启动过场
@@ -5248,4 +5263,96 @@ html[data-theme="dark"] .cal-beam {
   .wk-col:nth-child(2n) { border-right: 0; }
   .cal-weekhead { display: none; }
   #calWeekGrid { touch-action: pan-y; }
+}
+
+/* ==================================================================
+   v1.9.1
+   ------------------------------------------------------------------
+   1. 筛选栏右侧统计旁补一个平均值（月均 / 日均）；
+   2. 子类那一条收窄：七颗按钮原来各占约 200px，一眼扫过去像七个空槽；
+   3. 年历 / 周历的「今天」也挂上同一圈流光。
+   ================================================================== */
+
+/* ---- 1. 平均值 chip：比统计数轻一档，用虚线隔开，读作「顺带的参考」 ---- */
+.sub-sum .ss-vals {
+  display: inline-flex; align-items: baseline; gap: 10px;
+  min-width: 0; white-space: nowrap;
+}
+.sub-sum .ss-avg {
+  display: inline-flex; align-items: baseline; gap: 3px;
+  padding-left: 10px;
+  border-left: 1px dashed color-mix(in srgb, var(--border) 88%, var(--text));
+  font-size: 12.5px; font-weight: 700; color: var(--text-2);
+  letter-spacing: -.01em; white-space: nowrap;
+}
+.sub-sum .ss-avg i {
+  font-style: normal; font-size: 10px; font-weight: 650;
+  color: var(--muted); margin-right: 1px;
+}
+
+/* ---- 2. 子类条收窄：按内容定宽、每颗最多 112px ----------------------
+   原来七颗把整行等分，1920 宽时一颗近 230px，两字加个角标空得像七个槽。
+   收窄后右边会空一截 —— 那块交给统计框接管（只在子类条出现时生效），
+   统计框拉长、内容两端对齐，整行仍是一块实心面板，不是两个孤岛夹一个洞。 */
+.fx-sub-slot .sub-seg {
+  flex: 0 1 auto;
+  grid-template-columns: repeat(var(--seg-n), minmax(0, 112px));
+  justify-content: start;
+}
+.fx-sub-slot:has(.sub-seg:not([hidden])) .sub-sum {
+  flex: 1 1 auto;
+  margin-left: 0;
+  min-width: 168px;
+  justify-content: space-between;
+}
+@media (max-width: 760px) {
+  /* 手机上七颗仍要挤在一行：回到等分，左右不留空。
+     另外这一行会换行（统计框掉到第二行），而 .sub-seg 的 height:100%
+     会把整行高度吃满、把统计框顶到筛选面板之外（被下面的日历盖住）——
+     这里给条定高，两块各占一行。 */
+  .fx-sub-slot { align-self: start; }
+  .fx-sub-slot .sub-seg {
+    flex: 1 1 100%; height: 46px;
+    grid-template-columns: repeat(var(--seg-n), minmax(0, 1fr));
+  }
+  .fx-sub-slot:has(.sub-seg:not([hidden])) .sub-sum { flex: 1 1 100%; min-width: 0; }
+}
+
+/* ---- 3. 年历 / 周历的今日流光（月历 .cal-cell 上那圈，直接复用 .cal-beam） ----
+   月格的底是近白的，22% 那一档琥珀还压得住；年格只有 25px 宽，周列更是
+   167×722 且整列本身已铺了 16% 琥珀，同一圈色标叠上去几乎看不见。
+   这两处换成高对比版：底色档抬到 58%、白色火花加宽，绕一圈都读得出边界。 */
+.ym-day > .cal-beam, .wk-col > .cal-beam { z-index: 3; }
+.ym-day > .cal-beam { padding: 1.6px; }
+.wk-col > .cal-beam { padding: 2.2px; }
+.cal-beam.cal-beam-strong {
+  background: conic-gradient(from var(--beam-a, 0deg),
+    color-mix(in srgb, var(--today-ink) 58%, transparent) 0deg,
+    color-mix(in srgb, var(--today-ink) 76%, transparent) 34deg,
+    #ffffff 58deg,
+    var(--today-ink) 84deg,
+    color-mix(in srgb, var(--today-ink) 58%, transparent) 132deg,
+    color-mix(in srgb, var(--today-ink) 58%, transparent) 190deg,
+    color-mix(in srgb, var(--today-ink) 76%, transparent) 224deg,
+    #ffffff 248deg,
+    var(--today-ink) 274deg,
+    color-mix(in srgb, var(--today-ink) 58%, transparent) 322deg,
+    color-mix(in srgb, var(--today-ink) 58%, transparent) 360deg) !important;
+}
+html[data-theme="dark"] .cal-beam.cal-beam-strong {
+  background: conic-gradient(from var(--beam-a, 0deg),
+    color-mix(in srgb, var(--today-ink) 64%, transparent) 0deg,
+    color-mix(in srgb, var(--today-ink) 84%, transparent) 34deg,
+    #ffffff 58deg,
+    var(--today-ink) 84deg,
+    color-mix(in srgb, var(--today-ink) 64%, transparent) 132deg,
+    color-mix(in srgb, var(--today-ink) 64%, transparent) 190deg,
+    color-mix(in srgb, var(--today-ink) 84%, transparent) 224deg,
+    #ffffff 248deg,
+    var(--today-ink) 274deg,
+    color-mix(in srgb, var(--today-ink) 64%, transparent) 322deg,
+    color-mix(in srgb, var(--today-ink) 64%, transparent) 360deg) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ym-day > .cal-beam, .wk-col > .cal-beam { animation: none; }
 }
