@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.9.3';
+  var ASSET_V = '1.9.4';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2113,7 +2113,8 @@
     }
     var heavies = box.querySelectorAll('.ym.is-heavy');
     for (var j = 0; j < heavies.length; j++) {
-      heavies[j].style.setProperty('--heavy-ink', catHue);
+      var ink = heavies[j].dataset.heavyKind === 'income' ? p.income : catHue;
+      heavies[j].style.setProperty('--heavy-ink', ink);
     }
   }
 
@@ -4293,9 +4294,13 @@
     /* 重月：支出比「有支出月份的均值」高出 15% 以上才标。
        少于 3 个月有数据时样本太薄，一律不标 —— 一年只记了两个月，
        怎么算都有一半是重月，那这个标记就没有信息量了。 */
-    /* v1.9.3：基准跟着筛选方向走 —— 筛「收入」时支出账是空的，
-       继续拿 monthDe 算会一个重月都标不出来。 */
-    var heavyMonths = catKey === '收入' ? monthDi : monthDe;
+    /* v1.9.4：收支筛选为「收」而分类是「全部」时，账本里只有收入记录。
+       原来只看 catKey，支出账空着 → 一个重月都标不出来，红底填不上。
+       三个入口都算：分类=收入、收支=收入、或干脆只有收入账有数据。 */
+    var incomeTint = catKey === '收入' || state.filters.type === 'income' ||
+      (!Object.keys(monthDe).length && Object.keys(monthDi).length > 0);
+    var heavyHue = incomeTint ? p.income : catHue;
+    var heavyMonths = incomeTint ? monthDi : monthDe;
     var mList = [], mSum = 0;
     for (var mi = 1; mi <= 12; mi++) {
       if (heavyMonths[mi] > 0) { mList.push(heavyMonths[mi]); mSum += heavyMonths[mi]; }
@@ -4341,10 +4346,11 @@
       /* v1.9.3：重月色跟随筛选分类（格子底色早就是 catHue，标记却写死绿，
          筛「交通」时一整片绿底压在蓝格子上面，两套颜色语言打架）。
          「全部」时 catHue 就是 p.expense，视觉与从前完全一致。 */
-      var heavyStyle = hv ? ' style="--heavy-ink:' + catHue + '"' : '';
+      var heavyStyle = hv ? ' style="--heavy-ink:' + heavyHue +
+        '" data-heavy-kind="' + (incomeTint ? 'income' : 'cat') + '"' : '';
       html += '<article class="ym' + (hv ? ' is-heavy' : '') + '"' + heavyStyle + '>' +
         '<button type="button" class="ym-head" data-month="' + m + '"' +
-        (hv ? ' title="' + m + ' 月' + (catKey === '收入' ? '收入' : '支出') +
+        (hv ? ' title="' + m + ' 月' + (incomeTint ? '收入' : '支出') +
           '比全年月均高 ' + Math.round((hv - 1) * 100) + '%"' : '') + '><b>' + m + '月</b>' +
         '<span class="ym-msum">' + (msum || '<i>—</i>') + '</span></button>' +
         '<div class="ym-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
