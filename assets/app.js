@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.9.5';
+  var ASSET_V = '1.9.6';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -349,7 +349,7 @@
       catDaily: adapt(v('--cat-daily', '#490033')),
       catTravel: adapt(v('--cat-travel', '#264465')),
       catWear: adapt(v('--cat-wear', '#8b5cf6')),
-      catFun: adapt(v('--cat-fun', '#0000e4')),
+      catFun: adapt(v('--cat-fun', '#29f5e7')),
       text: v('--text', '#1a2433'),
       text2: v('--text-2', '#4b586c'),
       muted: v('--muted', '#8b97a9'),
@@ -390,7 +390,7 @@
     { key: '日常', name: '日常', css: '--cat-daily', def: '#490033' },
     { key: '交通', name: '交通', css: '--cat-travel', def: '#264465' },
     { key: '服饰', name: '服饰', css: '--cat-wear', def: '#8b5cf6' },
-    { key: '娱乐', name: '娱乐', css: '--cat-fun', def: '#0000e4' },
+    { key: '娱乐', name: '娱乐', css: '--cat-fun', def: '#29f5e7' },
     { key: '收入', name: '收入', css: '--income', def: '#e04a4a' }
   ];
   function toHex(c) {
