@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.9.6';
+  var ASSET_V = '1.9.7';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2085,14 +2085,39 @@
   /* 年历格子的底色是「分类色 × 透明度」拼出来的 rgba，写在内联 style 上，
      CSS 变量换肤管不到 —— 深色主题下这些格子会留着浅色底（空白日最扎眼，
      一整片白块浮在深色卡片上）。配色算法抽出来，首次渲染和换肤重绘共用。 */
+  /* v1.9.7：字色看「格子实际混出来的底色」，不再只看透明度。
+     旧逻辑 alpha > .42 就上白字，对深色分类成立；娱乐换成亮青 #29f5e7 后
+     实底白字对比度只有 1.37:1，日期数字几乎看不见。这里按 WCAG 相对亮度
+     在白字 / 同色系深墨之间挑对比度更高的那个，深浅主题、双色格都适用。 */
+  function relLuminance(c) {
+    var r = parseColor(c) || [0, 0, 0];
+    var a = r.map(function (v) { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); });
+    return .2126 * a[0] + .7152 * a[1] + .0722 * a[2];
+  }
+  function contrastOn(a, b) {
+    var x = relLuminance(a), y = relLuminance(b);
+    return (Math.max(x, y) + .05) / (Math.min(x, y) + .05);
+  }
+  function yearInkOn(bg1, bg2) {
+    var bgs = bg2 ? [bg1, bg2] : [bg1];
+    var options = ['#ffffff', mixColor(bg1, '#12242b', .82)];
+    var best = options[0], bestScore = -1;
+    options.forEach(function (ink) {
+      var score = 0;
+      bgs.forEach(function (bg) { score += Math.min(6, contrastOn(bg, ink)); });
+      if (score > bestScore) { bestScore = score; best = ink; }
+    });
+    return best;
+  }
   function yearCellPaint(p, catHue, e, inc, ae, ai) {
+    var bgE = mixColor(p.surface, catHue, ae);
+    var bgI = mixColor(p.surface, p.income, ai);
     if (e && inc) {
       return { bg: 'linear-gradient(155deg,' + withAlpha(catHue, ae) + ' 0 47%,' +
-        withAlpha(p.income, ai) + ' 53% 100%)',
-        ink: Math.max(ae, ai) > .42 ? '#ffffff' : p.text2 };
+        withAlpha(p.income, ai) + ' 53% 100%)', ink: yearInkOn(bgE, bgI) };
     }
-    if (e) return { bg: withAlpha(catHue, ae), ink: ae > .42 ? '#ffffff' : catInk(p, catHue) };
-    if (inc) return { bg: withAlpha(p.income, ai), ink: ai > .42 ? '#ffffff' : catInk(p, p.income) };
+    if (e) return { bg: withAlpha(catHue, ae), ink: yearInkOn(bgE) };
+    if (inc) return { bg: withAlpha(p.income, ai), ink: yearInkOn(bgI) };
     return { bg: mixColor(p.surface3, p.surface, .45), ink: p.muted };
   }
   /* 换肤后就地重刷年历格子的内联色：DOM 不重建，滚动位置和点选状态都不丢 */

@@ -4229,7 +4229,18 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
    谁也不知道整格淡色是什么意思；换成两字标签，不用悬停也能读懂。
    v1.9.3：色源交给 JS 写的 --heavy-ink（跟随筛选分类），「全部」才落回 --expense 绿。 */
 .ym.is-heavy { background: color-mix(in srgb, var(--heavy-ink, var(--expense)) 9%, var(--surface)); }
-.ym.is-heavy .ym-head b { color: var(--heavy-ink, var(--expense)); }
+/* v1.9.7：月头文字压在 9% 淡染底上，直接用原色（尤其亮青）会糊掉。
+   浅色改同色系深墨；深色底本身就暗，原色反而清楚。 */
+.ym.is-heavy .ym-head b,
+.ym.is-heavy .ym-head b::after,
+.ym.is-heavy .ym-msum i.c-expense {
+  color: color-mix(in srgb, var(--heavy-ink, var(--expense)) 38%, #12242b);
+}
+html[data-theme="dark"] .ym.is-heavy .ym-head b,
+html[data-theme="dark"] .ym.is-heavy .ym-head b::after,
+html[data-theme="dark"] .ym.is-heavy .ym-msum i.c-expense {
+  color: var(--heavy-ink, var(--expense));
+}
 .ym.is-heavy .ym-head b::after {
   content: '偏高';
   display: inline-block; margin-left: 4px;
@@ -4237,10 +4248,8 @@ html[data-theme="dark"] .day-list.is-today .dl-cat {
   letter-spacing: 0; white-space: nowrap;
   padding: 2px 4px; border-radius: 4px;
   vertical-align: 1px;
-  color: var(--heavy-ink, var(--expense));
   background: color-mix(in srgb, var(--heavy-ink, var(--expense)) 15%, var(--surface));
 }
-.ym.is-heavy .ym-msum i.c-expense { color: var(--heavy-ink, var(--expense)); }
 
 /* #18 气泡统一：原先是一块深色底、白字、11.5px 的小黑条，
    和图表里的 tooltip（surface 底 + 1px 边框 + 12px 字）完全是两套语言。
