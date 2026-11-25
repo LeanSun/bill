@@ -88,7 +88,7 @@
   --cat-daily: #7f77dd;
   --cat-travel: #378add;
   --cat-wear: #d4537e;
-  --cat-fun: #29f5e7;
+  --cat-fun: #00bdb0;
   --neon: 74, 108, 247;
   /* 今日格子的呼吸强度：深色底吃色，同一组百分比在暗色下会淡掉，故分主题给值 */
   --breath-lo: 6%;
@@ -147,7 +147,7 @@ html[data-theme="dark"] {
   --cat-daily: #afa9ec;
   --cat-travel: #85b7eb;
   --cat-wear: #ed93b1;
-  --cat-fun: #29f5e7;
+  --cat-fun: #00bdb0;
   --breath-lo: 13%;
   --breath-hi: 27%;
   --breath-ring-lo: .38;
