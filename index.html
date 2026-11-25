@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#f5f7fa" data-page-node-id="YNZhYru6j3RsrXDah5InT4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%234a6cf7'/%3E%3Crect x='8' y='21' width='6' height='12' rx='2.5' fill='white' opacity='.55'/%3E%3Crect x='17' y='13' width='6' height='20' rx='2.5' fill='white' opacity='.8'/%3E%3Crect x='26' y='7' width='6' height='26' rx='2.5' fill='white'/%3E%3C/svg%3E" data-page-node-id="ljD9H3EvTZuStNxnHHhOfD">
 <title>轻账 · 收支看板</title>
-<link rel="stylesheet" href="assets/ui-select.css?v=1.11.3">
-<link rel="stylesheet" href="assets/styles.css?v=1.11.3" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
+<link rel="stylesheet" href="assets/ui-select.css?v=1.11.4">
+<link rel="stylesheet" href="assets/styles.css?v=1.11.4" data-page-node-id="PDhu2Eq2DJOfjhIdpPBdYj">
 </head>
 <body class="is-booting" data-page-node-id="tMyPJ5SSZhJcCq6bXrfJH7">
 <script>setTimeout(function(){document.body.classList.remove("is-booting")},3000)</script>
@@ -351,11 +351,11 @@
                 </div>
               </div>
               <div class="pay-fields">
-                <label><span>缴费基数</span><input type="number" id="payBase" step="0.01" min="0" autocomplete="off"></label>
-                <label><span>基本工资</span><input type="number" id="payWage" step="0.01" min="0" autocomplete="off"></label>
-                <label><span>交通津贴</span><input type="number" id="paySubsidy" step="0.01" min="0" autocomplete="off"></label>
-                <label><span>个人所得税</span><input type="number" id="payTax" step="0.01" min="0" autocomplete="off"></label>
-                <label><span>工会会费</span><input type="number" id="payUnion" step="0.01" min="0" autocomplete="off"></label>
+                <label><span>缴费基数</span><input type="number" id="payBase" step="0.01" min="0" max="10000000" placeholder="例如 8476.51" autocomplete="off"></label>
+                <label><span>基本工资</span><input type="number" id="payWage" step="0.01" min="0" max="10000000" placeholder="例如 6400" autocomplete="off"></label>
+                <label><span>交通津贴</span><input type="number" id="paySubsidy" step="0.01" min="0" max="10000000" placeholder="例如 550" autocomplete="off"></label>
+                <label><span>个人所得税</span><input type="number" id="payTax" step="0.01" min="0" max="10000000" placeholder="例如 8.91" autocomplete="off"></label>
+                <label><span>工会会费</span><input type="number" id="payUnion" step="0.01" min="0" max="10000000" placeholder="例如 32" autocomplete="off"></label>
               </div>
               <table class="pay-table">
                 <thead><tr><th>项目</th><th>比例<i>个人 / 单位</i></th><th>个人</th><th>单位</th><th>合计</th></tr></thead>
@@ -363,6 +363,7 @@
               </table>
               <div class="pay-fund" id="payFund"></div>
               <p class="pay-note" id="payNote"></p>
+              <p class="pay-check" id="payCheck" hidden aria-live="polite"></p>
             </div>
           </article>
 
@@ -496,6 +497,7 @@
           <div class="cal-grid" id="calGrid" data-page-node-id="UhdGixFv2e6aF16Pl9y1Ln"></div>
           <div class="cal-week" id="calWeekGrid" hidden data-page-node-id="MsDCbu0oLY9DY8nUXHBFag"></div>
           <div class="cal-day" id="calDayBoard" hidden data-page-node-id="d9hsWVRg3nH80if83nTzX4"></div>
+          <div class="ym-sum-bar" id="ymSumBar" hidden role="group" aria-label="年历月小计口径"><span>月小计</span><div class="seg seg-sm" id="ymSumSeg" style="--seg-n:3"><span class="seg-ind" aria-hidden="true"></span><button type="button" data-yms="expense" class="is-active">支出</button><button type="button" data-yms="income">收入</button><button type="button" data-yms="balance">结余</button></div></div>
           <div class="cal-year" id="calYearBoard" hidden data-page-node-id="208nHEEMWsYKxbDqXHY3ON"></div>
         </div>
       </section>
@@ -705,6 +707,7 @@
   </div>
 </div>
 
+<div class="amount-peek" id="amountPeek" hidden aria-live="polite"></div>
 <div class="hover-tip" id="hoverTip" hidden data-page-node-id="EHiQ9FUqob4KNwXd57JLKc"></div>
 
 <!-- 长按日期格子的快捷菜单：记一笔 / 看明细 / 复制该日到今天 -->
@@ -755,7 +758,7 @@
     <svg viewBox="0 0 24 24" fill="none"><path d="M20 11a8 8 0 1 0-2.3 6.6M20 5v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </span>
   <span class="ub-text">
-    <b>有新版本可用<i class="ub-ver" id="ubVer">v1.11.3</i></b>
+    <b>有新版本可用<i class="ub-ver" id="ubVer">v1.11.4</i></b>
     <em>刷新即用，账目和设置都不会丢</em>
   </span>
   <button type="button" class="ub-btn" id="updateNow">立即刷新</button>
@@ -764,13 +767,13 @@
   </button>
 </div>
 
-<script src="assets/echarts.min.js?v=1.11.3" defer></script>
-<script src="assets/vault.js?v=1.11.3"></script>
-<script src="assets/boot.js?v=1.11.3"></script>
-<script src="assets/ui-select.js?v=1.11.3"></script>
-<script src="assets/app.js?v=1.11.3"></script>
+<script src="assets/echarts.min.js?v=1.11.4" defer></script>
+<script src="assets/vault.js?v=1.11.4"></script>
+<script src="assets/boot.js?v=1.11.4"></script>
+<script src="assets/ui-select.js?v=1.11.4"></script>
+<script src="assets/app.js?v=1.11.4"></script>
 <script>window.addEventListener("load",function(){try{UISelect.init()}catch(e){}});</script>
-<script src="assets/sync.js?v=1.11.3"></script>
+<script src="assets/sync.js?v=1.11.4"></script>
 <script>
 /* 离线加速：静态资源走本地缓存，页面本身始终取最新（详见 sw.js 顶部说明）。
    localhost 也算安全上下文，本地调试同样注册，省得两套行为。

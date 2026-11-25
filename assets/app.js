@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.11.3';
+  var ASSET_V = '1.11.4';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -206,6 +206,7 @@
     /* v1.8.5：对比口径。mom = 环比（上月同期），yoy = 同比（去年同月同期）。
        仅近 12 个月那档有效，年份范围本身就是跟去年同年比。 */
     trendCmp: 'mom',
+    ymSum: 'expense',   /* v1.11.4 #14：年历月小计口径 */
     calendarYear: Y_LAST,
     filters: { q: '', type: 'all', category: 'all', sub: 'all', weekday: 'all', amount: 'all' },
     editingId: null,
@@ -224,6 +225,7 @@
   };
 
   var charts = {};
+  var trendPeekRows = [];   /* v1.11.4 #16：柱底缩写，长按读精确值 */
   /* 状态每次落盘后的回调，云同步层（assets/sync.js）靠它知道"本地改了" */
   var STORE_HOOKS = [];
   /* 数据版本：任何一次落盘 +1。「关于这一天」用它判断内容是否真变了，
@@ -1562,6 +1564,7 @@
   function renderTrend(p) {
     fillTrendYears();
     var rows = trendRows(scopeRecords());
+    trendPeekRows = rows;
     var labels = rows.map(function (r) { return r.label; });
     var isYear = String(state.trendRange) !== '12m';
     /* v1.8.5：同比时把去年同月的数据也算一份，挂在提示气泡里对照 */
@@ -4394,8 +4397,17 @@
           d.getDate() + '</button>';
       }
       var mde = monthDe[m] || 0, mid = monthDi[m] || 0;
-      var msum = (mde ? '<i class="c-expense">−' + fmtBig(mde).slice(1) + '</i>' : '') +
-        (mid ? '<i class="c-income">+' + fmtBig(mid).slice(1) + '</i>' : '');
+      /* v1.11.4 #14：月小计按口径切成支 / 收 / 结余，默认仍是支出 */
+      var msum = '';
+      if (state.ymSum === 'income') {
+        if (mid) msum = '<i class="c-income">+' + fmtBig(mid).slice(1) + '</i>';
+      } else if (state.ymSum === 'balance') {
+        var bal = round(mid - mde);
+        if (bal) msum = '<i class="' + (bal > 0 ? 'c-income' : 'c-expense') + '">' +
+          (bal > 0 ? '+' : '−') + fmtBig(Math.abs(bal)).slice(1) + '</i>';
+      } else {
+        if (mde) msum = '<i class="c-expense">−' + fmtBig(mde).slice(1) + '</i>';
+      }
       var hv = heavyOf(m);
       /* v1.9.3：重月色跟随筛选分类（格子底色早就是 catHue，标记却写死绿，
          筛「交通」时一整片绿底压在蓝格子上面，两套颜色语言打架）。
@@ -4479,6 +4491,8 @@
 
   function renderBoard() {
     var y = state.calMonth.year, m = state.calMonth.month;
+    var ysb = $('ymSumBar');
+    if (ysb) ysb.hidden = state.scale !== 'year';
     var scopeAll = rangeRecords();
     var board = boardRecords();
     var p = palette();
@@ -5959,9 +5973,11 @@
   function exportCsv() {
     var rows = boardRecords();
     if (!rows.length) { toast('当前范围内没有可导出的记录', 'warn'); return; }
-    var lines = ['日期,分类,子类,项目备注,类型,金额'];
+    var lines = ['日期,分类,子类,子类来源,项目备注,类型,金额'];
     rows.forEach(function (r) {
-      lines.push([csvCell(r.date), csvCell(r.category), csvCell(r.sub), csvCell(r.note), r.type === 'income' ? '收入' : '支出', r.amount.toFixed(2)].join(','));
+      /* 子类一列本来就在；这一列补上它是手选还是关键词自动认的，导出后能分清脏数据 */
+      var subFrom = r.subExplicit ? '手选' : (r.sub ? '自动' : '—');
+      lines.push([csvCell(r.date), csvCell(r.category), csvCell(r.sub), csvCell(subFrom), csvCell(r.note), r.type === 'income' ? '收入' : '支出', r.amount.toFixed(2)].join(','));
     });
     var b = rangeBounds();
     var tag = state.scale === 'day' ? dateKey(b.from)
@@ -6349,6 +6365,23 @@
     if ($('payUnion')) $('payUnion').value = pay.unionFee;
   }
   /* 只刷数字格，不重建 DOM —— 边打字边算，焦点不会被抢走 */
+  /* v1.11.4 #13：缴费基数 / 工资 / 扣款三处数字互相校验。
+     社保按上年度月均核定，本来就常高于当月应发，所以只拦「离谱」的差距，
+     一般性的高低差仍由 #payNote 解释，不重复打扰。 */
+  function checkPayConsistency(base, gross, ip, tax, unionFee, net) {
+    var el = $('payCheck');
+    if (!el) return;
+    var msgs = [];
+    if (base > 0 && gross > 0) {
+      if (base > gross * 1.8) msgs.push('缴费基数比当月应发高 80% 以上，核对是否用了上年度口径');
+      else if (base < gross * 0.5) msgs.push('缴费基数不到当月应发一半，核对是否漏填');
+    }
+    if (gross > 0 && ip + tax + unionFee > gross * 0.6) msgs.push('个人扣款超过应发 60%，核对比例或金额');
+    if (net < 0) msgs.push('到手为负，检查工资与扣款');
+    el.hidden = !msgs.length;
+    el.innerHTML = msgs.length ? '<b>需要核对</b>' + msgs.join('；') : '';
+  }
+
   function renderPayNumbers() {
     var base = payVal('payBase', pay.base);
     var ip = 0, ic = 0, fundIp = 0, fundIc = 0, rateP = 0, rateC = 0;
@@ -6416,6 +6449,7 @@
           '<em>单位 ' + fmtYuan(fundIc) + ' + 个人 ' + fmtYuan(fundIp) + ' · 一年 ' + fmtYuan(fund * 12) + '</em>'
         : '';
     }
+    checkPayConsistency(base, gross, ip, tax, unionFee, net);
     if ($('payNote')) {
       $('payNote').textContent = base > gross + 0.01
         ? '缴费基数 ' + fmtYuan(base) + ' 按上年度月平均工资性收入核定，高于当月应发 ' + fmtYuan(gross) +
@@ -6496,6 +6530,48 @@
     renderReimb();
     toast('已记一笔报销 ' + fmtYuan(amt), 'success');
   }
+  /* v1.11.4 #16：柱底数字是缩写，鼠标悬浮的 tooltip 已有精确值，
+     但手机上没有 hover —— 长按柱子直接把这一月的三个精确数弹出来。 */
+  function hideAmountPeek() {
+    var tip = $('amountPeek');
+    if (tip) tip.hidden = true;
+  }
+  function bindTrendPeek() {
+    var el = $('chartTrend');
+    if (!el) return;
+    var timer = 0, sx = 0, sy = 0;
+    el.addEventListener('pointerdown', function (e) {
+      sx = e.clientX; sy = e.clientY;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var inst = window.echarts && echarts.getInstanceByDom(el);
+        var tip = $('amountPeek');
+        if (!inst || !tip || !trendPeekRows.length) return;
+        var r = el.getBoundingClientRect();
+        var conv = inst.convertFromPixel({ xAxisIndex: 0 }, [sx - r.left, sy - r.top]);
+        var idx = Math.round(Number(Array.isArray(conv) ? conv[0] : conv));
+        if (!isFinite(idx)) idx = Math.round((sx - r.left) / Math.max(1, r.width) * (trendPeekRows.length - 1));
+        idx = Math.max(0, Math.min(trendPeekRows.length - 1, idx));
+        var row = trendPeekRows[idx];
+        if (!row) return;
+        tip.innerHTML = '<b>' + row.year + ' 年 ' + row.month + ' 月</b>' +
+          '<span>支出 ' + fmtYuan(row.expense) + '</span>' +
+          '<span>收入 ' + fmtYuan(row.income) + '</span>' +
+          '<span>结余 ' + fmtYuan(row.balance) + '</span>';
+        tip.style.left = Math.min(window.innerWidth - 176, Math.max(10, sx)) + 'px';
+        tip.style.top = Math.max(10, sy - 14) + 'px';
+        tip.hidden = false;
+      }, 420);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+      el.addEventListener(ev, function () { clearTimeout(timer); hideAmountPeek(); });
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (Math.abs(e.clientX - sx) > 12 || Math.abs(e.clientY - sy) > 12) { clearTimeout(timer); hideAmountPeek(); }
+    });
+    document.addEventListener('scroll', hideAmountPeek, true);
+  }
+
   function initPay() {
     loadPay();
     renderPay();
@@ -6506,6 +6582,14 @@
     if (wrap) wrap.addEventListener('input', function (e) {
       var t = e.target;
       if (!t) return;
+      /* v1.11.4 #11：数字框填负数 / 超大值时只标红并拦住保存，不把脏数字写进工资条 */
+      if (t.type === 'number' && t.value !== '') {
+        var nv = Number(t.value);
+        var bad = !isFinite(nv) || nv < 0 || nv > 10000000;
+        t.classList.toggle('is-invalid', bad);
+        t.title = bad ? '请输入 0 – 10,000,000 之间的数字' : '';
+        if (bad) return;
+      }
       if (t.dataset && t.dataset.i !== undefined) {
         var i = Number(t.dataset.i), k = t.dataset.k;
         if (pay.rows[i]) pay.rows[i][k] = Number(t.value) || 0;
@@ -6961,6 +7045,8 @@
     if ($('searchInput')) $('searchInput').addEventListener('input', debounce(function (e) {
       state.filters.q = e.target.value; renderBoard();
     }, 180));
+    bindSeg($('ymSumSeg'), 'data-yms', function (v) { state.ymSum = v; renderBoard(); });
+    bindTrendPeek();
     bindSeg($('typeSeg'), 'data-type', function (v) {
       state.filters.type = v;
       if (v === 'income' && state.filters.category !== 'all' && state.filters.category !== '收入') {
