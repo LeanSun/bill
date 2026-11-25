@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.10.0';
+  var ASSET_V = '1.11.0';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -2744,8 +2744,6 @@
   function renderCharts(view, mode) {
     if (view === 'overview') {
       try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
-      try { renderHealth(); } catch (e) { warnChart(renderHealth, e); }
-      try { renderEngel(); } catch (e) { warnChart(renderEngel, e); }
     }
     if (!hasEcharts) return;
     var prevMode = RENDER_MODE;
@@ -2756,7 +2754,7 @@
          逐张隔离：某一张画失败（例如 echarts 少打包了某个组件）不该
          把后面几张一起带走 —— v1.0.70 裁 echarts 时漏了 calendar 组件，
          renderCalendar 一抛错，renderStack / renderTop 整片跟着消失。 */
-      var jobs = [renderTrend, renderDonut, renderBalance, renderWeight, renderCalendar, renderStack, renderTop, renderWaterfall];
+      var jobs = [renderTrend, renderDonut, renderBalance, renderWeight, renderCalendar, renderStack, renderTop];
       for (var i = 0; i < jobs.length; i++) {
         try { jobs[i](p); } catch (e) { warnChart(jobs[i], e); }
       }
@@ -3013,130 +3011,6 @@
     sparkline($('sparkIncome'), rows.map(function (r) { return r.income; }), p.income, 100, 26, { ax: ax, delay: 0 });
     sparkline($('sparkExpense'), rows.map(function (r) { return r.expense; }), p.expense, 100, 26, { ax: ax, delay: 90 });
     sparkline($('sparkBalance'), rows.map(function (r) { return r.balance; }), p.primary, 100, 26, { ax: ax, delay: 180 });
-  }
-
-  /* ---------------- v1.10.0：数据健康度 / 恩格尔 / 资金瀑布 ---------------- */
-  function healthUniq(list) {
-    var seen = Object.create(null), out = [];
-    list.forEach(function (r) { if (!seen[r.id]) { seen[r.id] = 1; out.push(r); } });
-    return out;
-  }
-  function renderHealth() {
-    var box = $('healthBody');
-    if (!box) return;
-    var recs = scopeRecords();
-    var amap = anomalyMap(allRecords());
-    var seen = Object.create(null);
-    var noCat = [], noNote = [], dup = [], severe = [];
-    recs.forEach(function (r) {
-      if (!r.category) noCat.push(r);
-      if (!r.note) noNote.push(r);
-      var k = r.date + '|' + r.amount + '|' + String(r.note || '');
-      if (seen[k]) { dup.push(seen[k], r); } else seen[k] = r;
-      if (anomalyLevel(r, amap) >= 2) severe.push(r);
-    });
-    var groups = [
-      { key: 'noCat', label: '缺分类', list: healthUniq(noCat), hint: '点开逐笔补上分类' },
-      { key: 'noNote', label: '缺备注', list: healthUniq(noNote), hint: '点开逐笔补上备注' },
-      { key: 'dup', label: '疑似重复', list: healthUniq(dup), hint: '同日同额同名，核对后可删' },
-      { key: 'severe', label: '异常大额', list: healthUniq(severe), hint: '远高于该类平时水平' }
-    ];
-    var total = groups.reduce(function (n, g) { return n + g.list.length; }, 0);
-    box.innerHTML = '<div class="health-grid">' + groups.map(function (g) {
-      return '<button type="button" class="health-cell' + (g.list.length ? ' has' : '') +
-        '" data-hk="' + g.key + '" aria-expanded="false" title="' + g.hint + '">' +
-        '<b>' + g.list.length + '</b><i>' + g.label + '</i></button>';
-    }).join('') + '</div><p class="health-note">' +
-      (total ? '共 ' + total + ' 处待核对 · 点数字看明细' : '账本很干净，没有待核对项') + '</p>' +
-      '<div class="health-list" hidden></div>';
-  }
-  function toggleHealthList(el) {
-    var box = $('healthBody');
-    if (!box) return;
-    var list = box.querySelector('.health-list');
-    if (!list) return;
-    if (el.getAttribute('aria-expanded') === 'true') {
-      el.setAttribute('aria-expanded', 'false');
-      list.hidden = true;
-      return;
-    }
-    var key = el.dataset.hk;
-    var recs = scopeRecords();
-    var amap = anomalyMap(allRecords());
-    var seen = Object.create(null), picked = [];
-    recs.forEach(function (r) {
-      var k = r.date + '|' + r.amount + '|' + String(r.note || '');
-      var hit = false;
-      if (key === 'noCat') hit = !r.category;
-      else if (key === 'noNote') hit = !r.note;
-      else if (key === 'dup') { hit = !!seen[k]; seen[k] = r; }
-      else if (key === 'severe') hit = anomalyLevel(r, amap) >= 2;
-      if (hit) picked.push(r);
-    });
-    list.innerHTML = picked.slice(0, 12).map(function (r) {
-      var c = catColor(palette(), r.category);
-      return '<button type="button" class="hl-row" data-day="' + esc(r.date) + '">' +
-        '<i style="--c:' + c + '"></i><span>' + esc(r.date.slice(5)) + ' ' +
-        esc(r.note || r.category || '未命名') + '</span><b>' + fmtBig(r.amount) + '</b></button>';
-    }).join('') || '<p class="hl-empty">这一类没有问题</p>';
-    list.hidden = false;
-    el.setAttribute('aria-expanded', 'true');
-  }
-
-  function renderEngel() {
-    var box = $('engelBody');
-    if (!box) return;
-    var rows = monthlyAgg(scopeRecords());
-    var t = totalsOf(scopeRecords());
-    var food = 0;
-    scopeRecords().forEach(function (r) {
-      if (r.type !== 'income' && r.category === '餐饮') food += r.amount;
-    });
-    var pct = t.expense > 0 ? food / t.expense * 100 : 0;
-    var label = pct < 30 ? '偏低 · 吃得省' : pct < 50 ? '适中' : '偏高 · 吃占比重';
-    var vals = rows.slice(-6).map(function (r) {
-      var f = r.byCat && r.byCat['餐饮'] ? r.byCat['餐饮'] : 0;
-      return r.expense > 0 ? Math.round(f / r.expense * 1000) / 10 : 0;
-    });
-    box.innerHTML = '<div class="engel-hero"><b>' + pct.toFixed(1) + '%</b><span>' + label +
-      '</span></div><div class="engel-sub">餐饮 ' + fmtBig(food) + ' / 总支出 ' + fmtBig(t.expense) +
-      '</div><svg class="engel-spark" id="engelSpark" viewBox="0 0 140 34" preserveAspectRatio="none" aria-hidden="true"></svg>' +
-      '<p class="engel-cap">近 ' + vals.length + ' 个月 · 越低越有余力</p>';
-    sparkline($('engelSpark'), vals, palette().primary, 140, 34, { animate: true });
-  }
-
-  function renderWaterfall(p) {
-    var el = $('chartWaterfall');
-    if (!el || !hasEcharts) return;
-    var y = state.year === 'all' ? new Date().getFullYear() : Number(state.year) || new Date().getFullYear();
-    var recs = allRecords().filter(function (r) { return r.year === y; });
-    var prev = allRecords().filter(function (r) { return r.year === y - 1; });
-    var t = totalsOf(recs), pt = totalsOf(prev);
-    var open = pt.balance, close = open + t.balance;
-    var sub = $('waterfallSub');
-    if (sub) sub.textContent = y + ' 年 · 期初 ' + fmtBig(open) + ' → 期末 ' + fmtBig(close);
-    /* 瀑布：透明底座 + 实色段。收入向上、支出从峰值向下落到期末。 */
-    var base = [Math.min(0, open), open, close, Math.min(0, close)];
-    var val = [Math.abs(open), t.income, t.expense, Math.abs(close)];
-    var names = ['期初', '收入', '支出', '期末'];
-    var colors = [p.primary, p.income, p.expense, p.primary2];
-    var o = baseOption(p);
-    o.grid = { left: 56, right: 18, top: 26, bottom: 30 };
-    o.tooltip = tooltipCommon(p, {
-      formatter: function (a) {
-        var i = a.dataIndex;
-        return names[i] + ' ' + fmtBig(val[i]) +
-          (i === 1 ? '（收入合计）' : i === 2 ? '（支出合计）' : '');
-      }
-    });
-    o.xAxis = catAxis(p, names, {});
-    o.yAxis = valAxis(p);
-    o.series = [
-      { name: '底', type: 'bar', stack: 'wf', silent: true, itemStyle: { color: 'transparent' }, data: base },
-      { name: '额', type: 'bar', stack: 'wf', barWidth: 34,
-        data: val.map(function (v, i) { return { value: v, itemStyle: { color: colors[i], borderRadius: [5, 5, 0, 0] } }; }) }
-    ];
-    setOpt('chartWaterfall', o);
   }
 
   function setText(id, v) {
@@ -6843,12 +6717,6 @@
     document.addEventListener('visibilitychange', function () {
       document.documentElement.classList.toggle('page-hidden', !!document.hidden);
     });
-    if ($('healthBody')) $('healthBody').addEventListener('click', function (e) {
-      var c = e.target.closest ? e.target.closest('.health-cell') : null;
-      if (c) { toggleHealthList(c); return; }
-      var r = e.target.closest ? e.target.closest('.hl-row') : null;
-      if (r && r.dataset.day) jumpToDay(r.dataset.day);
-    });
     if ($('fCategory')) $('fCategory').addEventListener('change', function () {
       modalCatManual = true;
       paintSelect($('fCategory'));
@@ -7906,8 +7774,8 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 16,
-    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'waterfall', 'health', 'engel', 'weight', 'stack', 'top',
+    v: 17,
+    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
       'salary', 'reimb'],
@@ -7915,7 +7783,6 @@
       /* v1.9.1：趋势卡 4x6 时表头占 78、小结占 73，画布只剩 136px —— 12 根柱子
          挤在里面读不出高低。加高到 8 行，画布回到 250 上下。 */
       kpi: [12, 3], calheat: [12, 7], trend: [4, 8], donut: [4, 6], balance: [4, 6],
-      waterfall: [6, 6], health: [3, 6], engel: [3, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
       cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
@@ -7928,7 +7795,7 @@
   var OV_CHART_IDS = {
     chartTrend: 'trend', chartDonut: 'donut', chartBalance: 'balance',
     chartCalendar: 'calheat', chartStack: 'stack',
-    chartTop: 'top', chartWaterfall: 'waterfall', chartWeight: 'weight'
+    chartTop: 'top', chartWeight: 'weight'
   };
   function ovIdOf(el) {
     if (el.getAttribute && el.getAttribute('data-oid')) return el.getAttribute('data-oid');
@@ -7944,7 +7811,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 16 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 17 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -7960,7 +7827,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 16, order: [], spans: {} };
+    var L = { v: 17, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;
