@@ -1149,6 +1149,23 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(3, 7, 14, .62); }
 }
 .entry-grid > .field { margin-bottom: 0; min-width: 0; }
 .ef-note { grid-area: note; }
+/* v1.10.0 #4：常用备注候选——贴着输入框下方一行小 chip，48px 起点的触控高度 */
+.note-sugs {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+}
+.note-sugs[hidden] { display: none; }
+.note-sug {
+  height: 30px; padding: 0 11px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-2); font-family: var(--font); font-size: 12px; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
+  transition: border-color .18s, color .18s, background-color .18s;
+}
+.note-sug:hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+  color: var(--primary); background: var(--primary-soft);
+}
+.note-sug:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .ef-date { grid-area: date; }
 .ef-cat { grid-area: cat; }
 .ef-sub { grid-area: sub; }
@@ -5365,4 +5382,61 @@ html[data-theme="dark"] .cal-beam.cal-beam-strong {
 }
 @media (prefers-reduced-motion: reduce) {
   .ym-day > .cal-beam, .wk-col > .cal-beam { animation: none; }
+}
+
+/* ==================================================================
+   v1.10.0 · 数据健康度 / 恩格尔 / 资金瀑布
+   ================================================================== */
+.health-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
+.health-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.health-cell {
+  display: flex; align-items: baseline; gap: 8px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  font-family: var(--font); color: var(--text); cursor: pointer;
+  transition: border-color .18s, background-color .18s;
+}
+.health-cell:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+.health-cell:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.health-cell b { font-size: 19px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--muted); }
+.health-cell.has b { color: var(--danger); }
+.health-cell i { font-style: normal; font-size: 11px; color: var(--text-2); }
+.health-note { margin: 0; font-size: 10.5px; color: var(--muted); }
+.health-list { display: flex; flex-direction: column; gap: 3px; max-height: 168px; overflow-y: auto; }
+.health-list[hidden] { display: none; }
+.hl-row {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 5px 6px; border: 0; border-radius: 7px; background: transparent;
+  font-family: var(--font); font-size: 11px; color: var(--text-2); text-align: left; cursor: pointer;
+}
+.hl-row:hover { background: var(--surface-2); color: var(--text); }
+.hl-row i { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--c, var(--primary)); }
+.hl-row span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hl-row b { font-variant-numeric: tabular-nums; font-size: 11px; }
+.hl-empty { margin: 4px; font-size: 11px; color: var(--muted); }
+
+.engel-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.engel-hero { display: flex; align-items: baseline; gap: 9px; }
+.engel-hero b { font-size: 32px; font-weight: 760; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+.engel-hero span { font-size: 11px; font-weight: 650; color: var(--primary); }
+.engel-sub { margin-top: 6px; font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.engel-spark { width: 100%; height: 34px; margin-top: auto; overflow: visible; }
+.engel-spark path.line { fill: none; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+.engel-spark path.area { opacity: .13; }
+.engel-cap { margin: 4px 0 0; font-size: 10px; color: var(--muted); }
+
+/* v1.10.0 #18：后台标签页冻住今日呼吸 / 流光，只停动画不改颜色 */
+html.page-hidden .cal-cell.is-today,
+html.page-hidden .wk-col.is-today,
+html.page-hidden .ym-day.is-today,
+html.page-hidden .cal-beam,
+html.page-hidden .is-today::before {
+  animation-play-state: paused !important;
+}
+
+/* v1.10.0 #17：横屏刘海 / Home 条——把左右安全区也吃进来 */
+@media (max-width: 760px) {
+  .sidebar { padding-left: calc(12px + env(safe-area-inset-left)); padding-right: calc(12px + env(safe-area-inset-right)); }
+  .main { padding-left: calc(18px + env(safe-area-inset-left)); padding-right: calc(18px + env(safe-area-inset-right)); }
+  .side-tools { right: calc(12px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .nav-more-sheet { left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); }
 }
