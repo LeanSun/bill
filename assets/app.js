@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.11.6';
+  var ASSET_V = '1.11.7';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -8241,24 +8241,44 @@
     }
     /* v1.11.6 #10：双击卡片进入聚焦（占满视口），再双击 / Esc / 点遮罩退出。
        编辑模式下的手柄有自己的 pointerdown，这里用 dblclick + ovEditing 守卫避开。 */
-    var focusBack = document.createElement('div');
-    focusBack.className = 'ov-focus-back';
-    focusBack.id = 'ovFocusBack';
-    focusBack.hidden = true;
-    document.body.appendChild(focusBack);
-    function closeFocus() {
-      var cur = ovGrid && ovGrid.querySelector('.ov-panel.is-focused');
-      if (cur) cur.classList.remove('is-focused');
+    /* renderAll 会重建网格并再走一次这里：遮罩只建一个，否则多个同 id 叠着 */
+    var focusBack = document.getElementById('ovFocusBack');
+    if (!focusBack) {
+      focusBack = document.createElement('div');
+      focusBack.className = 'ov-focus-back';
+      focusBack.id = 'ovFocusBack';
       focusBack.hidden = true;
+      document.body.appendChild(focusBack);
+    }
+    function closeFocus() {
+      /* 不能只查 ovGrid：renderAll() 会重建网格并再绑一次事件，
+         旧闭包里的 ovGrid 已脱离文档，Esc 就会「清了状态却没退出」。 */
+      var cur = document.querySelector('.ov-panel.is-focused');
+      if (cur) {
+        cur.classList.remove('is-focused');
+        var ex = cur.querySelector('.ov-focus-exit');
+        if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+      }
+      var back = document.getElementById('ovFocusBack');
+      if (back) back.hidden = true;
       document.body.classList.remove('ov-focus-on');
       requestAnimationFrame(resizeAll);
     }
     window.__ovCloseFocus = closeFocus;
-    focusBack.addEventListener('click', closeFocus);
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && document.body.classList.contains('ov-focus-on')) { e.preventDefault(); closeFocus(); }
-    });
-    if (ovGrid) ovGrid.addEventListener('dblclick', function (e) {
+    if (!focusBack.__qzBound) { focusBack.__qzBound = true; focusBack.addEventListener('click', closeFocus); }
+    if (!window.__ovEscBound) {
+      window.__ovEscBound = true;
+      /* 捕获阶段 + 直接看 DOM：前面那套 Esc 处理器会先 closeModal('esc')，
+         若它改了全局状态，冒泡到这里的判断就永远不成立。 */
+      window.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' && e.key !== 'Esc' && e.keyCode !== 27) return;
+        if (!document.querySelector('.ov-panel.is-focused')) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeFocus();
+      }, true);
+    }
+    if (ovGrid && !ovGrid.__qzFocusBound) { ovGrid.__qzFocusBound = true; ovGrid.addEventListener('dblclick', function (e) {
       if (!e.target || typeof e.target.closest !== 'function') return;
       var panel = e.target.closest('.ov-panel');
       if (!panel || ovEditing) return;
@@ -8267,10 +8287,18 @@
       var cur = ovGrid.querySelector('.ov-panel.is-focused');
       if (cur) cur.classList.remove('is-focused');
       panel.classList.add('is-focused');
+      /* 键盘之外再给一个显式出口，避免任何场景下退不出来 */
+      var exit = document.createElement('button');
+      exit.type = 'button';
+      exit.className = 'ov-focus-exit';
+      exit.setAttribute('aria-label', '退出聚焦');
+      exit.textContent = '退出 ×';
+      exit.addEventListener('click', function (ev) { ev.stopPropagation(); closeFocus(); });
+      panel.appendChild(exit);
       focusBack.hidden = false;
       document.body.classList.add('ov-focus-on');
       requestAnimationFrame(function () { requestAnimationFrame(resizeAll); });
-    });
+    }); }
     ovGrid.addEventListener('pointerdown', onDown);
   }
 
