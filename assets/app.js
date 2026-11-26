@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.11.5';
+  var ASSET_V = '1.11.6';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -607,6 +607,8 @@
   var vaultTimer = 0;
   function saveStore() {
     if (LOCKED) return;
+    /* 先判环境再写：断网 / 未连仓库 / 有冲突，都要让用户当场看见 */
+    if (typeof checkSaveEnvironment === 'function') checkSaveEnvironment();
     storeRev++;
     for (var i = 0; i < STORE_HOOKS.length; i++) {
       try { STORE_HOOKS[i](); } catch (e) { /* 通知失败不能拖垮记账 */ }
@@ -1559,6 +1561,38 @@
     if (!n) return '';
     if (Math.abs(n) >= 1000) return fmtAxis(n);
     return String(n);
+  }
+
+  /* v1.11.6 #3：年度最贵的一天 / 最贵的一笔 —— 两个极值榜单，
+     纯 DOM 卡，不占 ECharts 实例；数据跟着顶部年份筛选走。 */
+  function renderPriciest() {
+    var box = $('priciestBody');
+    if (!box) return;
+    var y = state.year === 'all' ? new Date().getFullYear() : Number(state.year) || new Date().getFullYear();
+    var recs = allRecords().filter(function (r) { return r.year === y && r.type !== 'income'; });
+    var byDay = {};
+    var top = null;
+    recs.forEach(function (r) {
+      byDay[r.date] = round((byDay[r.date] || 0) + r.amount);
+      if (!top || r.amount > top.amount) top = r;
+    });
+    var days = Object.keys(byDay).map(function (k) { return { date: k, amount: byDay[k] }; })
+      .sort(function (a, b) { return b.amount - a.amount; }).slice(0, 3);
+    var sub = $('priciestSub');
+    if (sub) sub.textContent = y + ' 年 · 花了 ' + fmtBig(recs.reduce(function (n, r) { return n + r.amount; }, 0));
+    function row(main, label, amount, day) {
+      return '<button type="button" class="pr-row" data-day="' + esc(day || '') + '">' +
+        '<span class="pr-dot"></span><span class="pr-main">' + esc(main) + '</span>' +
+        '<b>' + fmtBig(amount) + '</b><i>' + esc(label) + '</i></button>';
+    }
+    box.innerHTML =
+      '<div class="pr-group"><h4>最贵的一天</h4>' +
+      (days.length ? days.map(function (d) {
+        return row(d.date.slice(5).replace('-', ' 月 ') + ' 日', d.date, d.amount, d.date);
+      }).join('') : '<p class="pr-empty">这一年还没有支出记录</p>') + '</div>' +
+      '<div class="pr-group"><h4>最贵的一笔</h4>' +
+      (top ? row(top.note || top.category || '未命名', top.date, top.amount, top.date)
+        : '<p class="pr-empty">这一年还没有支出记录</p>') + '</div>';
   }
 
   function renderTrend(p) {
@@ -2747,6 +2781,7 @@
   function renderCharts(view, mode) {
     if (view === 'overview') {
       try { renderCubeOverview(); } catch (e) { warnChart(renderCubeOverview, e); }
+      try { renderPriciest(); } catch (e) { warnChart(renderPriciest, e); }
     }
     if (!hasEcharts) return;
     var prevMode = RENDER_MODE;
@@ -3750,10 +3785,11 @@
   /* 天页「关于这一天」：单列竖向五张卡，全部内联 SVG / CSS，带 hover 与点击跳日。
      近 7 日支出 / 今天花得多吗 / 还剩多少 / 当日分类构成 / 体重记录。 */
   function dayInsightsHTML(p, key, items, de) {
-    var byDate = {};
+    var byDate = {}, netDate = {};
     allRecords().forEach(function (r) {
-      if (r.type === 'income') return;
-      byDate[r.date] = (byDate[r.date] || 0) + r.amount;
+      if (r.type === 'income') netDate[r.date] = (netDate[r.date] || 0) + r.amount;
+      else { byDate[r.date] = (byDate[r.date] || 0) + r.amount;
+        netDate[r.date] = (netDate[r.date] || 0) - r.amount; }
     });
     var d0 = new Date(key + 'T00:00:00');
     function at(off) {
@@ -3789,6 +3825,31 @@
         '<span>' + (isToday ? '今天' : WD[h.d.getDay()]) + '</span></button>';
     }).join('');
     var line7 = '<div class="ins-wds">' + bars7 + '</div>';
+    /* #2 近 7 日结余：逐日净收支累加成一条线，看的是「这一周钱在往哪走」。
+       柱子只能看单日花多少，连续几天小亏也看不出来；折线的斜率就是存钱速度。 */
+    var bal7 = [], run = 0;
+    for (var q = 6; q >= 0; q--) {
+      var bk = at(q).k;
+      run = round(run + (netDate[bk] || 0));
+      bal7.push({ k: bk, v: run });
+    }
+    var balMin = Math.min.apply(null, bal7.map(function (b) { return b.v; }).concat([0]));
+    var balMax = Math.max.apply(null, bal7.map(function (b) { return b.v; }).concat([1]));
+    var balRange = (balMax - balMin) || 1;
+    var balPts = bal7.map(function (b, i) {
+      return [2 + i / 6 * 116, 30 - 2 - ((b.v - balMin) / balRange) * 26];
+    });
+    var balLine = balPts.map(function (pt, i) {
+      return (i ? 'L' : 'M') + pt[0].toFixed(1) + ',' + pt[1].toFixed(1);
+    }).join(' ');
+    var zeroY = (30 - 2 - ((0 - balMin) / balRange) * 26).toFixed(1);
+    var balCard = '<svg class="ins-balsvg" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">' +
+      '<line class="bal-zero" x1="0" y1="' + zeroY + '" x2="120" y2="' + zeroY + '"/>' +
+      '<path class="bal-line" d="' + balLine + '"/>' +
+      balPts.map(function (pt, i) {
+        return '<circle cx="' + pt[0].toFixed(1) + '" cy="' + pt[1].toFixed(1) + '" r="1.5" class="' +
+          (i === 6 ? 'is-now' : '') + '"/>';
+      }).join('') + '</svg>';
 
     /* 3) 本月累计 / 今年收支：本月剩余拿近 6 个完整月的月均当参照，
        今年结余直接是当年收入减支出 —— 两个口径都写在卡片脚注里 */
@@ -3976,7 +4037,9 @@
         '<span class="ins-key' + (mNow < 0 ? ' is-over' : '') + '">' + fmtYuan(mNow) + '</span>') +
       card('当日分类构成', catCard, 3, '',
         '<span class="ins-key">' + fmtYuan(catTotal) + '</span>') +
-      card('体重记录', weightCard, 4, 'is-weight', weightKey);
+      card('体重记录', weightCard, 4, 'is-weight', weightKey) +
+      card('近 7 日结余', balCard, 5, 'is-balance',
+        '<span class="ins-key' + (run < 0 ? ' is-over' : '') + '">' + fmtYuan(run) + '</span>');
   }
 
   /* 左栏内容随当天分类数变化：先按紧凑排版，仍超高就整体等比缩小，
@@ -7045,6 +7108,13 @@
     if ($('searchInput')) $('searchInput').addEventListener('input', debounce(function (e) {
       state.filters.q = e.target.value; renderBoard();
     }, 180));
+    if ($('saveAlert')) $('saveAlert').addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('#saveAlertClose')) hideSaveAlert();
+    });
+    if ($('priciestBody')) $('priciestBody').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.pr-row[data-day]') : null;
+      if (b && b.dataset.day) jumpToDay(b.dataset.day);
+    });
     bindSeg($('ymSumSeg'), 'data-yms', function (v) { state.ymSum = v; renderBoard(); });
     bindTrendPeek();
     bindSeg($('typeSeg'), 'data-type', function (v) {
@@ -7860,8 +7930,8 @@
      让所有旧记录自动作废）。消费日历提到第二位，下面三张图并排，
      社保 / 报销各占半宽 —— 分享给别人打开就是这一张。 */
   var DEFAULT_LAYOUT = {
-    v: 17,
-    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'weight', 'stack', 'top',
+    v: 18,
+    order: ['kpi', 'calheat', 'trend', 'donut', 'balance', 'priciest', 'weight', 'stack', 'top',
       'cubestats', 'cubeyear', 'cubetype',
       'cubebrand', 'cubeprice', 'compyear', 'compprov', 'compprice',
       'salary', 'reimb'],
@@ -7869,6 +7939,7 @@
       /* v1.9.1：趋势卡 4x6 时表头占 78、小结占 73，画布只剩 136px —— 12 根柱子
          挤在里面读不出高低。加高到 8 行，画布回到 250 上下。 */
       kpi: [12, 3], calheat: [12, 7], trend: [4, 8], donut: [4, 6], balance: [4, 6],
+      priciest: [4, 6],
       weight: [5, 5], stack: [4, 5], top: [3, 5],
       cubestats: [12, 3],
       cubeyear: [6, 5], cubetype: [6, 5],
@@ -7897,7 +7968,7 @@
     return '板块';
   }
   function validLayout(L) {
-    return !!(L && L.v === 17 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
+    return !!(L && L.v === 18 && Array.isArray(L.order) && L.spans && typeof L.spans === 'object');
   }
   function readLayout() {
     try { var o = JSON.parse(localStorage.getItem(LAYOUT_KEY)); if (validLayout(o)) return o; } catch (e) { /* noop */ }
@@ -7913,7 +7984,7 @@
     el.style.gridRow = 'span ' + h;
   }
   function collectLayout() {
-    var L = { v: 17, order: [], spans: {} };
+    var L = { v: 18, order: [], spans: {} };
     if (!ovGrid) return L;
     Array.prototype.forEach.call(ovGrid.children, function (el) {
       if (!el.classList || !el.classList.contains('ov-panel')) return;
@@ -7988,7 +8059,7 @@
        不插入额外节点，避免打乱 ovGrid.children 的拖拽顺序。 */
     var GROUPS = {
       kpi: 'money', calheat: 'life', trend: 'money', donut: 'money', balance: 'money',
-      weight: 'life', stack: 'money', top: 'money',
+      priciest: 'money', weight: 'life', stack: 'money', top: 'money',
       cubestats: 'cube', cubeyear: 'cube', cubetype: 'cube',
       cubebrand: 'cube', cubeprice: 'cube', compyear: 'cube', compprov: 'cube', compprice: 'cube',
       salary: 'finance', reimb: 'finance'
@@ -8168,6 +8239,38 @@
       act = null;
       requestAnimationFrame(resizeAll);
     }
+    /* v1.11.6 #10：双击卡片进入聚焦（占满视口），再双击 / Esc / 点遮罩退出。
+       编辑模式下的手柄有自己的 pointerdown，这里用 dblclick + ovEditing 守卫避开。 */
+    var focusBack = document.createElement('div');
+    focusBack.className = 'ov-focus-back';
+    focusBack.id = 'ovFocusBack';
+    focusBack.hidden = true;
+    document.body.appendChild(focusBack);
+    function closeFocus() {
+      var cur = ovGrid && ovGrid.querySelector('.ov-panel.is-focused');
+      if (cur) cur.classList.remove('is-focused');
+      focusBack.hidden = true;
+      document.body.classList.remove('ov-focus-on');
+      requestAnimationFrame(resizeAll);
+    }
+    window.__ovCloseFocus = closeFocus;
+    focusBack.addEventListener('click', closeFocus);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && document.body.classList.contains('ov-focus-on')) { e.preventDefault(); closeFocus(); }
+    });
+    if (ovGrid) ovGrid.addEventListener('dblclick', function (e) {
+      if (!e.target || typeof e.target.closest !== 'function') return;
+      var panel = e.target.closest('.ov-panel');
+      if (!panel || ovEditing) return;
+      if (e.target.closest('[data-ov-drag], [data-ov-resize], .ov-name-tag, button')) return;
+      if (panel.classList.contains('is-focused')) { closeFocus(); return; }
+      var cur = ovGrid.querySelector('.ov-panel.is-focused');
+      if (cur) cur.classList.remove('is-focused');
+      panel.classList.add('is-focused');
+      focusBack.hidden = false;
+      document.body.classList.add('ov-focus-on');
+      requestAnimationFrame(function () { requestAnimationFrame(resizeAll); });
+    });
     ovGrid.addEventListener('pointerdown', onDown);
   }
 
@@ -8382,6 +8485,62 @@
     Promise.resolve(ready).then(function (d) { applyDataset(d); startApp(); },
       function () { applyDataset({}); startApp(); });
   }
+  /* v1.11.6：保存类操作的重要提示 —— 离线或没写进仓库时，
+     不能再只在同步面板里改一行小字，用户根本看不见。 */
+  var saveAlertTimer = 0;
+  function showSaveAlert(msg, sub, kind) {
+    var el = $('saveAlert');
+    if (!el) return;
+    el.className = 'save-alert' + (kind ? ' is-' + kind : '');
+    el.innerHTML = '<i class="sa-ico" aria-hidden="true">!</i>' +
+      '<span class="sa-main">' + esc(msg) + '</span>' +
+      '<span class="sa-sub">' + esc(sub || '') + '</span>' +
+      '<button type="button" id="saveAlertClose" aria-label="关闭提示">×</button>';
+    el.hidden = false;
+    clearTimeout(saveAlertTimer);
+    if (kind !== 'offline') saveAlertTimer = setTimeout(hideSaveAlert, 12000);
+  }
+  function hideSaveAlert() {
+    var el = $('saveAlert');
+    if (el) el.hidden = true;
+    clearTimeout(saveAlertTimer);
+  }
+  window.QZSaveAlert = {
+    show: showSaveAlert, hide: hideSaveAlert,
+    fail: function (msg) { showSaveAlert('数据没存进仓库', msg || '本次改动只在本地，请稍后重试同步。', 'fail'); },
+    ok: function () {
+      var el = $('saveAlert');
+      if (el && !el.hidden && !el.classList.contains('is-offline')) hideSaveAlert();
+    }
+  };
+  function checkSaveEnvironment() {
+    if (navigator.onLine === false) {
+      showSaveAlert('设备当前未联网', '这次改动只写在本机；联网后会自动补传，别急着清浏览器数据。', 'offline');
+      return false;
+    }
+    var st = window.QZSync && window.QZSync.status ? window.QZSync.status() : null;
+    if (!st || !st.cfg || !st.cfg.token) {
+      showSaveAlert('还没有连上云端仓库', '这次改动只写在本机。到「云同步」连一次，避免换设备后丢账。', 'offline');
+      return false;
+    }
+    if (st.conflict) {
+      showSaveAlert('云端和本地有冲突', '两边都改过，先在「云同步」里选一份保留，否则改动可能不会上传。', 'fail');
+      return false;
+    }
+    hideSaveAlert();
+    return true;
+  }
+  window.addEventListener('offline', function () {
+    showSaveAlert('设备已断网', '现在记账只会写在本地，联网后自动补传。', 'offline');
+  });
+  window.addEventListener('online', function () {
+    var el = $('saveAlert');
+    if (el && !el.hidden && el.classList.contains('is-offline')) {
+      hideSaveAlert();
+      toast('已恢复联网，正在补传本地改动', 'info');
+    }
+  });
+
   function startApp() {
     document.body.classList.remove('is-booting');
     var pv = window.QZPrivate && window.QZPrivate.status && window.QZPrivate.status();

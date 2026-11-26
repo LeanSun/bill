@@ -301,6 +301,7 @@
         lastSync = Date.now();
         saveCfg();
         setStatus('已同步 · rev ' + cfg.rev);
+        if (window.QZSaveAlert) window.QZSaveAlert.ok();
         refreshMeta();
         return;
       }
@@ -309,6 +310,8 @@
       }
       if (res.code === 'auth') return expire(res.message);
       setStatus('推送失败：' + (res.message || '未知错误'), 'warn');
+      if (window.QZSaveAlert) window.QZSaveAlert.fail('仓库写入失败：' + (res.message || '未知错误') +
+        '。本地已保存，联网恢复后会自动重试。');
     });
   }
 
@@ -350,6 +353,8 @@
     pendingConflictSha = sha === undefined ? null : sha;
     var rev = cloudState ? cloudState.rev : '?';
     setStatus('发现冲突：云端 rev ' + rev + '，本地基线 rev ' + cfg.rev, 'warn');
+    if (window.QZSaveAlert) window.QZSaveAlert.show('云端和本地有冲突',
+      '两边 rev 不同，先在「云同步」里选一份保留，否则改动不会上传。', 'fail');
     refreshMeta();
   }
 
