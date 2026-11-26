@@ -10,7 +10,7 @@
 
   /* 资源版本：本地静态页每次发布都得换 URL，否则浏览器会拿 max-age=600
      的旧副本 —— 改了样式/脚本却在页面上看不见，多半就是这一层。 */
-  var ASSET_V = '1.11.7';
+  var ASSET_V = '1.11.8';
 
   /* ---------------- 常量 ----------------
      SEED / 年份不再是脚本加载时就算好的常量：私人数据要等门禁脚本
@@ -663,6 +663,51 @@
     SEARCH_CACHE[cacheKey] = text;
     return text;
   }
+  /* 搜索语法：空格分词（AND）、!排除、>100 / >=100 / <50 / <=50 金额比较。
+     每段仍走 searchBlob（中文 / 别名 / 全拼 / 首字母 / 日期），金额按绝对值，
+     与现有的「小额 / 中额 / 大额」档位口径一致。 */
+  function cleanTerm(s) { return String(s || '').toLowerCase().replace(/[\s'’"-]/g, ''); }
+  function parseQuery(raw) {
+    var s = String(raw || '').trim();
+    if (!s) return null;
+    var inc = [], exc = [], amt = [], re = /(>=|<=|>|<|!)?([^\s!<>]+)/g, m;
+    while ((m = re.exec(s))) {
+      var op = m[1] || '', v = m[2];
+      if ((op === '>' || op === '>=' || op === '<' || op === '<=') && /^\d+(?:\.\d+)?$/.test(v)) {
+        amt.push({ op: op, v: Number(v) });
+      } else if (op === '!') {
+        var x = cleanTerm(v); if (x) exc.push(x);
+      } else {
+        var c = cleanTerm(op + v); if (c) inc.push(c);
+      }
+    }
+    return (inc.length || exc.length || amt.length) ? { inc: inc, exc: exc, amt: amt } : null;
+  }
+  var PARSED_QUERY = { raw: null, val: null };
+  function parsedQuery() {
+    var raw = String((state.filters && state.filters.q) || '');
+    if (PARSED_QUERY.raw !== raw) {
+      PARSED_QUERY.raw = raw;
+      PARSED_QUERY.val = parseQuery(raw);
+    }
+    return PARSED_QUERY.val;
+  }
+  function matchQuery(r, q) {
+    var blob = searchBlob(r).replace(/[\s'’"-]/g, ''), i, t;
+    for (i = 0; i < q.inc.length; i++) if (blob.indexOf(q.inc[i]) === -1) return false;
+    for (i = 0; i < q.exc.length; i++) if (blob.indexOf(q.exc[i]) !== -1) return false;
+    if (q.amt.length) {
+      var a = Math.abs(Number(r.amount) || 0);
+      for (i = 0; i < q.amt.length; i++) {
+        t = q.amt[i];
+        if (t.op === '>' && !(a > t.v)) return false;
+        if (t.op === '>=' && !(a >= t.v)) return false;
+        if (t.op === '<' && !(a < t.v)) return false;
+        if (t.op === '<=' && !(a <= t.v)) return false;
+      }
+    }
+    return true;
+  }
   /* 口语 → 标准词。NOTE_ALIAS 是双向可用的：
      归一账目名目用它，反向识别也用它 —— 写"午饭"先被翻成"午餐"再匹配，
      于是"三餐"这一类的同义词不用在 SUBCATS 里重复维护一遍 */
@@ -1053,7 +1098,7 @@
      子类按钮上的笔数和右侧金额 chip 都要按这一层算，口径才和棋盘一致。 */
   function matchCore(r) {
     var f = state.filters;
-    var q = f.q.trim().toLowerCase().replace(/[\s'’"-]/g, '');
+    var pq = parsedQuery();
     var wd = f.weekday;
     if (f.type !== 'all' && r.type !== f.type) return false;
     /* 星期：数字来自图表点击（0=周一），workday / weekend 来自新增的分段控件 */
@@ -1071,7 +1116,7 @@
       if (f.amount === 'mid' && (a <= 20 || a >= 100)) return false;
       if (f.amount === 'large' && a < 100) return false;
     }
-    if (q && searchBlob(r).replace(/[\s'’"-]/g, '').indexOf(q) === -1) return false;
+    if (pq && !matchQuery(r, pq)) return false;
     return true;
   }
   function matchFilters(r) {
