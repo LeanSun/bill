@@ -5421,3 +5421,29 @@ html.page-hidden .is-today::before {
 .amount-peek[hidden] { display:none; }
 .amount-peek b { color:var(--text); font-size:11px; margin-bottom:2px; }
 .amount-peek span { font-variant-numeric:tabular-nums; }
+
+/* ==================================================================
+   v1.11.5 · iOS Safari 聚焦自动缩放
+   Safari 在聚焦 computed font-size < 16px 的输入控件时，会临时放大
+   视口来"帮你看清"，失焦再弹回 —— 手机上表现为点输入框整页忽然变大。
+   最稳的网页侧处理：手机断点里把所有可输入控件抬到 16px。
+   不用 user-scalable=no / maximum-scale=1：那会禁掉用户捏合缩放，
+   违反 WCAG，而且 iOS 10+ 本来就会忽略这个声明。
+   ================================================================== */
+@media (max-width: 760px) {
+  .field input, .field select,
+  #fNote, #fCategory, #fSub,
+  .ct-right .search-field input,
+  .dq-amount input, .dq-row select, .dq-note input[type="text"],
+  .ds-weight input[type="number"], .ds-quick input[type="text"], .ds-quick select,
+  .pay-fields input, .pay-rate input,
+  .ui-sel-trigger .ui-sel-input, .sync-field input,
+  body.modal-cell .field > input, body.modal-cell .field > select,
+  input[type="text"], input[type="number"], input[type="search"],
+  input[type="url"], input[type="password"], input[type="color"],
+  select, textarea {
+    font-size: 16px;
+  }
+  /* ui-select 把 font 写成简写 inherit，同权重 + important 钉死 */
+  .ui-sel-trigger .ui-sel-input { font-size: 16px !important; }
+}
